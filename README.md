@@ -66,3 +66,7 @@ claude plugin test ./<mod>          # the mod's tests
 ```
 
 To add a mod to the marketplace, add an entry to [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) and a row to the table above.
+
+## License
+
+[MIT](LICENSE)

@@ -98,3 +98,7 @@ claude --plugin-dir .
 | `hooks/patch.ts` | Reverses hunks to recover a file's previous content |
 | `hooks/host.ts` | The engine calls the helper modules use |
 | `types/index.d.ts` | The `$.state` contract |
+
+## License
+
+[MIT](../LICENSE)
