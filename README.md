@@ -6,7 +6,7 @@ Mods for [Claude Code](https://claude.com/claude-code): panes, slash commands an
 
 | Mod | What it does | Command |
 | --- | --- | --- |
-| [session-changes](session-changes/) | Treeview pane of the files the current session created, modified or deleted. Pressing a new file opens it in your editor; pressing a changed or deleted one opens its diff. | `/changes` |
+| [session-info](session-info/) | One pane with live plan usage bars (like `/usage`) and a treeview of the files the session created, modified or deleted. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info` |
 
 ## Install
 
@@ -15,7 +15,7 @@ Run these at the Claude Code prompt in a terminal session.
 Install one mod directly from this repository:
 
 ```text
-/plugin install session-changes --marketplace dougcunha/claude-mods
+/plugin install session-info --marketplace dougcunha/claude-mods
 ```
 
 Answer `y` to add the marketplace, then pick a scope (user scope loads the mod in every session).
@@ -24,7 +24,7 @@ Or add the marketplace once and install mods from it by name:
 
 ```text
 /plugin marketplace add dougcunha/claude-mods
-/plugin install session-changes@claude-mods
+/plugin install session-info@claude-mods
 ```
 
 To get new versions later:

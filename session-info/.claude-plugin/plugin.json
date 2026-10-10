@@ -1,15 +1,26 @@
 {
-  "name": "session-changes",
-  "version": "0.2.0",
-  "description": "Treeview pane of the files this session created, modified or deleted; a press opens a new file in your editor and a changed one as a diff.",
+  "name": "session-info",
+  "version": "0.3.0",
+  "description": "Session pane: live plan usage bars and a treeview of the files this session created, modified or deleted, opened in your editor or diff viewer.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
   },
-  "homepage": "https://github.com/dougcunha/claude-mods/tree/main/session-changes",
+  "homepage": "https://github.com/dougcunha/claude-mods/tree/main/session-info",
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
+    "sections": {
+      "type": "string",
+      "title": "Sections",
+      "description": "Which sections the pane shows: all, usage only, or changes only.",
+      "default": "all",
+      "options": [
+        "all",
+        "usage",
+        "changes"
+      ]
+    },
     "viewer": {
       "type": "string",
       "title": "Diff viewer",

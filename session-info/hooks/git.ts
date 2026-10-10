@@ -48,7 +48,7 @@ async function dir(host: Host): Promise<string> {
   if (snapshotDir !== undefined) return snapshotDir
   const env = await host.env()
   const temp = env.temp ?? env.tmpdir ?? '/tmp'
-  snapshotDir = `${norm(temp)}/claude-session-changes/${await host.sessionId()}`
+  snapshotDir = `${norm(temp)}/claude-session-info/${await host.sessionId()}`
 
   return snapshotDir
 }

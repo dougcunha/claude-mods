@@ -60,7 +60,7 @@ function launch(host: Host, argv: string[]): void {
     } catch (error) {
       errors = String(error)
     }
-    if (/fatal|error|not found/i.test(errors)) host.toast(`session-changes: ${errors.trim().slice(0, 300)}`)
+    if (/fatal|error|not found/i.test(errors)) host.toast(`session-info: ${errors.trim().slice(0, 300)}`)
   })()
 }
 

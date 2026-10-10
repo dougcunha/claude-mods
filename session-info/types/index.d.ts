@@ -8,10 +8,13 @@ export type InlineDiff = { path: string; source: string }
 
 declare module 'claude-code' {
   interface PluginState {
-    'session-changes': {
+    'session-info': {
       files: Record<string, FileChange>
+      /** Folded folders by tree key, and folded sections as `#usage` / `#changes`. */
       collapsed: string[]
       inline: InlineDiff | null
+      /** When the usage section last had reason to redraw: a new measurement or the minute tick. */
+      now: number
     }
   }
 }

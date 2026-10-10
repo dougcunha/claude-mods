@@ -1,11 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
 const PANE = {
-  plugin: 'session-changes',
+  plugin: 'session-info',
   component: 'Pane',
-  requestId: 'session-changes',
-  props: { title: 'Session changes', isFocused: true, bodyColumns: 80 },
+  requestId: 'session-info',
+  props: { title: 'Session info', isFocused: true, bodyColumns: 80 },
 } as const
+
+const usage = (rateLimits: { kind: string; percentUsed: number; resetsAt?: string }[]) =>
+  ({ value: { startedAt: 0, context: {}, rateLimits } }) as never
 
 const ran = (stdout = '', exitCode = 0) =>
   ({ exitCode, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false })
@@ -15,6 +18,7 @@ test('tracks created, modified and deleted files and draws them as a tree', asyn
   const gone = new Set(['/repo/src/old.ts'])
   on('session.cwd', async () => ({ value: '/repo' }))
   on('session.id', async () => ({ value: 'sid' }))
+  on('session.usage', async () => usage([]))
   on('env.get', async () => ({ value: undefined }))
   on('fs.write', async (_, e) => (written.set(e.path, e.text), { value: undefined }))
   on('fs.exists', async (_, e) => ({ value: !gone.has(e.path) }))
@@ -58,6 +62,7 @@ test('a file created then deleted in the session leaves the list', async ($, on)
   let exists = true
   on('session.cwd', async () => ({ value: '/repo' }))
   on('session.id', async () => ({ value: 'sid' }))
+  on('session.usage', async () => usage([]))
   on('env.get', async () => ({ value: undefined }))
   on('fs.write', async () => ({ value: undefined }))
   on('fs.exists', async () => ({ value: exists }))
@@ -82,6 +87,7 @@ test('a new file opens in the editor; a deleted one with unknown content opens n
   const gone = new Set<string>()
   on('session.cwd', async () => ({ value: '/repo' }))
   on('session.id', async () => ({ value: 'sid' }))
+  on('session.usage', async () => usage([]))
   on('env.get', async () => ({ value: undefined }))
   on('fs.write', async () => ({ value: undefined }))
   on('fs.exists', async (_, e) => ({ value: !gone.has(e.path.replace(/\\/g, '/').replace(/^[A-Za-z]:/, '')) }))
@@ -110,5 +116,36 @@ test('a new file opens in the editor; a deleted one with unknown content opens n
   await ui.press({ key: 'f:src/lost.ts' })
   expect(spawned.length).toBe(1)
   expect(toasts).toEqual([])
+  await ui.unmount()
+})
+
+test('the usage section draws one labelled bar per rate-limit window and folds', async ($, on) => {
+  const inTwoHours = new Date(Date.now() + 2 * 3_600_000 + 30_000).toISOString()
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('session.usage', async () =>
+    usage([
+      { kind: 'seven_day', percentUsed: 28, resetsAt: inTwoHours },
+      { kind: 'seven_day_fable', percentUsed: 3 },
+      { kind: 'five_hour', percentUsed: 3.4, resetsAt: inTwoHours },
+    ]))
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: 'Current session' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Current week (all models)' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Current week (Fable)' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: ' 28%' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /resets in 2h 1m/ })).toBeDefined()
+
+  await ui.press({ key: 'section:#usage' })
+  expect(await ui.find({ type: 'Text', text: 'Current session' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('with no reading yet the usage section says so', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('session.usage', async () => usage([]))
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /No usage reading yet/ })).toBeDefined()
   await ui.unmount()
 })
