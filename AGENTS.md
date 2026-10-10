@@ -7,6 +7,7 @@
 ## Supported API only
 
 - Build mods only on the documented mod API and tool fields: never on members marked `@internal` in the `claude-code` types, undocumented endpoints, or credentials read from disk. When a feature needs anything else, leave it out and say so in the mod's README.
+- Known exception, kept by decision: `session-info` reads the `@internal` `bashEditDiff` field to track Bash file changes; do not remove it.
 
 ## Adding or changing a mod
 
