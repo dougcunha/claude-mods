@@ -4,7 +4,7 @@ const PANE = {
   plugin: 'session-changes',
   component: 'Pane',
   requestId: 'session-changes',
-  props: { title: 'Alterações da sessão', isFocused: true, bodyColumns: 80 },
+  props: { title: 'Session changes', isFocused: true, bodyColumns: 80 },
 } as const
 
 const ran = (stdout = '', exitCode = 0) =>
@@ -44,7 +44,7 @@ test('tracks created, modified and deleted files and draws them as a tree', asyn
   expect(snapshots.find(([path]) => path.endsWith('/new.ts'))?.[1]).toBe('')
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /3 arquivos/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /3 files/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^new\.ts$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^old\.ts$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^main\.ts$/ })).toBeDefined()
@@ -72,6 +72,6 @@ test('a file created then deleted in the session leaves the list', async ($, on)
   await $.tool.call({ tool: 'PowerShell', command: 'Remove-Item tmp.txt' })
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /Nenhum arquivo/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /No files changed/ })).toBeDefined()
   await ui.unmount()
 })

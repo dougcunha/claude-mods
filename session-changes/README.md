@@ -3,16 +3,14 @@
 A Claude Code mod that lists every file the current session created, modified or deleted in a treeview pane. Pressing a file opens its diff in the diff viewer configured on your machine.
 
 ```text
-3 arquivos                         ✚ 1  ● 1  ✖ 1
+3 files                            ✚ 1  ● 1  ✖ 1
 ├─ ▾ src
 │  ├─ ▾ app
 │  │  └─ ● main.ts  M
 │  ├─ ✚ new.ts  A
 │  └─ ✖ old.ts  D
-[ recolher ]  [ expandir ]  [ limpar ]
+[ collapse ]  [ expand ]  [ clear ]
 ```
-
-The pane's labels are in Portuguese.
 
 ## Install
 
@@ -35,7 +33,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Open the pane | `/changes` |
 | Open a file's diff | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter |
 | Collapse or expand a folder | Press the folder |
-| Collapse all, expand all, clear the list | `c`, `e`, `l`, or the buttons at the bottom |
+| Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom |
 | Return to the prompt | `Esc` |
 
 Status colors follow your theme: green for created (`A`), yellow for modified (`M`), red and struck through for deleted (`D`). Chains of single-child folders collapse into one row, for example `src/app/ui`.

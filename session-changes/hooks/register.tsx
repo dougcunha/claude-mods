@@ -18,7 +18,7 @@ const collapsed = atom({ plugin: 'session-changes', key: 'collapsed' } as const,
 const inline = atom({ plugin: 'session-changes', key: 'inline' } as const, null as InlineDiff | null)
 
 const PANE = 'session-changes'
-const TITLE = 'Alterações da sessão'
+const TITLE = 'Session changes'
 
 const toggle = (list: readonly string[], key: string): string[] =>
   list.includes(key) ? list.filter(one => one !== key) : [...list, key]
@@ -63,7 +63,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'changes',
-      description: 'Mostra os arquivos criados, alterados e excluídos nesta sessão; Enter ou clique abre o diff',
+      description: 'Show the files this session created, modified or deleted; press one to open its diff',
     })
 
     return next(e)
@@ -72,7 +72,7 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'changes' }, async $ => {
     await $.ui.open({ id: PANE, title: TITLE, focus: true })
 
-    return { text: 'Painel de alterações aberto.' }
+    return { text: 'Session changes pane opened.' }
   })
 
   on('tool.call', async ($, e, next) => {
@@ -122,35 +122,35 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" justifyContent="space-between">
-          <Text bold>{`${changes.length} arquivo${changes.length === 1 ? '' : 's'}`}</Text>
+          <Text bold>{`${changes.length} file${changes.length === 1 ? '' : 's'}`}</Text>
           <Text>{summary(changes)}</Text>
         </Box>
-        {rows.length === 0 && <Text dimColor>Nenhum arquivo alterado nesta sessão ainda.</Text>}
+        {rows.length === 0 && <Text dimColor>No files changed in this session yet.</Text>}
         {rows.slice(0, room).map(line)}
-        {rows.length > room && <Text dimColor>{`… mais ${rows.length - room} linhas`}</Text>}
+        {rows.length > room && <Text dimColor>{`… ${rows.length - room} more rows`}</Text>}
         {diff && (
           <Box flexDirection="column" marginTop={1}>
             <Box flexDirection="row" justifyContent="space-between">
               <Text bold>{diff.path}</Text>
               <Button key="close-diff" plain onPress={() => void update($, inline, () => null)}>
-                ✕ fechar diff
+                ✕ close diff
               </Button>
             </Box>
-            {diff.source ? <Code format="diff" path={diff.path} source={diff.source} /> : <Text dimColor>Sem diferenças.</Text>}
+            {diff.source ? <Code format="diff" path={diff.path} source={diff.source} /> : <Text dimColor>No differences.</Text>}
           </Box>
         )}
         <Box flexDirection="row" marginTop={1} gap={2}>
           <Button key="collapse" hotkey="c" onPress={() => void update($, collapsed, () => rows.filter(r => r.isDir).map(r => r.key))}>
-            recolher
+            collapse
           </Button>
           <Button key="expand" hotkey="e" onPress={() => void update($, collapsed, () => [])}>
-            expandir
+            expand
           </Button>
-          <Button key="clear" hotkey="l" onPress={() => void update($, files, () => ({}))}>
-            limpar
+          <Button key="clear" hotkey="x" onPress={() => void update($, files, () => ({}))}>
+            clear
           </Button>
         </Box>
-        <Text dimColor>Clique ou Enter num arquivo abre o diff · numa pasta, recolhe/expande</Text>
+        <Text dimColor>Click or Enter on a file opens its diff · on a folder, collapses or expands it</Text>
       </Box>
     )
   })

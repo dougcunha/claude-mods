@@ -33,7 +33,7 @@ function launch(host: Host, argv: string[]): void {
     } catch (error) {
       errors = String(error)
     }
-    if (/fatal|error|not found|não/i.test(errors)) host.toast(`Diff viewer: ${errors.trim().slice(0, 300)}`)
+    if (/fatal|error|not found/i.test(errors)) host.toast(`Diff viewer: ${errors.trim().slice(0, 300)}`)
   })()
 }
 
@@ -49,7 +49,7 @@ export async function openDiff(host: Host, change: FileChange, viewer: Viewer): 
   const head = change.base === null ? await headText(host, change.path) : undefined
   const left = change.base ?? (head === undefined ? undefined : await snapshot(host, change.path, head))
   if (left === undefined) {
-    host.toast('O conteúdo anterior deste arquivo não é conhecido (fora do git e não capturado).')
+    host.toast('The previous content of this file is unknown (outside git and not captured).')
     return
   }
 
