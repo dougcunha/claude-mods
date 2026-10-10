@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { agentRows, agentSummary } from '../hooks/agents'
+import { crossings } from '../hooks/alerts'
 import { duration, tokens, turnLine } from '../hooks/session'
 
 const PANE = {
@@ -233,4 +234,36 @@ test('agent rows order active agents first and nest children', async () => {
   ])
   expect(rows.map(row => `${row.agent.id}:${row.depth}`)).toEqual(['parent:0', 'child:1', 'done:0'])
   expect(agentSummary([])).toBe('none')
+})
+
+test('alerts fire once per threshold and window, and again after a reset', async () => {
+  const now = Date.parse('2026-10-10T12:00:00Z')
+  const window = { kind: 'five_hour', percentUsed: 82, resetsAt: '2026-10-10T14:00:00Z' }
+  const calm = { percent: 40, tokens: 80_000, window: 200_000 }
+
+  const first = crossings([window], calm, [], now)
+  expect(first.alerts.map(a => a.body)).toEqual(['Current session at 82% · resets in 2h 0m'])
+
+  const again = crossings([window], calm, first.standing, now)
+  expect(again.alerts).toEqual([])
+
+  const higher = crossings([{ ...window, percentUsed: 91 }], calm, first.standing, now)
+  expect(higher.alerts.map(a => a.body)).toEqual(['Current session at 91% · resets in 2h 0m'])
+
+  const jumped = crossings([{ ...window, percentUsed: 95 }], calm, [], now)
+  expect(jumped.alerts.length).toBe(1)
+
+  const reset = crossings([{ ...window, percentUsed: 85, resetsAt: '2026-10-10T19:00:00Z' }], calm, higher.standing, now)
+  expect(reset.alerts.length).toBe(1)
+})
+
+test('the context alert fires at 85% and re-arms after it drops', async () => {
+  const high = { percent: 86, tokens: 172_000, window: 200_000 }
+  const first = crossings([], high, [], 0)
+  expect(first.alerts.map(a => a.body)).toEqual(['Context at 86% (172k / 200k): compaction is near'])
+  expect(crossings([], high, first.standing, 0).alerts).toEqual([])
+
+  const dropped = crossings([], { ...high, percent: 30 }, first.standing, 0)
+  expect(dropped.standing).toEqual([])
+  expect(crossings([], high, dropped.standing, 0).alerts.length).toBe(1)
 })

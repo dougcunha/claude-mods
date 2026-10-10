@@ -21,6 +21,8 @@ declare module 'claude-code' {
       compactions: number
       /** Whether the context breakdown by category is unfolded. */
       breakdown: boolean
+      /** Alert thresholds already notified: `<window>@<resetsAt>:<threshold>` or `context:<threshold>`. */
+      alerted: string[]
     }
   }
 }

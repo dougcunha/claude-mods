@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { FileChange, InlineDiff } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
+import { crossings } from './alerts'
 import type { AgentRow } from './agents'
 import { gitStatus } from './git'
 import type { Host } from './host'
@@ -25,6 +26,7 @@ const now = atom({ plugin: 'session-info', key: 'now' } as const, 0)
 const turns = atom({ plugin: 'session-info', key: 'turns' } as const, NO_TURNS)
 const compactions = atom({ plugin: 'session-info', key: 'compactions' } as const, 0)
 const breakdown = atom({ plugin: 'session-info', key: 'breakdown' } as const, false)
+const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as string[])
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
@@ -70,6 +72,16 @@ async function press($: EngineInterface, row: Row, prefs: Prefs): Promise<void> 
   }
 }
 
+/** Notifies each usage or context threshold the measurement crosses, once; a toast stands in where notifications are off. */
+async function alert($: EngineInterface, limits: readonly Limit[], context: { percent?: number; tokens?: number; window: number }): Promise<void> {
+  const { alerts, standing } = crossings(limits, context, await read($, alerted), Date.now())
+  await update($, alerted, () => standing)
+  for (const { title, body } of alerts) {
+    const sent = await $.ui.notify(body, { title }).catch(() => ({ isSent: false }))
+    if (!sent.isSent) $.ui.toast(`${title}: ${body}`)
+  }
+}
+
 async function openPane($: EngineInterface): Promise<{ text: string }> {
   await $.ui.open({ id: PANE, title: TITLE, focus: true })
 
@@ -88,6 +100,7 @@ export const register: Register = (on, options) => {
     agents: options.showAgents !== false,
     changes: options.showChanges !== false,
   }
+  const isAlerting = options.alerts !== false
   const isLive = shows.session || shows.usage || shows.agents
 
   on('session.start', async ($, e, next) => {
@@ -107,6 +120,7 @@ export const register: Register = (on, options) => {
 
   on('session.measure', async ($, e, next) => {
     if (isLive) await update($, now, () => Date.now())
+    if (isAlerting) await alert($, e.rateLimits, e.context)
 
     return next(e)
   })

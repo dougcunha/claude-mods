@@ -1,6 +1,6 @@
 {
   "name": "session-info",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Session pane: context, cost and turns, live plan usage bars, running agents, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
@@ -32,6 +32,12 @@
       "type": "boolean",
       "title": "Show the Changes section",
       "description": "Treeview of the files the session created, modified or deleted.",
+      "default": true
+    },
+    "alerts": {
+      "type": "boolean",
+      "title": "Usage and context alerts",
+      "description": "Notify once when a usage window reaches 80% and 90%, and when the context window reaches 85%.",
       "default": true
     },
     "viewer": {

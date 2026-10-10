@@ -7,6 +7,8 @@ A Claude Code mod with one pane and four sections:
 - **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
 - **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
+It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed.
+
 ```text
 ▾ Session                          $1.84 · 1h 12m
 ▸ Context              124k / 200k · 1 compaction
@@ -88,6 +90,17 @@ Every agent loop of the session, as Claude Code lists it: subagents the model or
 
 Active agents come first; an agent spawned by another is indented under it. Claude Code drops a finished agent from its list some time after it ends, and the row leaves with it. The section redraws when an agent starts or finishes a turn, and once a minute. Up to 8 rows are shown.
 
+## Alerts
+
+The mod notifies once per threshold through your Claude Code notification channel (`preferredNotifChannel`):
+
+| When | Notification |
+| --- | --- |
+| A usage window reaches 80%, then 90% | `Current session at 82% · resets in 1h 10m` |
+| The context window reaches 85% | `Context at 86% (172k / 200k): compaction is near` |
+
+A usage window alerts again after it resets; the context alert re-arms once the context drops under 85%, for example after a compaction. When notifications are off or the terminal has no channel, the alert shows as a toast instead. Turn alerts off with the `alerts` setting.
+
 ## How usage updates
 
 The bars read the same figures as `/usage` and the status line. Claude Code learns them from each API response, so they move after a reply, not while the session is idle. The pane redraws when a window moves a whole point, and once a minute so the reset countdown stays current.
@@ -121,6 +134,7 @@ Change these in `/config`:
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
 | `session-info.showChanges` | `true`, `false` | `true` |
+| `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
 | `session-info.icons` | `unicode`, `nerd` (needs a [Nerd Font](https://www.nerdfonts.com/)), `emoji` | `unicode` |
@@ -157,6 +171,7 @@ claude --plugin-dir .
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
+| `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |
 | `hooks/git.ts` | `git status`, `HEAD` content and snapshots |
 | `hooks/viewer.ts` | Opens a change: the editor for new files, the diff viewer for the rest |
