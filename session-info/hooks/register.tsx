@@ -8,6 +8,7 @@ import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
 import type { IconSet } from './icons'
 import { SHELLS, track } from './track'
+import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
 import { buildTree, flatten } from './tree'
 import type { Row } from './tree'
 import { bar, colorOf, labelOf, ordered, percentText, resetIn } from './usage'
@@ -19,13 +20,15 @@ const files = atom({ plugin: 'session-info', key: 'files' } as const, {} as Reco
 const collapsed = atom({ plugin: 'session-info', key: 'collapsed' } as const, [] as string[])
 const inline = atom({ plugin: 'session-info', key: 'inline' } as const, null as InlineDiff | null)
 const now = atom({ plugin: 'session-info', key: 'now' } as const, 0)
+const turns = atom({ plugin: 'session-info', key: 'turns' } as const, NO_TURNS)
+const compactions = atom({ plugin: 'session-info', key: 'compactions' } as const, 0)
+const breakdown = atom({ plugin: 'session-info', key: 'breakdown' } as const, false)
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
 const MINUTE = 60_000
 
-type Sections = 'all' | 'usage' | 'changes'
-type SectionKey = '#usage' | '#changes'
+type SectionKey = '#session' | '#usage' | '#changes'
 
 const toggle = (list: readonly string[], key: string): string[] =>
   list.includes(key) ? list.filter(one => one !== key) : [...list, key]
@@ -77,16 +80,20 @@ export const register: Register = (on, options) => {
     editor: (options.editor as Editor | undefined) ?? 'auto',
   }
   const icons = (options.icons as IconSet | undefined) ?? 'unicode'
-  const sections = (options.sections as Sections | undefined) ?? 'all'
-  const shows = { usage: sections !== 'changes', changes: sections !== 'usage' }
+  const shows = {
+    session: options.showSession !== false,
+    usage: options.showUsage !== false,
+    changes: options.showChanges !== false,
+  }
+  const isLive = shows.session || shows.usage
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'session-info',
-      description: 'Show plan usage and the files this session created, modified or deleted',
+      description: 'Show the session, plan usage and the files this session created, modified or deleted',
     })
     await $.command.register({ name: 'changes', description: 'Same as /session-info' })
-    if (shows.usage) $.clock.every(MINUTE, () => void update($, now, () => Date.now()))
+    if (isLive) $.clock.every(MINUTE, () => void update($, now, () => Date.now()))
 
     return next(e)
   })
@@ -96,9 +103,29 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'changes' }, async $ => openPane($))
 
   on('session.measure', async ($, e, next) => {
-    if (shows.usage && e.changed.includes('rateLimits')) await update($, now, () => Date.now())
+    if (isLive) await update($, now, () => Date.now())
 
     return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const answered = await next(e)
+    if (e.agentId === undefined)
+      await update($, turns, stats => ({
+        count: (stats ?? NO_TURNS).count + 1,
+        outputTokens: (stats ?? NO_TURNS).outputTokens + (e.usage?.output_tokens ?? 0),
+        lastMs: e.durationMs,
+      }))
+
+    return answered
+  })
+
+  on('session.compact', async ($, e, next) => {
+    const compacted = await next(e)
+    if (e.agentId === undefined && e.trigger !== 'precompute' && 'messages' in compacted)
+      await update($, compactions, count => (count ?? 0) + 1)
+
+    return compacted
   })
 
   on('tool.call', async ($, e, next) => {
@@ -118,12 +145,20 @@ export const register: Register = (on, options) => {
     const shut = new Set(await read($, collapsed))
     const isOpen = (key: SectionKey): boolean => !shut.has(key)
     await read($, now)
-    const limits: Limit[] = shows.usage ? ordered((await $.session.usage()).rateLimits) : []
+    const isDetailed = shows.session && isOpen('#session') && (await read($, breakdown))
+    const usage = isLive ? await $.session.usage(isDetailed ? { breakdown: 'summary' } : undefined) : undefined
+    const limits: Limit[] = shows.usage && usage ? ordered(usage.rateLimits) : []
+    const stats = shows.session ? await read($, turns) : NO_TURNS
+    const compacted = shows.session ? await read($, compactions) : 0
+    const categories = (usage?.context.breakdown?.categories ?? [])
+      .filter(category => category.tokens > 0 && !category.isDeferred)
+      .sort((a, b) => b.tokens - a.tokens)
     const changes = shows.changes ? Object.values(await read($, files)) : []
     const diff = shows.changes ? await read($, inline) : null
     const rows = flatten(buildTree(await $.session.cwd(), changes), shut)
     const usageRows = shows.usage ? 2 + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
-    const room = Math.max(3, (e.viewport?.rows ?? 30) - usageRows - (diff ? 16 : 7))
+    const sessionRows = shows.session ? 2 + (isOpen('#session') ? 3 + (isDetailed ? categories.length : 0) : 0) : 0
+    const room = Math.max(3, (e.viewport?.rows ?? 30) - usageRows - sessionRows - (diff ? 16 : 7))
 
     const header = (key: SectionKey, title: string, right: string) => (
       <Box flexDirection="row" justifyContent="space-between">
@@ -179,6 +214,44 @@ export const register: Register = (on, options) => {
       )
     }
 
+    const context = usage?.context
+    const spent = usage?.cost === undefined ? '' : `${cost(usage.cost.usd)} · `
+    const elapsed = usage === undefined ? '' : duration(Date.now() - usage.startedAt)
+    const contextBar = bar(context?.percent ?? 0, cols - 6)
+
+    const sessionSection = (
+      <Box flexDirection="column" marginBottom={1}>
+        {header('#session', 'Session', `${spent}${elapsed}`)}
+        {isOpen('#session') && (
+          <Box flexDirection="column">
+            <Box flexDirection="row" justifyContent="space-between">
+              <Button plain key="context" onPress={() => void update($, breakdown, open => !open)}>
+                {`${isDetailed ? '▾' : '▸'} Context`}
+              </Button>
+              <Text dimColor wrap="truncate-end">
+                {context?.tokens === undefined
+                  ? 'after the first reply'
+                  : `${tokens(context.tokens)} / ${tokens(context.window)}${compactionText(compacted)}`}
+              </Text>
+            </Box>
+            <Box flexDirection="row">
+              <Text color={colorOf(context?.percent ?? 0)}>{contextBar.filled}</Text>
+              <Text dimColor>{contextBar.empty}</Text>
+              <Text>{` ${percentText(context?.percent ?? 0)}`}</Text>
+            </Box>
+            {isDetailed &&
+              categories.map(category => (
+                <Box flexDirection="row" justifyContent="space-between">
+                  <Text wrap="truncate-end">{`  ${category.name}`}</Text>
+                  <Text dimColor>{tokens(category.tokens)}</Text>
+                </Box>
+              ))}
+            <Text dimColor wrap="truncate-end">{turnLine(stats ?? NO_TURNS)}</Text>
+          </Box>
+        )}
+      </Box>
+    )
+
     const usageSection = (
       <Box flexDirection="column" marginBottom={1}>
         {header('#usage', 'Usage', '')}
@@ -231,6 +304,7 @@ export const register: Register = (on, options) => {
 
     return (
       <Box flexDirection="column">
+        {shows.session && sessionSection}
         {shows.usage && usageSection}
         {shows.changes && changesSection}
       </Box>

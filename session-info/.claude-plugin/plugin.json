@@ -1,7 +1,7 @@
 {
   "name": "session-info",
-  "version": "0.3.0",
-  "description": "Session pane: live plan usage bars and a treeview of the files this session created, modified or deleted, opened in your editor or diff viewer.",
+  "version": "0.4.0",
+  "description": "Session pane: context, cost and turns, live plan usage bars, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -10,16 +10,23 @@
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
-    "sections": {
-      "type": "string",
-      "title": "Sections",
-      "description": "Which sections the pane shows: all, usage only, or changes only.",
-      "default": "all",
-      "options": [
-        "all",
-        "usage",
-        "changes"
-      ]
+    "showSession": {
+      "type": "boolean",
+      "title": "Show the Session section",
+      "description": "Context window, cost, duration and turn stats.",
+      "default": true
+    },
+    "showUsage": {
+      "type": "boolean",
+      "title": "Show the Usage section",
+      "description": "Plan rate-limit bars, like /usage.",
+      "default": true
+    },
+    "showChanges": {
+      "type": "boolean",
+      "title": "Show the Changes section",
+      "description": "Treeview of the files the session created, modified or deleted.",
+      "default": true
     },
     "viewer": {
       "type": "string",

@@ -1,5 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
+import { duration, tokens, turnLine } from '../hooks/session'
+
 const PANE = {
   plugin: 'session-info',
   component: 'Pane',
@@ -148,4 +150,47 @@ test('with no reading yet the usage section says so', async ($, on) => {
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: /No usage reading yet/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('the session section shows context, cost, duration and the context breakdown', async ($, on) => {
+  const startedAt = Date.now() - 72 * 60_000
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('session.usage', async (_, e) =>
+    ({
+      value: {
+        startedAt,
+        cost: { usd: 1.844 },
+        rateLimits: [],
+        context: {
+          tokens: 124_000,
+          window: 200_000,
+          percent: 62,
+          breakdown: e.breakdown
+            ? { categories: [{ name: 'Messages', tokens: 90_000, isDeferred: false }, { name: 'System tools', tokens: 20_000, isDeferred: false }] }
+            : undefined,
+        },
+      },
+    }) as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: '$1.84 · 1h 12m' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '124k / 200k' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: ' 62%' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'No turns yet' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '  Messages' })).toBeUndefined()
+
+  await ui.press({ key: 'context' })
+  expect(await ui.find({ type: 'Text', text: '  Messages' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '90k' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('turn and size formatting', async () => {
+  expect(tokens(950)).toBe('950')
+  expect(tokens(12_340)).toBe('12k')
+  expect(tokens(1_234)).toBe('1.2k')
+  expect(tokens(1_500_000)).toBe('1.5M')
+  expect(duration(38_000)).toBe('38s')
+  expect(duration(4 * 60_000 + 12_000)).toBe('4m 12s')
+  expect(turnLine({ count: 4, outputTokens: 1_000, lastMs: 38_000 })).toBe('4 turns · ~250 output tok/turn · last 38s')
 })

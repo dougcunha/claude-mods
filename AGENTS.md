@@ -15,4 +15,4 @@
 - Register every new mod in `.claude-plugin/marketplace.json` and add its row to the Mods table in the root `README.md`.
 - Bump `version` in the mod's `plugin.json` on each user-facing change, so `/plugin marketplace update` delivers it.
 - Before committing, run `claude plugin validate .`, `claude plugin validate <mod>` and `claude plugin test <mod>`; all must pass.
-- A mod being developed in a live session loads from `~/.claude/dev-mods/<session>/<mod>/`, not from this repo: copy changed files there to see them in that session.
+- To run a mod from this clone, add it once as a folder marketplace (`claude plugin marketplace add <clone path>`) and install the mod from it; the session reads the mod from this folder, so `/reload-plugins` loads an edit.

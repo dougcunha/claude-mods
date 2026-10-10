@@ -1,11 +1,17 @@
 # session-info
 
-A Claude Code mod with one pane and two sections:
+A Claude Code mod with one pane and three sections:
 
+- **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
 - **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
 ```text
+▾ Session                          $1.84 · 1h 12m
+▸ Context              124k / 200k · 1 compaction
+███████████████████████████████░░░░░░░░░░░░░░░░░ 62%
+14 turns · ~250 output tok/turn · last 38s
+
 ▾ Usage
 Current session                    resets in 2h 10m
 ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 3%
@@ -40,13 +46,25 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Action | How |
 | --- | --- |
 | Open the pane | `/session-info` (or `/changes`) |
-| Fold or unfold a section | Press its `▾ Usage` or `▾ Changes` header |
+| Fold or unfold a section | Press its `▾ Session`, `▾ Usage` or `▾ Changes` header |
+| Show the context breakdown by category | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
 | Collapse or expand a folder | Press the folder |
 | Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom |
 | Return to the prompt | `Esc` |
 
 Status colors follow your theme: green for created (`A`), yellow for modified (`M`), red and struck through for deleted (`D`). Chains of single-child folders collapse into one row, for example `src/app/ui`.
+
+## What the Session section shows
+
+| Row | Source |
+| --- | --- |
+| Cost and duration (header) | The session's cost as `/cost` totals it, and the time since the session started |
+| Context bar | The live context window: tokens used, the window size and the percentage. Pressing `▸ Context` unfolds the categories (messages, system prompt, tools, MCP), estimated locally |
+| Compactions | Compactions that went through in the main conversation |
+| Turns | Main-thread turns, their average output tokens, and how long the last one took |
+
+The turn and compaction counts start when the mod loads, so a reload or a newly installed mod starts them at zero.
 
 ## How usage updates
 
@@ -77,7 +95,9 @@ Change these in `/config`:
 
 | Setting | Values | Default |
 | --- | --- | --- |
-| `session-info.sections` | `all`, `usage`, `changes` | `all` |
+| `session-info.showSession` | `true`, `false` | `true` |
+| `session-info.showUsage` | `true`, `false` | `true` |
+| `session-info.showChanges` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
 | `session-info.icons` | `unicode`, `nerd` (needs a [Nerd Font](https://www.nerdfonts.com/)), `emoji` | `unicode` |
@@ -110,8 +130,9 @@ claude --plugin-dir .
 
 | File | Role |
 | --- | --- |
-| `hooks/register.tsx` | The commands, the `tool.call` tracker, the usage refresh and the pane |
+| `hooks/register.tsx` | The commands, the `tool.call`, `turn.complete` and `session.compact` hooks, the refresh timer and the pane |
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
+| `hooks/session.ts` | Token, duration, cost and turn formatting |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |
 | `hooks/git.ts` | `git status`, `HEAD` content and snapshots |
 | `hooks/viewer.ts` | Opens a change: the editor for new files, the diff viewer for the rest |

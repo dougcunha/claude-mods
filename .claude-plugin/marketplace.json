@@ -11,7 +11,7 @@
     {
       "name": "session-info",
       "source": "./session-info",
-      "description": "Session pane: live plan usage bars and a treeview of the files this session created, modified or deleted."
+      "description": "Session pane: context, cost and turns, live plan usage bars, and a treeview of the files this session created, modified or deleted."
     }
   ]
 }
