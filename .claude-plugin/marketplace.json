@@ -1,0 +1,12 @@
+{
+  "name": "claude-mods",
+  "owner": { "name": "Douglas Cunha", "url": "https://github.com/dougcunha" },
+  "metadata": { "description": "Mods for Claude Code built with the plugin function-hooks API." },
+  "plugins": [
+    {
+      "name": "session-changes",
+      "source": "./session-changes",
+      "description": "Treeview pane of the files this session created, modified or deleted; a press opens the diff in your configured viewer."
+    }
+  ]
+}

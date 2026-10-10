@@ -1,0 +1,36 @@
+{
+  "name": "session-changes",
+  "version": "0.1.0",
+  "description": "Treeview pane of the files this session created, modified or deleted; a press opens the diff in your configured viewer.",
+  "author": {
+    "name": "Douglas Cunha",
+    "url": "https://github.com/dougcunha"
+  },
+  "homepage": "https://github.com/dougcunha/claude-mods/tree/main/session-changes",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "viewer": {
+      "type": "string",
+      "title": "Diff viewer",
+      "description": "auto: git diff.guitool, then VS Code, then inline. git: git difftool --gui. vscode: code --diff. inline: inside the pane.",
+      "default": "auto",
+      "options": [
+        "auto",
+        "git",
+        "vscode",
+        "inline"
+      ]
+    },
+    "icons": {
+      "type": "string",
+      "title": "Icon set",
+      "description": "unicode works everywhere; nerd needs a Nerd Font; emoji needs a terminal that draws emoji two cells wide.",
+      "default": "unicode",
+      "options": [
+        "unicode",
+        "nerd",
+        "emoji"
+      ]
+    }
+  }
+}
