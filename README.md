@@ -6,7 +6,7 @@ Mods for [Claude Code](https://claude.com/claude-code): panes, slash commands an
 
 | Mod | What it does | Command |
 | --- | --- | --- |
-| [session-info](session-info/) | One pane with the context window, cost and turn stats, live plan usage bars (like `/usage`) and a treeview of the files the session created, modified or deleted. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info` |
+| [session-info](session-info/) | One pane with the context window, cost and turn stats, live plan usage bars (like `/usage`), the session's agents and a treeview of the files the session created, modified or deleted. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info` |
 
 ## Install
 

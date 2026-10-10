@@ -1,7 +1,7 @@
 {
   "name": "session-info",
-  "version": "0.4.0",
-  "description": "Session pane: context, cost and turns, live plan usage bars, and a treeview of the files this session created, modified or deleted.",
+  "version": "0.5.0",
+  "description": "Session pane: context, cost and turns, live plan usage bars, running agents, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -20,6 +20,12 @@
       "type": "boolean",
       "title": "Show the Usage section",
       "description": "Plan rate-limit bars, like /usage.",
+      "default": true
+    },
+    "showAgents": {
+      "type": "boolean",
+      "title": "Show the Agents section",
+      "description": "Subagents and teammates of the session with their status.",
       "default": true
     },
     "showChanges": {

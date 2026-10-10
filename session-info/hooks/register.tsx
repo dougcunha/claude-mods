@@ -3,6 +3,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { FileChange, InlineDiff } from '../types'
 
+import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
+import type { AgentRow } from './agents'
 import { gitStatus } from './git'
 import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
@@ -28,7 +30,7 @@ const PANE = 'session-info'
 const TITLE = 'Session info'
 const MINUTE = 60_000
 
-type SectionKey = '#session' | '#usage' | '#changes'
+type SectionKey = '#session' | '#usage' | '#agents' | '#changes'
 
 const toggle = (list: readonly string[], key: string): string[] =>
   list.includes(key) ? list.filter(one => one !== key) : [...list, key]
@@ -83,9 +85,10 @@ export const register: Register = (on, options) => {
   const shows = {
     session: options.showSession !== false,
     usage: options.showUsage !== false,
+    agents: options.showAgents !== false,
     changes: options.showChanges !== false,
   }
-  const isLive = shows.session || shows.usage
+  const isLive = shows.session || shows.usage || shows.agents
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -110,6 +113,7 @@ export const register: Register = (on, options) => {
 
   on('turn.complete', async ($, e, next) => {
     const answered = await next(e)
+    if (e.agentId !== undefined && shows.agents) await update($, now, () => Date.now())
     if (e.agentId === undefined)
       await update($, turns, stats => ({
         count: (stats ?? NO_TURNS).count + 1,
@@ -118,6 +122,13 @@ export const register: Register = (on, options) => {
       }))
 
     return answered
+  })
+
+  on('agent.spawn', async ($, e, next) => {
+    const spawned = await next(e)
+    if (shows.agents) await update($, now, () => Date.now())
+
+    return spawned
   })
 
   on('session.compact', async ($, e, next) => {
@@ -153,12 +164,16 @@ export const register: Register = (on, options) => {
     const categories = (usage?.context.breakdown?.categories ?? [])
       .filter(category => category.tokens > 0 && !category.isDeferred)
       .sort((a, b) => b.tokens - a.tokens)
+    const agents = shows.agents ? await $.agent.list() : []
     const changes = shows.changes ? Object.values(await read($, files)) : []
     const diff = shows.changes ? await read($, inline) : null
     const rows = flatten(buildTree(await $.session.cwd(), changes), shut)
     const usageRows = shows.usage ? 2 + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
     const sessionRows = shows.session ? 2 + (isOpen('#session') ? 3 + (isDetailed ? categories.length : 0) : 0) : 0
-    const room = Math.max(3, (e.viewport?.rows ?? 30) - usageRows - sessionRows - (diff ? 16 : 7))
+    const agentLines = agentRows(agents)
+    const agentRoom = Math.min(agentLines.length, 8)
+    const agentsRows = shows.agents ? 2 + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
+    const room = Math.max(3, (e.viewport?.rows ?? 30) - usageRows - sessionRows - agentsRows - (diff ? 16 : 7))
 
     const header = (key: SectionKey, title: string, right: string) => (
       <Box flexDirection="row" justifyContent="space-between">
@@ -262,6 +277,28 @@ export const register: Register = (on, options) => {
       </Box>
     )
 
+    const agentLine = ({ agent, depth }: AgentRow) => {
+      const status = AGENT_STATUS[agent.status]
+
+      return (
+        <Box flexDirection="row">
+          <Text color={status.color}>{`${'  '.repeat(depth)}${status.glyph} `}</Text>
+          <Text bold={agent.status === 'running'}>{agentLabel(agent)}</Text>
+          <Text dimColor wrap="truncate-end">{agent.description ? ` · ${agent.description}` : ''}</Text>
+        </Box>
+      )
+    }
+
+    const agentsSection = (
+      <Box flexDirection="column" marginBottom={1}>
+        {header('#agents', 'Agents', agentSummary(agents))}
+        {isOpen('#agents') && agentLines.slice(0, agentRoom).map(agentLine)}
+        {isOpen('#agents') && agentLines.length > agentRoom && (
+          <Text dimColor>{`… ${agentLines.length - agentRoom} more`}</Text>
+        )}
+      </Box>
+    )
+
     const changesSection = (
       <Box flexDirection="column">
         {header('#changes', 'Changes', `${changes.length} file${changes.length === 1 ? '' : 's'}  ${summary(changes)}`)}
@@ -306,6 +343,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         {shows.session && sessionSection}
         {shows.usage && usageSection}
+        {shows.agents && agentsSection}
         {shows.changes && changesSection}
       </Box>
     )

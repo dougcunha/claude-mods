@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { agentRows, agentSummary } from '../hooks/agents'
 import { duration, tokens, turnLine } from '../hooks/session'
 
 const PANE = {
@@ -19,6 +20,7 @@ test('tracks created, modified and deleted files and draws them as a tree', asyn
   const written = new Map<string, string>()
   const gone = new Set(['/repo/src/old.ts'])
   on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
   on('session.id', async () => ({ value: 'sid' }))
   on('session.usage', async () => usage([]))
   on('env.get', async () => ({ value: undefined }))
@@ -63,6 +65,7 @@ test('tracks created, modified and deleted files and draws them as a tree', asyn
 test('a file created then deleted in the session leaves the list', async ($, on) => {
   let exists = true
   on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
   on('session.id', async () => ({ value: 'sid' }))
   on('session.usage', async () => usage([]))
   on('env.get', async () => ({ value: undefined }))
@@ -88,6 +91,7 @@ test('a new file opens in the editor; a deleted one with unknown content opens n
   const toasts: string[] = []
   const gone = new Set<string>()
   on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
   on('session.id', async () => ({ value: 'sid' }))
   on('session.usage', async () => usage([]))
   on('env.get', async () => ({ value: undefined }))
@@ -124,6 +128,7 @@ test('a new file opens in the editor; a deleted one with unknown content opens n
 test('the usage section draws one labelled bar per rate-limit window and folds', async ($, on) => {
   const inTwoHours = new Date(Date.now() + 2 * 3_600_000 + 30_000).toISOString()
   on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
   on('session.usage', async () =>
     usage([
       { kind: 'seven_day', percentUsed: 28, resetsAt: inTwoHours },
@@ -145,6 +150,7 @@ test('the usage section draws one labelled bar per rate-limit window and folds',
 
 test('with no reading yet the usage section says so', async ($, on) => {
   on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
   on('session.usage', async () => usage([]))
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
@@ -155,6 +161,7 @@ test('with no reading yet the usage section says so', async ($, on) => {
 test('the session section shows context, cost, duration and the context breakdown', async ($, on) => {
   const startedAt = Date.now() - 72 * 60_000
   on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
   on('session.usage', async (_, e) =>
     ({
       value: {
@@ -193,4 +200,37 @@ test('turn and size formatting', async () => {
   expect(duration(38_000)).toBe('38s')
   expect(duration(4 * 60_000 + 12_000)).toBe('4m 12s')
   expect(turnLine({ count: 4, outputTokens: 1_000, lastMs: 38_000 })).toBe('4 turns · ~250 output tok/turn · last 38s')
+})
+
+test('the agents section lists agents by status, children under their parent', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('session.usage', async () => usage([]))
+  on('agent.list', async () =>
+    ({
+      value: [
+        { id: 'a1', type: 'Explore', description: 'find auth code', status: 'completed' },
+        { id: 'a2', type: 'general-purpose', name: 'reviewer', description: 'review diff', status: 'running' },
+        { id: 'a3', type: 'Explore', description: 'nested search', status: 'running', parentId: 'a2' },
+      ],
+    }) as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: '2 running · 1 done' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'reviewer' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '  ⟳ ' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: ' · find auth code' })).toBeDefined()
+
+  await ui.press({ key: 'section:#agents' })
+  expect(await ui.find({ type: 'Text', text: 'reviewer' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('agent rows order active agents first and nest children', async () => {
+  const rows = agentRows([
+    { id: 'done', type: 'Explore', description: '', status: 'completed' },
+    { id: 'child', type: 'Explore', description: '', status: 'running', parentId: 'parent' },
+    { id: 'parent', type: 'Plan', description: '', status: 'waiting' },
+  ])
+  expect(rows.map(row => `${row.agent.id}:${row.depth}`)).toEqual(['parent:0', 'child:1', 'done:0'])
+  expect(agentSummary([])).toBe('none')
 })

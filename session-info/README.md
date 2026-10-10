@@ -1,9 +1,10 @@
 # session-info
 
-A Claude Code mod with one pane and three sections:
+A Claude Code mod with one pane and four sections:
 
 - **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
+- **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
 - **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
 ```text
@@ -17,6 +18,11 @@ Current session                    resets in 2h 10m
 ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 3%
 Current week (all models)          resets in 5d 21h
 ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 28%
+
+▾ Agents                       2 running · 1 done
+⟳ reviewer · review diff
+  ⟳ Explore · nested search
+✓ Explore · find auth code
 
 ▾ Changes                    3 files  ✚ 1  ● 1  ✖ 1
 ├─ ▾ src
@@ -46,7 +52,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Action | How |
 | --- | --- |
 | Open the pane | `/session-info` (or `/changes`) |
-| Fold or unfold a section | Press its `▾ Session`, `▾ Usage` or `▾ Changes` header |
+| Fold or unfold a section | Press its `▾ Session`, `▾ Usage`, `▾ Agents` or `▾ Changes` header |
 | Show the context breakdown by category | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
 | Collapse or expand a folder | Press the folder |
@@ -65,6 +71,22 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
 
 The turn and compaction counts start when the mod loads, so a reload or a newly installed mod starts them at zero.
+
+## What the Agents section shows
+
+Every agent loop of the session, as Claude Code lists it: subagents the model or a plugin spawned and teammates. Each row shows a status glyph, the agent's name (or its type) and its task description:
+
+| Glyph | Status |
+| --- | --- |
+| `⟳` | running |
+| `⏸` | waiting |
+| `◌` | pending |
+| `○` | idle (a teammate waiting for a message) |
+| `✓` | completed |
+| `✖` | failed |
+| `⊘` | killed |
+
+Active agents come first; an agent spawned by another is indented under it. Claude Code drops a finished agent from its list some time after it ends, and the row leaves with it. The section redraws when an agent starts or finishes a turn, and once a minute. Up to 8 rows are shown.
 
 ## How usage updates
 
@@ -97,6 +119,7 @@ Change these in `/config`:
 | --- | --- | --- |
 | `session-info.showSession` | `true`, `false` | `true` |
 | `session-info.showUsage` | `true`, `false` | `true` |
+| `session-info.showAgents` | `true`, `false` | `true` |
 | `session-info.showChanges` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
@@ -130,9 +153,10 @@ claude --plugin-dir .
 
 | File | Role |
 | --- | --- |
-| `hooks/register.tsx` | The commands, the `tool.call`, `turn.complete` and `session.compact` hooks, the refresh timer and the pane |
+| `hooks/register.tsx` | The commands, the `tool.call`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh timer and the pane |
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
+| `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |
 | `hooks/git.ts` | `git status`, `HEAD` content and snapshots |
 | `hooks/viewer.ts` | Opens a change: the editor for new files, the diff viewer for the rest |
