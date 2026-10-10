@@ -1,6 +1,6 @@
 # session-changes
 
-A Claude Code mod that lists every file the current session created, modified or deleted in a treeview pane. Pressing a file opens its diff in the diff viewer configured on your machine.
+A Claude Code mod that lists every file the current session created, modified or deleted in a treeview pane. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
 ```text
 3 files                            ✚ 1  ● 1  ✖ 1
@@ -31,14 +31,18 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Action | How |
 | --- | --- |
 | Open the pane | `/changes` |
-| Open a file's diff | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter |
+| Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
 | Collapse or expand a folder | Press the folder |
 | Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom |
 | Return to the prompt | `Esc` |
 
 Status colors follow your theme: green for created (`A`), yellow for modified (`M`), red and struck through for deleted (`D`). Chains of single-child folders collapse into one row, for example `src/app/ui`.
 
-## How the diff opens
+## How a file opens
+
+A **new file** opens in your editor. With the `auto` editor that is VS Code when `code` is on the `PATH`, else the app the system associates with the file (`explorer.exe` on Windows, `open` on macOS, `xdg-open` on Linux). Terminal editors such as `$EDITOR` cannot open from the pane.
+
+A **modified or deleted file** opens as a diff. A deleted file whose previous content is unknown (outside git and never captured) opens nothing.
 
 The diff compares the file **as it was before the session first touched it** with the file as it is now, not with `HEAD`. The original content is saved under `%TEMP%` (or `$TMPDIR`) in `claude-session-changes/<session id>/`.
 
@@ -58,6 +62,7 @@ Change these in `/config`:
 | Setting | Values | Default |
 | --- | --- | --- |
 | `session-changes.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
+| `session-changes.editor` | `auto`, `vscode`, `system` | `auto` |
 | `session-changes.icons` | `unicode`, `nerd` (needs a [Nerd Font](https://www.nerdfonts.com/)), `emoji` | `unicode` |
 
 ## How changes are detected
@@ -90,7 +95,7 @@ claude --plugin-dir .
 | `hooks/register.tsx` | The `/changes` command, the `tool.call` tracker and the pane |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |
 | `hooks/git.ts` | `git status`, `HEAD` content and snapshots |
-| `hooks/viewer.ts` | Picks and launches the diff viewer |
+| `hooks/viewer.ts` | Opens a change: the editor for new files, the diff viewer for the rest |
 | `hooks/tree.ts` | Builds and flattens the tree |
 | `hooks/icons.ts` | Icon sets and status colors |
 | `hooks/patch.ts` | Reverses hunks to recover a file's previous content |

@@ -6,7 +6,7 @@ Mods for [Claude Code](https://claude.com/claude-code): panes, slash commands an
 
 | Mod | What it does | Command |
 | --- | --- | --- |
-| [session-changes](session-changes/) | Treeview pane of the files the current session created, modified or deleted. Pressing a file opens its diff in your configured diff viewer. | `/changes` |
+| [session-changes](session-changes/) | Treeview pane of the files the current session created, modified or deleted. Pressing a new file opens it in your editor; pressing a changed or deleted one opens its diff. | `/changes` |
 
 ## Install
 

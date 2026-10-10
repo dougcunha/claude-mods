@@ -75,3 +75,40 @@ test('a file created then deleted in the session leaves the list', async ($, on)
   expect(await ui.find({ type: 'Text', text: /No files changed/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('a new file opens in the editor; a deleted one with unknown content opens nothing', { options: { editor: 'system' } }, async ($, on) => {
+  const spawned: string[][] = []
+  const toasts: string[] = []
+  const gone = new Set<string>()
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('session.id', async () => ({ value: 'sid' }))
+  on('env.get', async () => ({ value: undefined }))
+  on('fs.write', async () => ({ value: undefined }))
+  on('fs.exists', async (_, e) => ({ value: !gone.has(e.path.replace(/\\/g, '/').replace(/^[A-Za-z]:/, '')) }))
+  on('process.run', async () => ({ value: ran('', 128) }))
+  on('process.spawn', async function* (_, e) {
+    spawned.push([...e.argv])
+    return { value: { code: 0, signal: null } }
+  })
+  on('ui.toast', async (_, e) => (toasts.push(String(e.text)), { value: undefined }))
+  on('tool.call', { tool: 'Write' }, async (_, e) =>
+    ({ result: { type: 'create', filePath: e.file_path, content: '', structuredPatch: [], originalFile: null } }) as never)
+  on('tool.call', { tool: 'Edit' }, async (_, e) =>
+    ({ result: { filePath: e.file_path, originalFile: null, structuredPatch: [] } }) as never)
+  on('tool.call', { tool: 'PowerShell' }, async () =>
+    ({ result: { stdout: '', stderr: '', interrupted: false } }) as never)
+
+  await $.tool.call({ tool: 'Write', file_path: '/repo/src/new.ts', content: 'x' })
+  await $.tool.call({ tool: 'Edit', file_path: '/repo/src/lost.ts', old_string: 'a', new_string: 'b' })
+  gone.add('/repo/src/lost.ts')
+  await $.tool.call({ tool: 'PowerShell', command: 'Remove-Item src/lost.ts' })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'f:src/new.ts' })
+  expect(spawned).toEqual([['xdg-open', '/repo/src/new.ts']])
+
+  await ui.press({ key: 'f:src/lost.ts' })
+  expect(spawned.length).toBe(1)
+  expect(toasts).toEqual([])
+  await ui.unmount()
+})

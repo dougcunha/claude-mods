@@ -1,7 +1,7 @@
 {
   "name": "session-changes",
-  "version": "0.1.0",
-  "description": "Treeview pane of the files this session created, modified or deleted; a press opens the diff in your configured viewer.",
+  "version": "0.2.0",
+  "description": "Treeview pane of the files this session created, modified or deleted; a press opens a new file in your editor and a changed one as a diff.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -20,6 +20,17 @@
         "git",
         "vscode",
         "inline"
+      ]
+    },
+    "editor": {
+      "type": "string",
+      "title": "Editor for new files",
+      "description": "auto: VS Code when on the PATH, else the app the system associates with the file. vscode: code <file>. system: the associated app.",
+      "default": "auto",
+      "options": [
+        "auto",
+        "vscode",
+        "system"
       ]
     },
     "icons": {

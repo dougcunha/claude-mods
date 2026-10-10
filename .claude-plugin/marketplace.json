@@ -6,7 +6,7 @@
     {
       "name": "session-changes",
       "source": "./session-changes",
-      "description": "Treeview pane of the files this session created, modified or deleted; a press opens the diff in your configured viewer."
+      "description": "Treeview pane of the files this session created, modified or deleted; a press opens a new file in your editor and a changed one as a diff."
     }
   ]
 }

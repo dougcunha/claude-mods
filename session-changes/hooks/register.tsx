@@ -10,8 +10,8 @@ import type { IconSet } from './icons'
 import { SHELLS, track } from './track'
 import { buildTree, flatten } from './tree'
 import type { Row } from './tree'
-import { openDiff } from './viewer'
-import type { Viewer } from './viewer'
+import { openChange } from './viewer'
+import type { Editor, Prefs, Viewer } from './viewer'
 
 const files = atom({ plugin: 'session-changes', key: 'files' } as const, {} as Record<string, FileChange>)
 const collapsed = atom({ plugin: 'session-changes', key: 'collapsed' } as const, [] as string[])
@@ -47,23 +47,26 @@ function hostOf($: EngineInterface): Host {
 }
 
 /** A folder folds or unfolds; a file opens its diff. */
-async function press($: EngineInterface, row: Row, viewer: Viewer): Promise<void> {
+async function press($: EngineInterface, row: Row, prefs: Prefs): Promise<void> {
   try {
     if (row.isDir) await update($, collapsed, list => toggle(list ?? [], row.key))
-    else if (row.change) await openDiff(hostOf($), row.change, viewer)
+    else if (row.change) await openChange(hostOf($), row.change, prefs)
   } catch (error) {
     $.ui.toast(`session-changes: ${String(error)}`)
   }
 }
 
 export const register: Register = (on, options) => {
-  const viewer = (options.viewer as Viewer | undefined) ?? 'auto'
+  const prefs: Prefs = {
+    viewer: (options.viewer as Viewer | undefined) ?? 'auto',
+    editor: (options.editor as Editor | undefined) ?? 'auto',
+  }
   const icons = (options.icons as IconSet | undefined) ?? 'unicode'
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'changes',
-      description: 'Show the files this session created, modified or deleted; press one to open its diff',
+      description: 'Show the files this session created, modified or deleted; press one to open it',
     })
 
     return next(e)
@@ -99,7 +102,7 @@ export const register: Register = (on, options) => {
       return (
         <Box flexDirection="row">
           <Text dimColor>{row.guide}</Text>
-          <Button plain key={`${row.isDir ? 'd' : 'f'}:${row.key}`} onPress={() => void press($, row, viewer)}>
+          <Button plain key={`${row.isDir ? 'd' : 'f'}:${row.key}`} onPress={() => void press($, row, prefs)}>
             {row.isDir || !status || !row.change
               ? [
                   <Text color="suggestion">{folderIcon(icons, row.isOpen)}</Text>,
@@ -150,7 +153,7 @@ export const register: Register = (on, options) => {
             clear
           </Button>
         </Box>
-        <Text dimColor>Click or Enter on a file opens its diff · on a folder, collapses or expands it</Text>
+        <Text dimColor>Click or Enter: new file opens in the editor, changed or deleted one as a diff · folder collapses or expands</Text>
       </Box>
     )
   })
