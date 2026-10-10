@@ -4,6 +4,10 @@
 
 - Write all repository text in English: code, UI strings (pane labels, buttons, toasts, command descriptions), comments and READMEs, even when the conversation is in another language.
 
+## Supported API only
+
+- Build mods only on the documented mod API and tool fields: never on members marked `@internal` in the `claude-code` types, undocumented endpoints, or credentials read from disk. When a feature needs anything else, leave it out and say so in the mod's README.
+
 ## Adding or changing a mod
 
 - Put each mod in its own top-level folder: `.claude-plugin/plugin.json`, `hooks/`, `tests/*.test.ts`, and a `README.md` with an Install section that uses `/plugin install <mod> --marketplace dougcunha/claude-mods`.
