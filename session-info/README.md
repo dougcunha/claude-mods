@@ -52,7 +52,7 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 
 The bars read the same figures as `/usage` and the status line. Claude Code learns them from each API response, so they move after a reply, not while the session is idle. The pane redraws when a window moves a whole point, and once a minute so the reset countdown stays current.
 
-The section shows each window the account reports: the current session (`five_hour`), the current week (`seven_day`), any per-model weekly window, and a gateway's spend limit. Bars turn yellow at 70% and red at 90%. On API-key or other non-subscription accounts there are no windows to show.
+The section shows each window Claude Code reports: the current session (`five_hour`), the current week (`seven_day`) and a gateway's spend limit. Bars turn yellow at 70% and red at 90%. On API-key or other non-subscription accounts there are no windows to show.
 
 ## How a file opens
 
@@ -98,7 +98,7 @@ After every shell command, the mod also checks that each listed file still exist
 - **Mouse clicks** work in the fullscreen terminal. Elsewhere, use the keyboard.
 - **The diff viewer** runs as a child of the mod, so it closes when the mod reloads.
 - **Binary files** are not handled. The snapshot stores text only.
-- **Usage** shows only the rate-limit windows. The `~N tok/turn` total that `/usage` prints is not exposed to mods.
+- **Usage** shows only the windows Claude Code exposes to mods. The per-model weekly windows and the `~N tok/turn` total that `/usage` prints come from an endpoint mods cannot reach without your OAuth token, so they are left out.
 
 ## Development
 
