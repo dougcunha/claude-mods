@@ -2,7 +2,9 @@ import { expect, test } from 'claude-code/testing'
 
 import { agentRows, agentSummary } from '../hooks/agents'
 import { crossings } from '../hooks/alerts'
+import { tileLayout } from '../hooks/cards'
 import { duration, tokens, turnLine } from '../hooks/session'
+import { bar } from '../hooks/usage'
 
 const PANE = {
   plugin: 'session-info',
@@ -52,7 +54,7 @@ test('tracks created, modified and deleted files and draws them as a tree', asyn
   expect(snapshots.find(([path]) => path.endsWith('/old.ts'))?.[1]).toBe('one\ntwo\n')
   expect(snapshots.find(([path]) => path.endsWith('/new.ts'))?.[1]).toBe('')
 
-  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 80, rows: 50 } })
   expect(await ui.find({ type: 'Text', text: /3 files/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^new\.ts$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^old\.ts$/ })).toBeDefined()
@@ -181,7 +183,9 @@ test('the session section shows context, cost, duration and the context breakdow
     }) as never)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: '$1.84 · 1h 12m' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '$1.84' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '1h 12m' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'context' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '124k / 200k' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: ' 62%' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: 'No turns yet' })).toBeDefined()
@@ -191,6 +195,32 @@ test('the session section shows context, cost, duration and the context breakdow
   expect(await ui.find({ type: 'Text', text: '  Messages' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '90k' })).toBeDefined()
   await ui.unmount()
+})
+
+test('a narrow pane draws bare sections with cost and duration in the session header', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.usage', async () =>
+    ({ value: { startedAt: Date.now() - 72 * 60_000, cost: { usd: 1.844 }, rateLimits: [], context: {} } }) as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', props: { ...PANE.props, bodyColumns: 36 } })
+  expect(await ui.find({ type: 'Text', text: '$1.84 · 1h 12m' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'context' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('bars fill to the eighth of a cell and show any use', async () => {
+  expect(bar(50, 10)).toEqual({ filled: '█████', empty: '░░░░░' })
+  expect(bar(55, 10)).toEqual({ filled: '█████▌', empty: '░░░░' })
+  expect(bar(0.1, 10)).toEqual({ filled: '▏', empty: '░░░░░░░░░' })
+  expect(bar(0, 4)).toEqual({ filled: '', empty: '░░░░' })
+  expect(bar(120, 4)).toEqual({ filled: '████', empty: '' })
+})
+
+test('tiles share the width and wrap when it runs out', async () => {
+  expect(tileLayout(4, 80)).toEqual({ width: 20, rows: 3 })
+  expect(tileLayout(4, 44)).toEqual({ width: 22, rows: 6 })
+  expect(tileLayout(0, 80).rows).toBe(0)
 })
 
 test('turn and size formatting', async () => {

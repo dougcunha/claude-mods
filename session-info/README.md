@@ -10,40 +10,49 @@ A Claude Code mod with one pane and five sections:
 
 It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed.
 
+Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost, the elapsed time, the turn count and the context fill at a glance. Bars fill to the eighth of a cell. In a pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions.
+
 ```text
-▾ Session                          $1.84 · 1h 12m
-▸ Context              124k / 200k · 1 compaction
-███████████████████████████████░░░░░░░░░░░░░░░░░ 62%
-14 turns · ~250 output tok/turn · last 38s
-
-▾ Usage
-Current session                    resets in 2h 10m
-██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 3%
-Current week (all models)          resets in 5d 21h
-██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 28%
-
-▾ Agents                       2 running · 1 done
-⟳ reviewer · review diff
-  ⟳ Explore · nested search
-✓ Explore · find auth code
-
-▾ Checks                         ✖ build  ✖ tests
-✖ Build  2 errors                         4m 2s ago
-  dotnet build App.sln
-  Class1.cs(7,20): CS0029: Cannot implicitly conv…
-  Class1.cs(8,16): CS0103: The name 'total' does …
-✖ Tests  2 failed / 120           agent · 38s ago
-  rtk dotnet test --project tests/App.Tests
-  CalculatorTests.Subtract_Fails
-  CalculatorTests.Divide_Throws
-
-▾ Changes                    3 files  ✚ 1  ● 1  ✖ 1
-├─ ▾ src
-│  ├─ ▾ app
-│  │  └─ ● main.ts  M
-│  ├─ ✚ new.ts  A
-│  └─ ✖ old.ts  D
-[ collapse ]  [ expand ]  [ clear ]
+╭────────────────╮╭────────────────╮╭────────────────╮╭────────────────╮
+│ $1.84 cost     ││ 1h 12m elapsed ││ 14 turns       ││ 62% context    │
+╰────────────────╯╰────────────────╯╰────────────────╯╰────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Session                                                            │
+│ ▸ Context                                 124k / 200k · 1 compaction │
+│ ██████████████████████████████████████▌░░░░░░░░░░░░░░░░░░░░░░░ 62%   │
+│ 14 turns · ~250 output tok/turn · last 38s                           │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Usage                                                              │
+│ Current session                                     resets in 2h 10m │
+│ ██▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 3%    │
+│ Current week (all models)                           resets in 5d 21h │
+│ █████████████████▍░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 28%   │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Agents                                          2 running · 1 done │
+│ ⟳ reviewer · review diff                                             │
+│   ⟳ Explore · nested search                                          │
+│ ✓ Explore · find auth code                                           │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Checks                                            ✖ build  ✓ tests │
+│ ✖ Build  2 errors                                          4m 2s ago │
+│   dotnet build App.sln                                               │
+│   Class1.cs(8,16): CS0103: The name 'total' does not exist in the c… │
+│ ✓ Tests  120 passed                                  agent · 38s ago │
+│   rtk dotnet test --project tests/App.Tests                          │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Changes                                     3 files  ✚ 1  ● 1  ✖ 1 │
+│ ├─ ▾ src                                                             │
+│ │  ├─ ▾ app                                                          │
+│ │  │  └─ ● main.ts  M                                                │
+│ │  ├─ ✚ new.ts  A                                                    │
+│ │  └─ ✖ old.ts  D                                                    │
+│                                                                      │
+│ [ collapse ]  [ expand ]  [ clear ]                                  │
+╰──────────────────────────────────────────────────────────────────────╯
 ```
 
 ## Install
@@ -78,7 +87,7 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 
 | Row | Source |
 | --- | --- |
-| Cost and duration (header) | The session's cost as `/cost` totals it, and the time since the session started |
+| Cost, elapsed and turns (tiles) | The session's cost as `/cost` totals it, the time since the session started, and the main-thread turn count. In a narrow pane, cost and duration move to the section header |
 | Context bar | The live context window: tokens used, the window size and the percentage. Pressing `▸ Context` unfolds the categories (messages, system prompt, tools, MCP), estimated locally |
 | Compactions | Compactions that went through in the main conversation |
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
@@ -207,6 +216,7 @@ claude --plugin-dir .
 | File | Role |
 | --- | --- |
 | `hooks/register.tsx` | The commands, the `tool.call`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh timer and the pane |
+| `hooks/cards.tsx` | Framed cards, the tiles row and how the tiles wrap |
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |

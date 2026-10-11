@@ -38,13 +38,17 @@ export function resetIn(resetsAt: string | undefined, now: number): string | und
   return `resets in ${minutes}m`
 }
 
-/** The filled and empty runs of a bar `width` cells wide; any use shows at least one filled cell. */
+const EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉']
+
+/** The filled and empty runs of a bar `width` cells wide, filled to the eighth of a cell; any use shows at least one eighth. */
 export function bar(percent: number, width: number): { filled: string; empty: string } {
   const cells = Math.max(1, width)
   const share = Math.min(100, Math.max(0, percent)) / 100
-  const filled = percent > 0 ? Math.max(1, Math.round(share * cells)) : 0
+  const eighths = percent > 0 ? Math.max(1, Math.round(share * cells * 8)) : 0
+  const full = Math.floor(eighths / 8)
+  const partial = EIGHTHS[eighths % 8]
 
-  return { filled: '█'.repeat(filled), empty: '░'.repeat(cells - filled) }
+  return { filled: '█'.repeat(full) + partial, empty: '░'.repeat(cells - full - (partial === '' ? 0 : 1)) }
 }
 
 export const colorOf = (percent: number): 'suggestion' | 'warning' | 'error' =>

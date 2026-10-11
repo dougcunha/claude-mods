@@ -1,11 +1,13 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
 import type { Checks, FileChange, InlineDiff } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
 import { crossings } from './alerts'
 import type { AgentRow } from './agents'
+import { FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
+import type { Tile } from './cards'
 import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, NO_CHECKS, toPattern } from './checks'
 import type { CheckView, Patterns } from './checks'
 import { gitStatus } from './git'
@@ -198,7 +200,11 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button, Code } = $.ui.resolve(e)
+    const { card, tiles } = widgets({ Box, Text })
     const cols = Math.max(20, e.props.bodyColumns)
+    const isCards = isFramed(cols)
+    const inner = isCards ? cols - FRAME_COLUMNS : cols
+    const chrome = isCards ? 1 + FRAME_ROWS : 2
     const shut = new Set(await read($, collapsed))
     const isOpen = (key: SectionKey): boolean => !shut.has(key)
     await read($, now)
@@ -214,15 +220,35 @@ export const register: Register = (on, options) => {
     const changes = shows.changes ? Object.values(await read($, files)) : []
     const diff = shows.changes ? await read($, inline) : null
     const rows = flatten(buildTree(await $.session.cwd(), changes), shut)
-    const usageRows = shows.usage ? 2 + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
-    const sessionRows = shows.session ? 2 + (isOpen('#session') ? 3 + (isDetailed ? categories.length : 0) : 0) : 0
+    const context = usage?.context
+    const figures: Tile[] =
+      isCards && shows.session && usage !== undefined
+        ? [
+            ...(usage.cost === undefined ? [] : [{ key: 'cost', value: cost(usage.cost.usd), label: 'cost' }]),
+            { key: 'elapsed', value: duration(Date.now() - usage.startedAt), label: 'elapsed' },
+            { key: 'turns', value: `${(stats ?? NO_TURNS).count}`, label: (stats ?? NO_TURNS).count === 1 ? 'turn' : 'turns' },
+            { key: 'context', value: percentText(context?.percent ?? 0), label: 'context', color: colorOf(context?.percent ?? 0) },
+          ]
+        : []
+    const tileRows = tileLayout(figures.length, cols).rows
+    const usageRows = shows.usage ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
+    const sessionRows = shows.session ? chrome + (isOpen('#session') ? 3 + (isDetailed ? categories.length : 0) : 0) : 0
     const agentLines = agentRows(agents)
     const agentRoom = Math.min(agentLines.length, 8)
-    const agentsRows = shows.agents ? 2 + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
+    const agentsRows = shows.agents ? chrome + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
     const lastChecks = shows.checks ? await read($, checks) : NO_CHECKS
     const views = checkViews(lastChecks)
-    const checksRows = shows.checks ? 2 + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
-    const room = Math.max(3, (e.viewport?.rows ?? 30) - usageRows - sessionRows - agentsRows - checksRows - (diff ? 16 : 7))
+    const checksRows = shows.checks ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
+    const changesFrame = isCards ? FRAME_ROWS : 0
+    const above = tileRows + usageRows + sessionRows + agentsRows + checksRows + changesFrame
+    const room = Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7))
+
+    const section = (key: SectionKey, children: RenderChildren, isLast = false) =>
+      isCards ? card(key, isOpen(key), children) : (
+        <Box flexDirection="column" marginBottom={isLast ? 0 : 1}>
+          {children}
+        </Box>
+      )
 
     const header = (key: SectionKey, title: string, right: string) => (
       <Box flexDirection="row" justifyContent="space-between">
@@ -234,7 +260,7 @@ export const register: Register = (on, options) => {
     )
 
     const limitRows = (limit: Limit) => {
-      const { filled, empty } = bar(limit.percentUsed, cols - 6)
+      const { filled, empty } = bar(limit.percentUsed, inner - 6)
       const reset = resetIn(limit.resetsAt, Date.now())
 
       return (
@@ -278,15 +304,15 @@ export const register: Register = (on, options) => {
       )
     }
 
-    const context = usage?.context
     const spent = usage?.cost === undefined ? '' : `${cost(usage.cost.usd)} · `
     const elapsed = usage === undefined ? '' : duration(Date.now() - usage.startedAt)
-    const contextBar = bar(context?.percent ?? 0, cols - 6)
+    const contextBar = bar(context?.percent ?? 0, inner - 6)
 
-    const sessionSection = (
-      <Box flexDirection="column" marginBottom={1}>
-        {header('#session', 'Session', `${spent}${elapsed}`)}
-        {isOpen('#session') && (
+    const sessionSection = section(
+      '#session',
+      [
+        header('#session', 'Session', figures.length > 0 ? '' : `${spent}${elapsed}`),
+        isOpen('#session') && (
           <Box flexDirection="column">
             <Box flexDirection="row" justifyContent="space-between">
               <Button plain key="context" onPress={() => void update($, breakdown, open => !open)}>
@@ -312,19 +338,17 @@ export const register: Register = (on, options) => {
               ))}
             <Text dimColor wrap="truncate-end">{turnLine(stats ?? NO_TURNS)}</Text>
           </Box>
-        )}
-      </Box>
+        ),
+      ],
     )
 
-    const usageSection = (
-      <Box flexDirection="column" marginBottom={1}>
-        {header('#usage', 'Usage', '')}
-        {isOpen('#usage') && limits.length === 0 && (
-          <Text dimColor>No usage reading yet: it appears after the next reply, on subscription plans.</Text>
-        )}
-        {isOpen('#usage') && limits.map(limitRows)}
-      </Box>
-    )
+    const usageSection = section('#usage', [
+      header('#usage', 'Usage', ''),
+      isOpen('#usage') && limits.length === 0 && (
+        <Text dimColor>No usage reading yet: it appears after the next reply, on subscription plans.</Text>
+      ),
+      isOpen('#usage') && limits.map(limitRows),
+    ])
 
     const agentLine = ({ agent, depth }: AgentRow) => {
       const status = AGENT_STATUS[agent.status]
@@ -338,15 +362,11 @@ export const register: Register = (on, options) => {
       )
     }
 
-    const agentsSection = (
-      <Box flexDirection="column" marginBottom={1}>
-        {header('#agents', 'Agents', agentSummary(agents))}
-        {isOpen('#agents') && agentLines.slice(0, agentRoom).map(agentLine)}
-        {isOpen('#agents') && agentLines.length > agentRoom && (
-          <Text dimColor>{`… ${agentLines.length - agentRoom} more`}</Text>
-        )}
-      </Box>
-    )
+    const agentsSection = section('#agents', [
+      header('#agents', 'Agents', agentSummary(agents)),
+      isOpen('#agents') && agentLines.slice(0, agentRoom).map(agentLine),
+      isOpen('#agents') && agentLines.length > agentRoom && <Text dimColor>{`… ${agentLines.length - agentRoom} more`}</Text>,
+    ])
 
     const checkRows = ({ run, label, result, details }: CheckView) => {
       const status = CHECK_STATUS[run.status]
@@ -370,32 +390,32 @@ export const register: Register = (on, options) => {
       )
     }
 
-    const checksSection = (
-      <Box flexDirection="column" marginBottom={1}>
-        {header('#checks', 'Checks', checkSummary(lastChecks))}
-        {isOpen('#checks') && views.length === 0 && <Text dimColor>No build or test run in this session yet.</Text>}
-        {isOpen('#checks') && views.map(checkRows)}
+    const checksSection = section('#checks', [
+      header('#checks', 'Checks', checkSummary(lastChecks)),
+      isOpen('#checks') && views.length === 0 && <Text dimColor>No build or test run in this session yet.</Text>,
+      isOpen('#checks') && views.map(checkRows),
+    ])
+
+    const diffView = diff && (
+      <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="row" justifyContent="space-between">
+          <Text bold>{diff.path}</Text>
+          <Button key="close-diff" plain onPress={() => void update($, inline, () => null)}>
+            ✕ close diff
+          </Button>
+        </Box>
+        {diff.source ? <Code format="diff" path={diff.path} source={diff.source} /> : <Text dimColor>No differences.</Text>}
       </Box>
     )
 
-    const changesSection = (
-      <Box flexDirection="column">
-        {header('#changes', 'Changes', `${changes.length} file${changes.length === 1 ? '' : 's'}  ${summary(changes)}`)}
-        {isOpen('#changes') && rows.length === 0 && <Text dimColor>No files changed in this session yet.</Text>}
-        {isOpen('#changes') && rows.slice(0, room).map(line)}
-        {isOpen('#changes') && rows.length > room && <Text dimColor>{`… ${rows.length - room} more rows`}</Text>}
-        {diff && (
-          <Box flexDirection="column" marginTop={1}>
-            <Box flexDirection="row" justifyContent="space-between">
-              <Text bold>{diff.path}</Text>
-              <Button key="close-diff" plain onPress={() => void update($, inline, () => null)}>
-                ✕ close diff
-              </Button>
-            </Box>
-            {diff.source ? <Code format="diff" path={diff.path} source={diff.source} /> : <Text dimColor>No differences.</Text>}
-          </Box>
-        )}
-        {isOpen('#changes') && (
+    const changesSection = section(
+      '#changes',
+      [
+        header('#changes', 'Changes', `${changes.length} file${changes.length === 1 ? '' : 's'}  ${summary(changes)}`),
+        isOpen('#changes') && rows.length === 0 && <Text dimColor>No files changed in this session yet.</Text>,
+        isOpen('#changes') && rows.slice(0, room).map(line),
+        isOpen('#changes') && rows.length > room && <Text dimColor>{`… ${rows.length - room} more rows`}</Text>,
+        isOpen('#changes') && (
           <Box flexDirection="row" marginTop={1} gap={2}>
             <Button
               key="collapse"
@@ -411,20 +431,23 @@ export const register: Register = (on, options) => {
               clear
             </Button>
           </Box>
-        )}
-        {isOpen('#changes') && (
+        ),
+        isOpen('#changes') && (
           <Text dimColor>Click or Enter: new file opens in the editor, changed or deleted one as a diff · folder collapses or expands</Text>
-        )}
-      </Box>
+        ),
+      ],
+      true,
     )
 
     return (
       <Box flexDirection="column">
+        {figures.length > 0 && tiles(figures, cols)}
         {shows.session && sessionSection}
         {shows.usage && usageSection}
         {shows.agents && agentsSection}
         {shows.checks && checksSection}
         {shows.changes && changesSection}
+        {shows.changes && diffView}
       </Box>
     )
   })
