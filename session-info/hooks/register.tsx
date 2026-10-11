@@ -1,11 +1,13 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { FileChange, InlineDiff } from '../types'
+import type { Checks, FileChange, InlineDiff } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
 import { crossings } from './alerts'
 import type { AgentRow } from './agents'
+import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, NO_CHECKS, toPattern } from './checks'
+import type { CheckView, Patterns } from './checks'
 import { gitStatus } from './git'
 import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
@@ -27,12 +29,13 @@ const turns = atom({ plugin: 'session-info', key: 'turns' } as const, NO_TURNS)
 const compactions = atom({ plugin: 'session-info', key: 'compactions' } as const, 0)
 const breakdown = atom({ plugin: 'session-info', key: 'breakdown' } as const, false)
 const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as string[])
+const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECKS as Checks)
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
 const MINUTE = 60_000
 
-type SectionKey = '#session' | '#usage' | '#agents' | '#changes'
+type SectionKey = '#session' | '#usage' | '#agents' | '#checks' | '#changes'
 
 const toggle = (list: readonly string[], key: string): string[] =>
   list.includes(key) ? list.filter(one => one !== key) : [...list, key]
@@ -52,7 +55,12 @@ function hostOf($: EngineInterface): Host {
     readFile: path => $.fs.read(path),
     writeFile: (path, text) => $.fs.write(path, text),
     exists: path => $.fs.exists(path),
-    env: async () => ({ temp: await $.env.get('TEMP'), tmpdir: await $.env.get('TMPDIR'), os: await $.env.get('OS') }),
+    env: async () => ({
+      temp: await $.env.get('TEMP'),
+      tmpdir: await $.env.get('TMPDIR'),
+      os: await $.env.get('OS'),
+      home: (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')),
+    }),
     sessionId: () => $.session.id(),
     cwd: () => $.session.cwd(),
     toast: text => $.ui.toast(text),
@@ -82,6 +90,26 @@ async function alert($: EngineInterface, limits: readonly Limit[], context: { pe
   }
 }
 
+/** Records a shell call that ran a build or tests as the last one of its kind; any agent's call counts. */
+async function inspect($: EngineInterface, input: Record<string, unknown>, ran: Record<string, unknown>, patterns: Patterns): Promise<void> {
+  const command = typeof input.command === 'string' ? input.command : ''
+  const kinds = classify(command, patterns)
+  if (kinds.length === 0 || ran.deny !== undefined) return
+
+  const isError = ran.isError === true
+  const result = !isError && typeof ran.result === 'object' && ran.result !== null ? (ran.result as Record<string, unknown>) : {}
+  const fallback = typeof ran.result === 'string' ? ran.result : `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  const runs = await checkRuns(hostOf($), kinds, {
+    command,
+    text: typeof ran.text === 'string' ? ran.text : fallback,
+    isError,
+    isBackground: typeof result.backgroundTaskId === 'string',
+    isAgent: input.agentId !== undefined,
+    persistedPath: typeof result.persistedOutputPath === 'string' ? result.persistedOutputPath : undefined,
+  }, Date.now())
+  await update($, checks, current => runs.reduce((all, run) => ({ ...all, [run.kind]: run }), current ?? NO_CHECKS))
+}
+
 async function openPane($: EngineInterface): Promise<{ text: string }> {
   await $.ui.open({ id: PANE, title: TITLE, focus: true })
 
@@ -98,10 +126,12 @@ export const register: Register = (on, options) => {
     session: options.showSession !== false,
     usage: options.showUsage !== false,
     agents: options.showAgents !== false,
+    checks: options.showChecks !== false,
     changes: options.showChanges !== false,
   }
+  const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
-  const isLive = shows.session || shows.usage || shows.agents
+  const isLive = shows.session || shows.usage || shows.agents || shows.checks
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -154,12 +184,14 @@ export const register: Register = (on, options) => {
   })
 
   on('tool.call', async ($, e, next) => {
-    if (!shows.changes) return next(e)
     const isShell = (SHELLS as readonly string[]).includes(e.tool)
-    const before = isShell ? await gitStatus(hostOf($)).catch(() => undefined) : undefined
+    const isChecked = shows.checks && isShell
+    if (!shows.changes && !isChecked) return next(e)
+    const before = shows.changes && isShell ? await gitStatus(hostOf($)).catch(() => undefined) : undefined
     const ran = await next(e)
-    if (ran.deny === undefined && !ran.isError)
-      await track(hostOf($), e.tool, ran.result, before).catch(error => $.ui.toast(`session-info: ${String(error)}`))
+    const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
+    if (shows.changes && ran.deny === undefined && !ran.isError) await track(hostOf($), e.tool, ran.result, before).catch(toast)
+    if (isChecked) await inspect($, e as Record<string, unknown>, ran as Record<string, unknown>, patterns).catch(toast)
 
     return ran
   }).catch(($, e, next) => next(e))
@@ -187,7 +219,10 @@ export const register: Register = (on, options) => {
     const agentLines = agentRows(agents)
     const agentRoom = Math.min(agentLines.length, 8)
     const agentsRows = shows.agents ? 2 + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
-    const room = Math.max(3, (e.viewport?.rows ?? 30) - usageRows - sessionRows - agentsRows - (diff ? 16 : 7))
+    const lastChecks = shows.checks ? await read($, checks) : NO_CHECKS
+    const views = checkViews(lastChecks)
+    const checksRows = shows.checks ? 2 + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
+    const room = Math.max(3, (e.viewport?.rows ?? 30) - usageRows - sessionRows - agentsRows - checksRows - (diff ? 16 : 7))
 
     const header = (key: SectionKey, title: string, right: string) => (
       <Box flexDirection="row" justifyContent="space-between">
@@ -313,6 +348,36 @@ export const register: Register = (on, options) => {
       </Box>
     )
 
+    const checkRows = ({ run, label, result, details }: CheckView) => {
+      const status = CHECK_STATUS[run.status]
+      const tone = run.status === 'failed' ? { color: 'error' } : {}
+
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" justifyContent="space-between">
+            <Box flexDirection="row">
+              <Text color={status.color}>{`${status.glyph} `}</Text>
+              <Text bold>{label}</Text>
+              <Text {...tone} wrap="truncate-end">{`  ${result}`}</Text>
+            </Box>
+            <Text dimColor>{checkWhen(run, Date.now())}</Text>
+          </Box>
+          <Text dimColor wrap="truncate-end">{`  ${run.command}`}</Text>
+          {details.map(detail => (
+            <Text {...tone} wrap="truncate-end">{`  ${detail}`}</Text>
+          ))}
+        </Box>
+      )
+    }
+
+    const checksSection = (
+      <Box flexDirection="column" marginBottom={1}>
+        {header('#checks', 'Checks', checkSummary(lastChecks))}
+        {isOpen('#checks') && views.length === 0 && <Text dimColor>No build or test run in this session yet.</Text>}
+        {isOpen('#checks') && views.map(checkRows)}
+      </Box>
+    )
+
     const changesSection = (
       <Box flexDirection="column">
         {header('#changes', 'Changes', `${changes.length} file${changes.length === 1 ? '' : 's'}  ${summary(changes)}`)}
@@ -358,6 +423,7 @@ export const register: Register = (on, options) => {
         {shows.session && sessionSection}
         {shows.usage && usageSection}
         {shows.agents && agentsSection}
+        {shows.checks && checksSection}
         {shows.changes && changesSection}
       </Box>
     )

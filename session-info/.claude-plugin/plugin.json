@@ -1,7 +1,7 @@
 {
   "name": "session-info",
-  "version": "0.6.0",
-  "description": "Session pane: context, cost and turns, live plan usage bars, running agents, and a treeview of the files this session created, modified or deleted.",
+  "version": "0.7.0",
+  "description": "Session pane: context, cost and turns, live plan usage bars, running agents, the last build and test run, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -26,6 +26,12 @@
       "type": "boolean",
       "title": "Show the Agents section",
       "description": "Subagents and teammates of the session with their status.",
+      "default": true
+    },
+    "showChecks": {
+      "type": "boolean",
+      "title": "Show the Checks section",
+      "description": "Status of the last build and the last test run the session started, with error lines or failed test names.",
       "default": true
     },
     "showChanges": {
@@ -73,6 +79,18 @@
         "nerd",
         "emoji"
       ]
+    },
+    "buildPattern": {
+      "type": "string",
+      "title": "Extra build commands",
+      "description": "A regular expression (case-insensitive) for more commands to treat as a build, matched against each command segment, for example ^make( |$). Leave empty for the built-in list.",
+      "default": ""
+    },
+    "testPattern": {
+      "type": "string",
+      "title": "Extra test commands",
+      "description": "A regular expression (case-insensitive) for more commands to treat as a test run, for example ^make test|^just test. Leave empty for the built-in list.",
+      "default": ""
     }
   }
 }

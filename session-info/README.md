@@ -1,10 +1,11 @@
 # session-info
 
-A Claude Code mod with one pane and four sections:
+A Claude Code mod with one pane and five sections:
 
 - **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
 - **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
+- **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests. .NET, Node, Bun, Rust, Go and Python tools are recognized.
 - **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
 It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed.
@@ -25,6 +26,16 @@ Current week (all models)          resets in 5d 21h
 ⟳ reviewer · review diff
   ⟳ Explore · nested search
 ✓ Explore · find auth code
+
+▾ Checks                         ✖ build  ✖ tests
+✖ Build  2 errors                         4m 2s ago
+  dotnet build App.sln
+  Class1.cs(7,20): CS0029: Cannot implicitly conv…
+  Class1.cs(8,16): CS0103: The name 'total' does …
+✖ Tests  2 failed / 120           agent · 38s ago
+  rtk dotnet test --project tests/App.Tests
+  CalculatorTests.Subtract_Fails
+  CalculatorTests.Divide_Throws
 
 ▾ Changes                    3 files  ✚ 1  ● 1  ✖ 1
 ├─ ▾ src
@@ -54,7 +65,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Action | How |
 | --- | --- |
 | Open the pane | `/session-info` (or `/changes`) |
-| Fold or unfold a section | Press its `▾ Session`, `▾ Usage`, `▾ Agents` or `▾ Changes` header |
+| Fold or unfold a section | Press its `▾ Session`, `▾ Usage`, `▾ Agents`, `▾ Checks` or `▾ Changes` header |
 | Show the context breakdown by category | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
 | Collapse or expand a folder | Press the folder |
@@ -89,6 +100,29 @@ Every agent loop of the session, as Claude Code lists it: subagents the model or
 | `⊘` | killed |
 
 Active agents come first; an agent spawned by another is indented under it. Claude Code drops a finished agent from its list some time after it ends, and the row leaves with it. The section redraws when an agent starts or finishes a turn, and once a minute. Up to 8 rows are shown.
+
+## What the Checks section shows
+
+One row for the last build and one for the last test run, from any shell command the session ran, a subagent's included (marked `agent`). A command counts when one of its segments runs a known tool, so `cd app && npm test` and `rtk dotnet test …` count too:
+
+| Check | Commands |
+| --- | --- |
+| Build | `dotnet build`, `dotnet publish`, `dotnet pack`, `npm`/`pnpm`/`yarn`/`bun run build`, `bun build`, `tsc`, `vite`/`next`/`nuxt`/`astro`/`ng build`, `cargo build`, `cargo check`, `go build`, Gradle and Maven builds |
+| Tests | `dotnet test`, `dotnet run` of a test project, `npm`/`pnpm`/`yarn`/`bun test`, `bun test`, `jest`, `vitest`, `mocha`, `playwright test`, `node --test`, `cargo test`, `go test`, `pytest` |
+
+Add your own commands, such as `make test` or `./build.ps1`, with the `buildPattern` and `testPattern` settings.
+
+The status comes from the command's exit code; an interrupted or timed-out command shows as failed. When a pipe hid the exit code (`dotnet test | tail -3`), the summary in the output decides. The details come from the output itself:
+
+| Check | Shows |
+| --- | --- |
+| A failed build | The error count and the first error lines (`file(line,col): code: message`). With no recognizable error line, the last lines of the output |
+| A test run | `12 passed`, or `2 failed / 120` with the first failed test names. A test run that did not compile shows the compile errors |
+| A command run in the background | `running in background`, until the next run of that kind |
+
+The output is read as the model got it: raw, filtered by RTK, or localized. Localized .NET output (`Com falha! – Com falha: 2, Aprovado: 1, …`) is read by its structure, not its words. When RTK cut the output and points to the whole log (`[full output: …]`), or wrote a vitest JSON report in its place, the mod reads that file for the counts and names.
+
+The readers were checked against real output of `dotnet build` and `dotnet test` (VSTest and Microsoft.Testing.Platform, English and Portuguese), tsc, jest, vitest, `node --test`, Bun and `cargo test`, each with and without RTK. Go and pytest are read by their documented formats.
 
 ## Alerts
 
@@ -133,11 +167,14 @@ Change these in `/config`:
 | `session-info.showSession` | `true`, `false` | `true` |
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
+| `session-info.showChecks` | `true`, `false` | `true` |
 | `session-info.showChanges` | `true`, `false` | `true` |
 | `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
 | `session-info.icons` | `unicode`, `nerd` (needs a [Nerd Font](https://www.nerdfonts.com/)), `emoji` | `unicode` |
+| `session-info.buildPattern` | A case-insensitive regular expression matched against each command segment, for example `^make( \|$)` | empty |
+| `session-info.testPattern` | The same, for test runs, for example `^make test\|^just test` | empty |
 
 ## How changes are detected
 
@@ -155,6 +192,8 @@ After every shell command, the mod also checks that each listed file still exist
 - **Mouse clicks** work in the fullscreen terminal. Elsewhere, use the keyboard.
 - **The diff viewer** runs as a child of the mod, so it closes when the mod reloads.
 - **Binary files** are not handled. The snapshot stores text only.
+- **Checks of background commands** stay `running in background`: mods get no event when a background command ends, so the row updates on the next run of that kind.
+- **Check details** depend on the tool's output format. When a format is not recognized, the row shows the status and, for a failure, the last lines of the output. `rtk dotnet test` on a Microsoft.Testing.Platform project prints no counts when it passes, so the row says `passed`.
 - **Usage** shows only the windows Claude Code exposes to mods. The per-model weekly windows and the `~N tok/turn` total that `/usage` prints come from an endpoint mods cannot reach without your OAuth token, so they are left out.
 
 ## Development
@@ -172,6 +211,8 @@ claude --plugin-dir .
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
+| `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, and its rows |
+| `hooks/parse.ts` | Reads error lines, error counts, test counts and failed test names from build and test output |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |
 | `hooks/git.ts` | `git status`, `HEAD` content and snapshots |
 | `hooks/viewer.ts` | Opens a change: the editor for new files, the diff viewer for the rest |

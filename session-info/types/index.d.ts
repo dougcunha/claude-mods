@@ -6,6 +6,31 @@ export type FileChange = { path: string; status: ChangeStatus; base: string | nu
 /** A diff drawn inside the pane, for the inline viewer or when no external one is found. */
 export type InlineDiff = { path: string; source: string }
 
+export type CheckKind = 'build' | 'test'
+
+export type CheckStatus = 'passed' | 'failed' | 'running'
+
+/**
+ * A build or test command the session ran: its status, and what its output said.
+ * `errors` holds the first error lines of a failed run; `failures` the names of the failed tests.
+ */
+export type CheckRun = {
+  kind: CheckKind
+  status: CheckStatus
+  command: string
+  at: number
+  isAgent: boolean
+  errors: string[]
+  errorCount?: number
+  passed?: number
+  failed?: number
+  skipped?: number
+  total?: number
+  failures: string[]
+}
+
+export type Checks = { build: CheckRun | null; test: CheckRun | null }
+
 declare module 'claude-code' {
   interface PluginState {
     'session-info': {
@@ -23,6 +48,8 @@ declare module 'claude-code' {
       breakdown: boolean
       /** Alert thresholds already notified: `<window>@<resetsAt>:<threshold>` or `context:<threshold>`. */
       alerted: string[]
+      /** The last build and the last test run of the session. */
+      checks: Checks
     }
   }
 }
