@@ -25,7 +25,7 @@ export function tileLayout(count: number, columns: number): { width: number; row
 }
 
 /** Framed cards and KPI tiles drawn with the surface's own `Box` and `Text`; the frame lights under the pointer. */
-export function widgets({ Box, Text }: Widgets) {
+export function widgets({ Box, Text }: Widgets, isTerminal = true) {
   const card = (key: string, isOpen: boolean, children: RenderChildren) => (
     <Box
       key={`card:${key}`}
@@ -34,21 +34,28 @@ export function widgets({ Box, Text }: Widgets) {
       borderColor="subtle"
       borderDimColor={!isOpen}
       paddingX={1}
+      {...(isTerminal ? {} : { marginBottom: 1, paddingY: 1 })}
       hover={{ borderColor: 'claude', borderDimColor: false }}
     >
       {children}
     </Box>
   )
 
+  /** Cells mean nothing outside a terminal: there the tiles take half the row each and wrap by share. */
   const tiles = (data: readonly Tile[], columns: number) => {
     const { width } = tileLayout(data.length, columns)
 
     return (
-      <Box flexDirection="row" flexWrap="wrap">
+      <Box
+        flexDirection="row"
+        flexWrap="wrap"
+        justifyContent={isTerminal ? 'flex-start' : 'space-between'}
+        {...(isTerminal ? {} : { marginBottom: 1, rowGap: 1 })}
+      >
         {data.map(tile => (
           <Box
             key={`tile:${tile.key}`}
-            width={width}
+            width={isTerminal ? width : '49%'}
             flexDirection="row"
             borderStyle="round"
             borderColor="subtle"

@@ -200,9 +200,10 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button, Code } = $.ui.resolve(e)
-    const { card, tiles } = widgets({ Box, Text })
+    const isTerminal = e.surface === 'terminal'
+    const { card, tiles } = widgets({ Box, Text }, isTerminal)
     const cols = Math.max(20, e.props.bodyColumns)
-    const isCards = isFramed(cols)
+    const isCards = !isTerminal || isFramed(cols)
     const inner = isCards ? cols - FRAME_COLUMNS : cols
     const chrome = isCards ? 1 + FRAME_ROWS : 2
     const shut = new Set(await read($, collapsed))
@@ -241,7 +242,7 @@ export const register: Register = (on, options) => {
     const checksRows = shows.checks ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
     const changesFrame = isCards ? FRAME_ROWS : 0
     const above = tileRows + usageRows + sessionRows + agentsRows + checksRows + changesFrame
-    const room = Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7))
+    const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
 
     const section = (key: SectionKey, children: RenderChildren, isLast = false) =>
       isCards ? card(key, isOpen(key), children) : (
@@ -259,8 +260,32 @@ export const register: Register = (on, options) => {
       </Box>
     )
 
+    /** Block characters are cell-wide only in a terminal; elsewhere the bar is two Boxes sized by percentage. */
+    const meter = (percent: number) => {
+      if (isTerminal) {
+        const { filled, empty } = bar(percent, inner - 6)
+
+        return (
+          <Box flexDirection="row">
+            <Text color={colorOf(percent)}>{filled}</Text>
+            <Text dimColor>{empty}</Text>
+            <Text>{` ${percentText(percent)}`}</Text>
+          </Box>
+        )
+      }
+      const share = percent > 0 ? Math.min(100, Math.max(1, Math.round(percent))) : 0
+
+      return (
+        <Box flexDirection="row" alignItems="center" gap={1}>
+          <Box flexGrow={1} flexDirection="row" height={1} backgroundColor="subtle">
+            <Box width={`${share}%`} height={1} backgroundColor={colorOf(percent)} />
+          </Box>
+          <Text>{percentText(percent)}</Text>
+        </Box>
+      )
+    }
+
     const limitRows = (limit: Limit) => {
-      const { filled, empty } = bar(limit.percentUsed, inner - 6)
       const reset = resetIn(limit.resetsAt, Date.now())
 
       return (
@@ -269,11 +294,7 @@ export const register: Register = (on, options) => {
             <Text wrap="truncate-end">{labelOf(limit.kind)}</Text>
             {reset !== undefined && <Text dimColor wrap="truncate-end">{reset}</Text>}
           </Box>
-          <Box flexDirection="row">
-            <Text color={colorOf(limit.percentUsed)}>{filled}</Text>
-            <Text dimColor>{empty}</Text>
-            <Text>{` ${percentText(limit.percentUsed)}`}</Text>
-          </Box>
+          {meter(limit.percentUsed)}
         </Box>
       )
     }
@@ -306,7 +327,6 @@ export const register: Register = (on, options) => {
 
     const spent = usage?.cost === undefined ? '' : `${cost(usage.cost.usd)} · `
     const elapsed = usage === undefined ? '' : duration(Date.now() - usage.startedAt)
-    const contextBar = bar(context?.percent ?? 0, inner - 6)
 
     const sessionSection = section(
       '#session',
@@ -324,11 +344,7 @@ export const register: Register = (on, options) => {
                   : `${tokens(context.tokens)} / ${tokens(context.window)}${compactionText(compacted)}`}
               </Text>
             </Box>
-            <Box flexDirection="row">
-              <Text color={colorOf(context?.percent ?? 0)}>{contextBar.filled}</Text>
-              <Text dimColor>{contextBar.empty}</Text>
-              <Text>{` ${percentText(context?.percent ?? 0)}`}</Text>
-            </Box>
+            {meter(context?.percent ?? 0)}
             {isDetailed &&
               categories.map(category => (
                 <Box flexDirection="row" justifyContent="space-between">

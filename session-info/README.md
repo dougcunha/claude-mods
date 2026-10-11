@@ -10,7 +10,7 @@ A Claude Code mod with one pane and five sections:
 
 It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed.
 
-Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost, the elapsed time, the turn count and the context fill at a glance. Bars fill to the eighth of a cell. In a pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions.
+Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost, the elapsed time, the turn count and the context fill at a glance. Bars fill to the eighth of a cell. In a terminal pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions. The desktop app always draws the frames and tiles, sizing them and the bars by percentage instead of terminal cells.
 
 ```text
 ╭────────────────╮╭────────────────╮╭────────────────╮╭────────────────╮

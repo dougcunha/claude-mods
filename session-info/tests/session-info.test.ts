@@ -209,6 +209,27 @@ test('a narrow pane draws bare sections with cost and duration in the session he
   await ui.unmount()
 })
 
+test('a narrow desktop pane still draws the tiles and percentage bars, not block characters', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.usage', async () =>
+    ({
+      value: {
+        startedAt: Date.now() - 72 * 60_000,
+        cost: { usd: 1.844 },
+        rateLimits: [{ kind: 'five_hour', percentUsed: 44 }],
+        context: { tokens: 124_000, window: 200_000, percent: 62 },
+      },
+    }) as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 36 } })
+  expect(await ui.find({ type: 'Text', text: 'cost' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '62%' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '44%' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /█|░/ })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('bars fill to the eighth of a cell and show any use', async () => {
   expect(bar(50, 10)).toEqual({ filled: '█████', empty: '░░░░░' })
   expect(bar(55, 10)).toEqual({ filled: '█████▌', empty: '░░░░' })

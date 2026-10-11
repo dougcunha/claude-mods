@@ -1,6 +1,6 @@
 {
   "name": "session-info",
-  "version": "0.8.0",
+  "version": "0.8.3",
   "description": "Session pane: context, cost and turns, live plan usage bars, running agents, the last build and test run, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
