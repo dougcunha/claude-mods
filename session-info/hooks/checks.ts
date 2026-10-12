@@ -69,10 +69,13 @@ export function toPattern(source: unknown): RegExp | undefined {
   }
 }
 
+/** A shell command's segments, each without its wrappers: `cd app && rtk git push` gives `cd app` and `git push`. */
+export const segments = (command: string): string[] => command.split(/\s*(?:&&|\|\||[;|\n])\s*/).map(unwrap)
+
 /** Which checks a command runs, segment by segment: `cd app && npm test` is a test run. */
 export function classify(command: string, custom: Patterns = {}): CheckKind[] {
   const kinds = new Set<CheckKind>()
-  for (const segment of command.split(/\s*(?:&&|\|\||[;|\n])\s*/).map(unwrap)) {
+  for (const segment of segments(command)) {
     if (segment === '' || IGNORED.test(segment)) continue
     if (custom.test?.test(segment) || TEST.some(pattern => pattern.test(segment))) kinds.add('test')
     else if (custom.build?.test(segment) || BUILD.some(pattern => pattern.test(segment))) kinds.add('build')

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderChildren } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren, RenderSurface } from 'claude-code'
 
-import type { Checks, ContextReading, FileChange, InlineDiff, Repo, Todo, TurnRecord } from '../types'
+import type { Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, SkillUse, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
 import { crossings } from './alerts'
@@ -11,22 +11,25 @@ import type { Tile } from './cards'
 import { openClient } from './client'
 import { cellWidths, contextText, GLYPH, LEGEND_GAP, legendLines, legendText, SWATCH, toReading } from './context'
 import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, NO_CHECKS, toPattern } from './checks'
+import { CI_POLL_MS, CI_ROOM, CI_STATUS, ciTrigger, isWatching, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from './ci'
 import type { CheckView, Patterns } from './checks'
 import { gitStatus } from './git'
 import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
 import type { IconSet } from './icons'
+import { allowRequest, browseUrl, errorText, isAllowed, isIssueKey, isRefusal, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
 import { age, branchText, countParts, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
+import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
 import { SHELLS, track } from './track'
 import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
-import { latestTodos, parseTodos, TODO_PROMPT, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoReply, todoSummary, todoText } from './todos'
+import { latestTodos, minSteps, parseTodos, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoPrompt, todoReply, todoSummary, todoText } from './todos'
 import { buildTree, flatten } from './tree'
 import { modelText, RESULT, resultText, startDraft, toolsText, tokensText, toRecord, turnLines, withSpawn, withStep, withSubagentUsage, withTool } from './turn'
 import type { TurnDraft } from './turn'
 import type { Row } from './tree'
 import { bar, colorOf, labelOf, ordered, percentText, resetIn } from './usage'
 import type { Limit } from './usage'
-import { openChange } from './viewer'
+import { openChange, openUrl } from './viewer'
 import type { Editor, Prefs, Viewer } from './viewer'
 
 const files = atom({ plugin: 'session-info', key: 'files' } as const, {} as Record<string, FileChange>)
@@ -42,12 +45,16 @@ const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECK
 const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
 const lastTurn = atom({ plugin: 'session-info', key: 'lastTurn' } as const, null as TurnRecord | null)
 const todos = atom({ plugin: 'session-info', key: 'todos' } as const, [] as Todo[])
+const skills = atom({ plugin: 'session-info', key: 'skills' } as const, [] as SkillUse[])
+const ciState = atom({ plugin: 'session-info', key: 'ci' } as const, null as CiWatch | null)
+const jiraServer = atom({ plugin: 'session-info', key: 'jiraServer' } as const, null as string | null)
+const jiraIssues = atom({ plugin: 'session-info', key: 'jiraIssues' } as const, [] as JiraIssue[])
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
 const MINUTE = 60_000
 
-type SectionKey = '#session' | '#turn' | '#todos' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
+type SectionKey = '#session' | '#turn' | '#todos' | '#skills' | '#ci' | '#jira' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
 
 /** Tools whose calls can change the working tree, so the Git section reads the repository again after them. */
 const FILE_TOOLS: readonly string[] = [...SHELLS, 'Write', 'Edit', 'NotebookEdit']
@@ -56,6 +63,15 @@ let reading: Promise<void> | undefined
 let isStale = false
 /** The main-thread turn that runs now; a reload during a turn starts without it. */
 let draft: TurnDraft | undefined
+/** Skill tool calls in flight: the skill.prompt each raises takes the calling loop from here. */
+const pendingSkills: { name: string; agentId?: string; isSeen: boolean }[] = []
+/** The GitHub poll that runs now; a tick while it runs is skipped. */
+let polling: Promise<void> | undefined
+/** The Jira site the reads go to, found once per load; the keys whose read runs now. */
+let jiraSite: { cloudId: string; url?: string } | undefined
+/** The name `$.mcp.call` took for the Jira server, found by the first call that went through. */
+let jiraName: string | undefined
+const reads = new Set<string>()
 
 const toggle = (list: readonly string[], key: string): string[] =>
   list.includes(key) ? list.filter(one => one !== key) : [...list, key]
@@ -166,6 +182,146 @@ async function restoreTodos($: EngineInterface): Promise<void> {
   if (found !== undefined) await update($, todos, () => found)
 }
 
+/** Asks GitHub about the watched runs once, and notifies each run that completed. */
+function pollCi($: EngineInterface): Promise<void> {
+  polling ??= (async () => {
+    const watch = await read($, ciState)
+    if (!isWatching(watch, Date.now())) return
+    const { watch: polled, finished } = await pollWatch(argv => $.process.run(argv), watch, Date.now())
+    // A push made while the poll ran started a new watch: the old poll's answer is dropped.
+    await update($, ciState, current => (current?.since === watch.since ? polled : current))
+    for (const run of finished) {
+      const body = `${run.workflow} · ${run.conclusion} · ${runDetail(run, Date.now())}`
+      const sent = await $.ui.notify(body, { title: 'GitHub Actions' }).catch(() => ({ isSent: false }))
+      if (!sent.isSent) $.ui.toast(`GitHub Actions: ${body}`)
+    }
+  })().finally(() => {
+    polling = undefined
+  })
+
+  return polling
+}
+
+/** Starts following the runs a push, a pull request, a dispatch or a rerun started. */
+async function watchCi($: EngineInterface, command: string, output: string): Promise<void> {
+  const trigger = ciTrigger(command, output)
+  if (trigger === undefined) return
+  const git = async (args: string[]) => {
+    const done = await $.process.run(['git', ...args]).catch(() => undefined)
+
+    return done?.exitCode === 0 ? done.stdout.trim() : undefined
+  }
+  const isCommit = trigger.kind === 'push' || trigger.kind === 'pr'
+  const sha = isCommit ? await git(['rev-parse', 'HEAD']) : undefined
+  const branch = await git(['rev-parse', '--abbrev-ref', 'HEAD'])
+  await update($, ciState, () =>
+    startWatch(trigger, { ...(sha === undefined ? {} : { sha }), ...(branch === undefined ? {} : { branch }) }, Date.now()),
+  )
+  await pollCi($)
+}
+
+/** The connected MCP server that serves getJiraIssue; servers connect after the session starts, so a miss asks again later. */
+async function findJiraServer($: EngineInterface): Promise<string | null> {
+  const known = await read($, jiraServer)
+  if (known !== null) return known
+  const server = (await $.tool.list()).map(tool => serverOf(tool.name)).find(name => name !== undefined) ?? null
+  if (server !== null) await update($, jiraServer, () => server)
+
+  return server
+}
+
+/** Calls a tool of the Jira server by each name it may go by until one goes through; all failing, the first error stands. */
+async function callJira($: EngineInterface, server: string, tool: string, args: Record<string, unknown>) {
+  let first: unknown
+  for (const name of jiraName === undefined ? serverNames(server) : [jiraName]) {
+    try {
+      const result = await $.mcp.call(name, tool, args)
+      jiraName = name
+
+      return result
+    } catch (error) {
+      first ??= error
+    }
+  }
+  throw first
+}
+
+/** The site from the jiraSite setting, else the first Jira site the server's account reaches. */
+async function findJiraSite($: EngineInterface, server: string, setting: unknown): Promise<{ cloudId: string; url?: string } | undefined> {
+  jiraSite ??= siteSetting(setting) ?? readSite(await callJira($, server, 'getAccessibleAtlassianResources', {}))
+
+  return jiraSite
+}
+
+async function readJira($: EngineInterface, key: string, setting: unknown): Promise<void> {
+  if (reads.has(key)) return
+  reads.add(key)
+  const started = Date.now()
+  const store = (fn: (issue: JiraIssue) => JiraIssue) =>
+    update($, jiraIssues, list => (list ?? []).map(issue => (issue.key === key ? fn(issue) : issue)))
+  try {
+    const server = await findJiraServer($)
+    if (server === null) return void (await store(issue => ({ ...issue, readAt: Date.now(), error: 'No Atlassian MCP server is connected.' })))
+    const site = await findJiraSite($, server, setting)
+    if (site === undefined) return void (await store(issue => ({ ...issue, readAt: Date.now(), error: 'No Jira site found: set jiraSite.' })))
+    const result = await callJira($, server, 'getJiraIssue', { cloudId: site.cloudId, issueIdOrKey: key, fields: JIRA_FIELDS })
+    const url = browseUrl(site.url, key)
+    await store(issue => ({ ...readIssue(issue, result, Date.now()), ...(url === undefined ? {} : { url }) }))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // The row has room for one line; the transcript keeps the whole message.
+    $.ui.log(`session-info: Jira ${key}: ${message}`)
+    const server = await read($, jiraServer)
+    const blocked = server !== null && isRefusal(message) ? { blockedTool: `mcp__${server}__getJiraIssue` } : {}
+    // Claude's own read may land while this one fails: a good reading newer than this read stays.
+    await store(issue =>
+      issue.error === undefined && issue.readAt !== undefined && issue.readAt >= started
+        ? issue
+        : { ...issue, readAt: Date.now(), error: errorText(error), ...blocked },
+    )
+  } finally {
+    reads.delete(key)
+  }
+}
+
+/** Puts the request for the allow rule in the prompt, after any draft: the person sends it, and Claude edits the settings. */
+async function askAllow($: EngineInterface, tool: string): Promise<void> {
+  const filled = await $.prompt.fill({ text: allowRequest(tool), mode: 'append' }).catch(() => ({ isFilled: false }))
+  $.ui.toast(filled.isFilled ? 'session-info: send the request in the prompt to add the rule.' : 'session-info: the prompt could not take the request.')
+}
+
+async function copyRule($: EngineInterface, tool: string, surface: RenderSurface): Promise<void> {
+  const copied = await $.ui.copy({ text: tool, surface }).catch(() => ({ isCopied: false as const, reason: 'refused' as const }))
+  $.ui.toast(copied.isCopied ? `session-info: copied ${tool}` : `session-info: could not copy the rule (${copied.reason}).`)
+}
+
+/** The issue as the model's own getJiraIssue call answered it: no call of the mod's, so no permission to ask. */
+async function takeIssue($: EngineInterface, key: string, text: string, cloudId: unknown, setting: unknown): Promise<void> {
+  const at = Date.now()
+  const site = siteSetting(setting)?.url ?? jiraSite?.url ?? (typeof cloudId === 'string' ? siteSetting(cloudId)?.url : undefined)
+  const url = browseUrl(site, key)
+  await update($, jiraIssues, list => {
+    const [top, ...rest] = mention(list ?? [], key, at)
+    const issue = readIssue(top ?? { key, at }, { content: [{ type: 'text', text }] }, at)
+
+    return [{ ...issue, ...(url === undefined ? {} : { url }) }, ...rest]
+  })
+}
+
+/** Puts the mentioned keys on top of the Jira section and reads the ones not read in the last minutes. */
+async function noteIssues($: EngineInterface, keys: readonly string[], setting: unknown): Promise<void> {
+  if (keys.length === 0) return
+  const at = Date.now()
+  const before = await read($, jiraIssues)
+  await update($, jiraIssues, list => [...keys].reverse().reduce((all, key) => mention(all, key, at), list ?? []))
+  for (const key of keys) if (needsRead(before.find(issue => issue.key === key), at)) await readJira($, key, setting)
+}
+
+/** The reads run on after the hook that saw the keys returns, so a slow server never holds the prompt. */
+function noteText($: EngineInterface, text: string, pattern: RegExp | undefined, setting: unknown): void {
+  void noteIssues($, issueKeys(text, pattern), setting).catch(() => undefined)
+}
+
 async function openPane($: EngineInterface, isGitShown: boolean, isSessionShown: boolean): Promise<{ text: string }> {
   if (isGitShown) void refreshRepo($)
   if (isSessionShown) void refreshContext($).catch(() => undefined)
@@ -184,12 +340,16 @@ export const register: Register = (on, options) => {
     session: options.showSession !== false,
     turn: options.showLastTurn !== false,
     todos: options.showTodos !== false,
+    skills: options.showSkills !== false,
+    ci: options.showCi !== false,
     usage: options.showUsage !== false,
     agents: options.showAgents !== false,
     checks: options.showChecks !== false,
     git: options.showGit !== false,
     changes: options.showChanges !== false,
+    jira: options.showJira !== false,
   }
+  const keyPattern = toKeyPattern(options.jiraKeyPattern)
   const gitClient = typeof options.gitClient === 'string' ? options.gitClient.trim() : 'lazygit'
   const paneBackground = typeof options.paneBackground === 'string' ? options.paneBackground.trim() : ''
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
@@ -214,10 +374,30 @@ export const register: Register = (on, options) => {
       })
     if (shows.git) void refreshRepo($)
     if (shows.session) void refreshContext($).catch(() => undefined)
+    if (shows.ci) {
+      $.clock.every(CI_POLL_MS, () => void pollCi($).catch(() => undefined))
+      // A reload during a run picks the watch up again from the state.
+      void pollCi($).catch(() => undefined)
+    }
+    if (shows.jira) void findJiraServer($).catch(() => undefined)
     // The engine draws a pane that the person did not ask for only on a wide terminal; a narrow one keeps it until /session-info.
     if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: TITLE })
 
     return next(e)
+  })
+
+  // /clear starts a new conversation in the same process and raises no session.start: what belonged to the old one goes here.
+  on('classic.SessionStart', async ($, e, next) => {
+    const started = await next(e)
+    if (e.source === 'clear') {
+      draft = undefined
+      if (shows.todos) await update($, todos, () => [])
+      if (shows.turn) await update($, lastTurn, () => null)
+      if (shows.skills) await update($, skills, () => [])
+      if (shows.jira) await update($, jiraIssues, () => [])
+    }
+
+    return started
   })
 
   on('command.run', { command: 'session-info' }, async $ => openPane($, shows.git, shows.session))
@@ -227,26 +407,62 @@ export const register: Register = (on, options) => {
   // A commit made outside the session, in the Git client for example, shows by the next prompt.
   on('prompt.submit', async ($, e, next) => {
     if (shows.git) void refreshRepo($)
+    if (shows.jira) {
+      // MCP servers connect after the session starts: each prompt looks again until one serves Jira.
+      void findJiraServer($).catch(() => undefined)
+      noteText($, e.text, keyPattern, options.jiraSite)
+    }
 
     return next(e)
   })
 
   if (shows.todos) {
+    const instruction = todoPrompt(minSteps(options.todoMinSteps), options.todoInstruction)
     // The section rides after the engine's own, on the session side of the cache boundary.
     on('prompt.compose', async ($, e, next) => {
       const composed = await next(e)
       if (!e.tools.includes(TODO_TOOL)) return composed
 
-      return { sections: [...composed.sections, { id: 'session-info:todos', text: TODO_PROMPT, scope: 'session' }] }
+      return { sections: [...composed.sections, { id: 'session-info:todos', text: instruction, scope: 'session' }] }
     })
 
     on('tool.call', { tool: TODO_TOOL }, async ($, e) => {
       if (e.agentId !== undefined) return { result: 'Ignored: only the main conversation keeps the task list.' }
+      // This hook answers the call itself, so the general tool.call hook never counts it for the Last turn section.
+      if (shows.turn && draft !== undefined) draft = withTool(draft, e.tool)
       const parsed = parseTodos(e as Record<string, unknown>)
       if (typeof parsed === 'string') return { deny: parsed }
       await update($, todos, () => parsed)
 
       return { result: todoReply(parsed) }
+    })
+  }
+
+  if (shows.skills) {
+    // The Skill tool's call raises skill.prompt while it runs; a slash command raises it alone, in the main conversation.
+    on('tool.call', { tool: 'Skill' }, async ($, e, next) => {
+      const input = e as Record<string, unknown>
+      const name = typeof input.skill === 'string' ? input.skill : ''
+      const pending = { name, ...(e.agentId === undefined ? {} : { agentId: e.agentId }), isSeen: false }
+      pendingSkills.push(pending)
+      try {
+        const ran = await next(e)
+        if (!pending.isSeen && name !== '' && ran.deny === undefined && !ran.isError)
+          await update($, skills, list => startSkill(list ?? [], name, e.agentId, Date.now()))
+
+        return ran
+      } finally {
+        pendingSkills.splice(pendingSkills.indexOf(pending), 1)
+      }
+    })
+
+    on('skill.prompt', async ($, e, next) => {
+      const prompted = await next(e)
+      const pending = pendingSkills.find(one => !one.isSeen && isSameSkill(one.name, e.skill))
+      if (pending) pending.isSeen = true
+      await update($, skills, list => startSkill(list ?? [], e.skill, pending?.agentId, Date.now()))
+
+      return prompted
     })
   }
 
@@ -284,6 +500,8 @@ export const register: Register = (on, options) => {
         lastMs: e.durationMs,
       }))
     if (shows.turn && e.agentId !== undefined && draft !== undefined) draft = withSubagentUsage(draft, e.usage)
+    if (shows.skills) await update($, skills, list => endSkills(list ?? [], e.agentId))
+    if (shows.jira && e.agentId === undefined) noteText($, e.answer, keyPattern, options.jiraSite)
     if (shows.turn && e.agentId === undefined) {
       const own = draft
       draft = undefined
@@ -317,13 +535,24 @@ export const register: Register = (on, options) => {
     const isShell = (SHELLS as readonly string[]).includes(e.tool)
     const isChecked = shows.checks && isShell
     const isRepoTool = shows.git && FILE_TOOLS.includes(e.tool)
-    if (!shows.changes && !isChecked && !isRepoTool) return next(e)
+    const isCiTool = shows.ci && isShell
+    // The model's own read of an issue names it as clearly as a mention, and its answer is the read the section needs.
+    const input = e as Record<string, unknown>
+    const asked = typeof input.issueIdOrKey === 'string' ? input.issueIdOrKey.toUpperCase() : ''
+    const isJiraRead = shows.jira && serverOf(e.tool) !== undefined && isIssueKey(asked)
+    if (!shows.changes && !isChecked && !isRepoTool && !isCiTool && !isJiraRead) return next(e)
     const before = shows.changes && isShell ? await gitStatus(hostOf($)).catch(() => undefined) : undefined
     const ran = await next(e)
     const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
     if (shows.changes && ran.deny === undefined && !ran.isError) await track(hostOf($), e.tool, ran.result, before).catch(toast)
     if (isChecked) await inspect($, e as Record<string, unknown>, ran as Record<string, unknown>, patterns).catch(toast)
     if (isRepoTool && ran.deny === undefined) void refreshRepo($)
+    if (isCiTool && ran.deny === undefined && !ran.isError) {
+      const command = typeof (e as Record<string, unknown>).command === 'string' ? String((e as Record<string, unknown>).command) : ''
+      void watchCi($, command, typeof ran.text === 'string' ? ran.text : '').catch(toast)
+    }
+    if (isJiraRead && ran.deny === undefined && !ran.isError && typeof ran.text === 'string')
+      await takeIssue($, asked, ran.text, input.cloudId, options.jiraSite).catch(toast)
 
     return ran
   }).catch(($, e, next) => next(e))
@@ -347,7 +576,19 @@ export const register: Register = (on, options) => {
     const compacted = shows.session ? await read($, compactions) : 0
     const turnRecord = shows.turn ? await read($, lastTurn) : null
     const taskList = shows.todos ? await read($, todos) : []
+    const skillList = shows.skills ? await read($, skills) : []
+    const ciWatch = shows.ci ? await read($, ciState) : null
+    const ciRuns = ciWatch?.runs.slice(0, CI_ROOM) ?? []
+    const issueList = shows.jira ? await read($, jiraIssues) : []
+    // The section waits for an Atlassian MCP server: without one it has nothing to read.
+    const isJiraShown = shows.jira && (issueList.length > 0 || (await read($, jiraServer)) !== null)
+    const issues = issueList.slice(0, JIRA_ROOM)
+    // The settings are read only while a refusal is on screen: the buttons go once the rule is in place.
+    const permissions = issues.some(issue => issue.blockedTool !== undefined) ? await $.settings.read() : undefined
+    const needsAllow = (issue: JiraIssue): issue is JiraIssue & { blockedTool: string } =>
+      issue.blockedTool !== undefined && !isAllowed(permissions, issue.blockedTool)
     const agents = shows.agents ? await $.agent.list() : []
+    const loops = shows.agents || !skillList.some(use => use.agentId !== undefined) ? agents : await $.agent.list()
     const changes = shows.changes ? Object.values(await read($, files)) : []
     const diff = shows.changes ? await read($, inline) : null
     const rows = flatten(buildTree(await $.session.cwd(), changes), shut)
@@ -361,6 +602,11 @@ export const register: Register = (on, options) => {
         : []
     const tileRows = tileLayout(figures.length, cols).rows
     const turnRows = shows.turn ? chrome + (isOpen('#turn') ? (turnRecord ? turnLines(turnRecord).length : 1) : 0) : 0
+    const skillRoom = Math.min(skillList.length, SKILL_ROOM)
+    const skillsRows = shows.skills ? chrome + (isOpen('#skills') ? Math.max(1, skillRoom + (skillList.length > skillRoom ? 1 : 0)) : 0) : 0
+    const ciBody = ciRuns.reduce((sum, run) => sum + 1 + (run.jobs.length > 0 ? 1 : 0) + (run.url === '' ? 0 : 1), 0)
+    const ciRows = shows.ci ? chrome + (isOpen('#ci') ? Math.max(1, ciBody + (ciWatch?.error === undefined ? 0 : 1)) : 0) : 0
+    const jiraRows = isJiraShown ? chrome + (isOpen('#jira') ? Math.max(1, issues.length * 2 + issues.filter(needsAllow).length) : 0) : 0
     const todoRoom = Math.min(taskList.length, TODO_ROOM)
     const todosRows = shows.todos ? chrome + (isOpen('#todos') ? Math.max(1, todoRoom + (taskList.length > todoRoom ? 1 : 0)) : 0) : 0
     const usageRows = shows.usage ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
@@ -375,7 +621,7 @@ export const register: Register = (on, options) => {
     const repo = shows.git ? await read($, repoState) : null
     const gitRows = shows.git ? chrome + (isOpen('#git') ? repoRowCount(repo) : 0) : 0
     const changesFrame = isCards ? FRAME_ROWS : 0
-    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + agentsRows + checksRows + gitRows + changesFrame
+    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame
     const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
 
     const section = (key: SectionKey, children: RenderChildren, isLast = false) =>
@@ -594,6 +840,128 @@ export const register: Register = (on, options) => {
       isOpen('#todos') && taskList.length > todoRoom && <Text dimColor>{`… ${taskList.length - todoRoom} more`}</Text>,
     ])
 
+    const skillLine = (use: SkillUse) => {
+      const status = SKILL_STATUS[use.isActive ? 'active' : 'done']
+      const loop = use.agentId === undefined ? 'main' : (loops.find(agent => agent.id === use.agentId)?.type ?? 'subagent')
+
+      return (
+        <Box flexDirection="row" justifyContent="space-between">
+          <Box flexDirection="row" flexShrink={1}>
+            <Text color={status.color}>{`${status.glyph} `}</Text>
+            <Text bold={use.isActive} dimColor={!use.isActive} wrap="truncate-end">
+              {use.name}
+            </Text>
+          </Box>
+          <Box flexShrink={0} paddingLeft={1}>
+            <Text dimColor>{`${loop} · ${age(Date.now() - use.at)} ago`}</Text>
+          </Box>
+        </Box>
+      )
+    }
+
+    const skillsSection = section('#skills', [
+      header('#skills', 'Skills', skillSummary(skillList)),
+      isOpen('#skills') && skillList.length === 0 && <Text dimColor>No skill loaded in this conversation yet.</Text>,
+      isOpen('#skills') && skillList.slice(0, skillRoom).map(skillLine),
+      isOpen('#skills') && skillList.length > skillRoom && <Text dimColor>{`… ${skillList.length - skillRoom} more`}</Text>,
+    ])
+
+    const ciRunRows = (run: CiRun) => {
+      const state = CI_STATUS[stateOf(run)]
+
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" justifyContent="space-between">
+            <Box flexDirection="row" flexShrink={1}>
+              <Text color={state.color}>{`${state.glyph} `}</Text>
+              <Text bold wrap="truncate-end">
+                {run.workflow || `Run ${run.id}`}
+              </Text>
+            </Box>
+            <Box flexShrink={0} paddingLeft={1}>
+              <Text dimColor>{runDetail(run, Date.now())}</Text>
+            </Box>
+          </Box>
+          {run.jobs.length > 0 && (
+            <Text wrap="truncate-end">
+              {run.jobs.map(job => (
+                <Text color={CI_STATUS[stateOf(job)].color}>{`  ${CI_STATUS[stateOf(job)].glyph} ${job.name}`}</Text>
+              ))}
+            </Text>
+          )}
+          {run.url !== '' && (
+            <Box flexDirection="row" paddingLeft={2}>
+              <Button plain key={`ci:${run.id}`} onPress={() => void openUrl(hostOf($), run.url)}>
+                <Text color="suggestion">↗ Open on GitHub</Text>
+              </Button>
+            </Box>
+          )}
+        </Box>
+      )
+    }
+
+    const ciHeadline = ciWatch ? watchState(ciWatch) : undefined
+    const ciWaiting = ciWatch ? waitingText(ciWatch, Date.now()) : undefined
+    const ciSection = section('#ci', [
+      header(
+        '#ci',
+        'CI',
+        '',
+        ciHeadline === undefined ? undefined : <Text color={CI_STATUS[ciHeadline].color}>{`${CI_STATUS[ciHeadline].glyph} ${ciHeadline}`}</Text>,
+      ),
+      isOpen('#ci') && ciWatch === null && <Text dimColor>No GitHub Actions run started from this session yet.</Text>,
+      isOpen('#ci') && ciWaiting !== undefined && <Text dimColor>{ciWaiting}</Text>,
+      isOpen('#ci') && ciRuns.map(ciRunRows),
+      isOpen('#ci') && ciWatch?.error !== undefined && <Text color="error" wrap="truncate-end">{ciWatch.error}</Text>,
+    ])
+
+    const issueRows = (issue: JiraIssue) => (
+      <Box flexDirection="column">
+        <Box flexDirection="row" justifyContent="space-between">
+          <Box flexDirection="row" flexShrink={1}>
+            <Box flexShrink={0}>
+              {issue.url === undefined ? (
+                <Text bold color="suggestion">{issue.key}</Text>
+              ) : (
+                <Button plain key={`jira:${issue.key}`} onPress={() => void openUrl(hostOf($), issue.url ?? '')}>
+                  <Text bold color="suggestion">{issue.key}</Text>
+                </Button>
+              )}
+            </Box>
+            <Text wrap="truncate-end">{issue.summary === undefined ? '' : ` · ${issue.summary}`}</Text>
+          </Box>
+          {issue.status !== undefined && (
+            <Box flexShrink={0} paddingLeft={1}>
+              <Text color={statusColor(issue.status)}>{issue.status}</Text>
+            </Box>
+          )}
+        </Box>
+        {issue.error === undefined ? (
+          <Text dimColor wrap="truncate-end">{`  ${issueDetail(issue, Date.now())}`}</Text>
+        ) : (
+          <Text color="error" wrap="truncate-end">{`  ${issue.error}`}</Text>
+        )}
+        {needsAllow(issue) && (
+          <Box flexDirection="row" gap={2} paddingLeft={2}>
+            <Button plain key={`jira-allow:${issue.key}`} onPress={() => void askAllow($, issue.blockedTool)}>
+              <Text color="suggestion">Allow reads</Text>
+            </Button>
+            <Button plain key={`jira-copy:${issue.key}`} onPress={() => void copyRule($, issue.blockedTool, e.surface)}>
+              <Text color="suggestion">Copy rule</Text>
+            </Button>
+          </Box>
+        )}
+      </Box>
+    )
+
+    const jiraSection = section('#jira', [
+      header('#jira', 'Jira', issueList.length > JIRA_ROOM ? `${issueList.length} issues` : ''),
+      isOpen('#jira') && issues.length === 0 && (
+        <Text dimColor>{keyPattern ? 'No issue mentioned yet.' : 'No issue mentioned yet. Set jiraKeyPattern to find issue keys in the chat.'}</Text>
+      ),
+      isOpen('#jira') && issues.map(issueRows),
+    ])
+
     const usageSection = section('#usage', [
       header('#usage', 'Usage', ''),
       isOpen('#usage') && limits.length === 0 && (
@@ -767,6 +1135,9 @@ export const register: Register = (on, options) => {
         {shows.session && sessionSection}
         {shows.turn && turnSection}
         {shows.todos && todosSection}
+        {shows.skills && skillsSection}
+        {shows.ci && ciSection}
+        {isJiraShown && jiraSection}
         {shows.usage && usageSection}
         {shows.agents && agentsSection}
         {shows.checks && checksSection}

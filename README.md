@@ -6,7 +6,7 @@ Mods for [Claude Code](https://claude.com/claude-code): panes, slash commands an
 
 | Mod | What it does | Command |
 | --- | --- | --- |
-| [session-info](session-info/) | One pane with the context window, cost and turn stats, the last turn's result, tokens, cache and tools, a task list Claude keeps (like OpenCode's todos), live plan usage bars (like `/usage`), the session's agents, the status of the last build and test run, the Git state of the repository and its submodules, and a treeview of the files the session created, modified or deleted, plus usage and context alerts. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info` |
+| [session-info](session-info/) | One pane with the context window, cost and turn stats, the last turn's result, tokens, cache and tools, a task list Claude keeps (like OpenCode's todos), the skills in use, the GitHub Actions runs the session started, the Jira issues the chat mentions, live plan usage bars (like `/usage`), the session's agents, the status of the last build and test run, the Git state of the repository and its submodules, and a treeview of the files the session created, modified or deleted, plus usage and context alerts. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info` |
 
 <p align="center">
   <img src="session-info/images/pane.png" width="480" alt="The session-info pane: cost, time, turns and context tiles, then the Session, Usage, Agents, Checks, Git and Changes sections">

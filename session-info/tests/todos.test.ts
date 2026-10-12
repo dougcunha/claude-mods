@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { latestTodos, parseTodos, TODO_TOOL, todoReply, todoSummary } from '../hooks/todos'
+import { latestTodos, minSteps, parseTodos, TODO_TOOL, todoPrompt, todoReply, todoSummary } from '../hooks/todos'
 
 const PANE = {
   plugin: 'session-info',
@@ -69,6 +69,30 @@ test('the prompt gets the task list section only when the request offers the too
 
   const plain = await $.prompt.compose({ ...COMPOSE, tools: ['Read'] })
   expect(plain.sections.map(s => s.id)).toEqual(['intro'])
+  expect(offered.sections.at(-1)?.text).toContain('work that has 3 or more distinct steps')
+})
+
+test('todoMinSteps sets the step count the prompt section names', { options: { todoMinSteps: 2 } }, async ($, on) => {
+  on('prompt.compose', async () => ({ sections: [] }) as never)
+  const composed = await $.prompt.compose({ ...COMPOSE, tools: [TODO_TOOL] })
+  expect(composed.sections.at(-1)?.text).toContain('work that has 2 or more distinct steps')
+})
+
+test('todoInstruction replaces the body of the prompt section', { options: { todoInstruction: '  Always plan first.  ' } }, async ($, on) => {
+  on('prompt.compose', async () => ({ sections: [] }) as never)
+  const composed = await $.prompt.compose({ ...COMPOSE, tools: [TODO_TOOL] })
+  expect(composed.sections.at(-1)?.text).toBe('# Task list\nAlways plan first.')
+})
+
+test('the step setting falls back to 3 and a single step drops the single-step exception', async () => {
+  expect(minSteps(undefined)).toBe(3)
+  expect(minSteps(0)).toBe(3)
+  expect(minSteps(2.5)).toBe(3)
+  expect(minSteps('4')).toBe(4)
+  const one = todoPrompt(1)
+  expect(one).toContain('any work, even of a single step')
+  expect(one).not.toContain('single, simple step')
+  expect(todoPrompt(3, '   ')).toContain('3 or more distinct steps')
 })
 
 test('session start registers the tool and a resumed session gets its list back', async ($, on) => {
@@ -113,4 +137,26 @@ test('lists parse, count and come back from the transcript', async () => {
   const failed = { toolUses: [{ tool: TODO_TOOL, input: { todos: 'bad' }, isError: true as const }] }
   expect(latestTodos([older, failed])).toEqual([{ content: 'old', status: 'pending' }])
   expect(latestTodos([{ toolUses: [] }])).toBeUndefined()
+})
+
+test('/clear empties the task list and the last turn; a resume keeps them', async ($, on) => {
+  pane(on)
+  on('classic.SessionStart', async () => ({}))
+  on('turn.start', async (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', async (_, e) => ({ text: e.answer }))
+  await $.tool.call({ tool: TODO_TOOL, todos: TODOS } as never)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await $.turn.complete({ answer: '', durationMs: 1_000, isAborted: false, turnId: 't1', reason: 'answer' })
+
+  await $.classic.SessionStart({ source: 'resume' })
+  const kept = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await kept.find({ type: 'Text', text: '1/3 done' })).toBeDefined()
+  expect(await kept.find({ type: 'Text', text: /^No turn finished yet/ })).toBeUndefined()
+  await kept.unmount()
+
+  await $.classic.SessionStart({ source: 'clear' })
+  const cleared = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await cleared.find({ type: 'Text', text: /^No task list yet/ })).toBeDefined()
+  expect(await cleared.find({ type: 'Text', text: 'No turn finished yet.' })).toBeDefined()
+  await cleared.unmount()
 })

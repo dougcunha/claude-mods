@@ -55,7 +55,7 @@ test('tracks created, modified and deleted files and draws them as a tree', asyn
   expect(snapshots.find(([path]) => path.endsWith('/old.ts'))?.[1]).toBe('one\ntwo\n')
   expect(snapshots.find(([path]) => path.endsWith('/new.ts'))?.[1]).toBe('')
 
-  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 80, rows: 50 } })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 80, rows: 80 } })
   expect(await ui.find({ type: 'Text', text: /3 files/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^new\.ts$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^old\.ts$/ })).toBeDefined()

@@ -35,6 +35,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await $.tool.call({ tool: 'Read', file_path: '/repo/a.ts' })
     await $.tool.call({ tool: 'Read', file_path: '/repo/b.ts' })
     await $.tool.call({ tool: 'Grep', pattern: 'x' })
+    await $.tool.call({ tool: 'mcp__session-info__todo_write', todos: [] } as never)
     await $.turn.complete({ answer: '', durationMs: 4_000, isAborted: false, turnId: 'sub', agentId: 'a1', reason: 'answer', usage: { ...USAGE, model: 'claude-haiku-5-5' } })
     spent = 1.42
     await $.turn.complete({ answer: 'done', durationMs: 72_000, isAborted: false, turnId: 't1', reason: 'answer', usage: USAGE })
@@ -45,7 +46,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(await drawn.find({ type: 'Text', text: 'turns' })).toBeUndefined()
     expect(await drawn.find({ type: 'Text', text: 'claude-opus-5-5' })).toBeDefined()
     expect(await drawn.find({ type: 'Text', text: 'in 3.2k · out 4.1k · cache 182k read / 12k write · 92% hit' })).toBeDefined()
-    expect(await drawn.find({ type: 'Text', text: 'Read 2 · Grep 1 · subagents (201k tok)' })).toBeDefined()
+    expect(await drawn.find({ type: 'Text', text: 'Read 2 · Grep 1 · todo_write 1 · subagents (201k tok)' })).toBeDefined()
 
     await drawn.press({ key: 'section:#turn' })
     expect(await drawn.find({ type: 'Text', text: 'claude-opus-5-5' })).toBeUndefined()

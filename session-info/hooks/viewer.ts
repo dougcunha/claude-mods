@@ -64,6 +64,13 @@ export function launch(host: Host, argv: string[], cwd?: string): void {
   })()
 }
 
+/** Opens a web page in the default browser. */
+export async function openUrl(host: Host, url: string): Promise<void> {
+  const os = await platformOf(host)
+  if (os === 'windows') return launch(host, ['explorer.exe', url])
+  launch(host, [os === 'mac' ? 'open' : 'xdg-open', url])
+}
+
 /** Opens a file in VS Code, or in the app the system associates with it. */
 async function openInEditor(host: Host, path: string, editor: Editor): Promise<void> {
   if (editor === 'vscode' || (editor === 'auto' && (await codeOnPath(host))))

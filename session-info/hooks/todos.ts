@@ -46,13 +46,32 @@ export const TODO_SPEC = {
   isDeferred: false,
 } as const
 
-/** The system prompt section that tells the model when to keep the list. */
-export const TODO_PROMPT = [
-  '# Task list',
-  `Use the ${TODO_TOOL} tool to plan and track work that has 3 or more distinct steps, or when the user gives several tasks at once.`,
-  'Write the list before you start the work. Update it each time a task starts or ends, so the list always shows the current state.',
-  'Do not use it for a single, simple step or for a question that needs only an answer.',
-].join('\n')
+/** Steps a piece of work needs before the prompt asks for a list, when the setting names none. */
+export const TODO_MIN_STEPS = 3
+
+/** The setting as a step count: a whole number from 1, else the default. */
+export function minSteps(value: unknown): number {
+  const steps = typeof value === 'number' ? value : Number(value)
+
+  return Number.isInteger(steps) && steps >= 1 ? steps : TODO_MIN_STEPS
+}
+
+/**
+ * The system prompt section that tells the model when to keep the list: work of `steps` or more distinct steps.
+ * A custom instruction from the settings replaces the body under the heading.
+ */
+export function todoPrompt(steps: number, custom?: unknown): string {
+  const own = typeof custom === 'string' ? custom.trim() : ''
+  if (own !== '') return `# Task list\n${own}`
+  const work = steps === 1 ? 'any work, even of a single step' : `work that has ${steps} or more distinct steps`
+
+  return [
+    '# Task list',
+    `Use the ${TODO_TOOL} tool to plan and track ${work}, or when the user gives several tasks at once.`,
+    'Write the list before you start the work. Update it each time a task starts or ends, so the list always shows the current state.',
+    steps === 1 ? 'Do not use it for a question that needs only an answer.' : 'Do not use it for a single, simple step or for a question that needs only an answer.',
+  ].join('\n')
+}
 
 /** The list from a call's input, or why the input is not a list. */
 export function parseTodos(input: Record<string, unknown>): Todo[] | string {

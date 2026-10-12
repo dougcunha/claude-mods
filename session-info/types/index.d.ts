@@ -91,6 +91,62 @@ export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 /** One task of the list the model writes with the mod's todo_write tool; `activeForm` is the task as it runs. */
 export type Todo = { content: string; status: TodoStatus; activeForm?: string }
 
+/** One skill the session loaded, by the Skill tool or a slash command; `agentId` is absent for the main conversation. */
+export type SkillUse = { name: string; agentId?: string; at: number; isActive: boolean }
+
+/** A GitHub Actions job as `gh run view --json jobs` reports it; `conclusion` is '' until the job completes. */
+export type CiJob = { name: string; status: string; conclusion: string }
+
+/** A GitHub Actions run as `gh` reports it; times in epoch milliseconds. */
+export type CiRun = {
+  id: number
+  workflow: string
+  title: string
+  branch: string
+  sha: string
+  status: string
+  conclusion: string
+  url: string
+  createdAt: number
+  updatedAt: number
+  jobs: CiJob[]
+}
+
+export type CiTriggerKind = 'push' | 'pr' | 'workflow' | 'rerun'
+
+/**
+ * The runs the CI section follows: those of the last push, pull request, workflow dispatch or rerun of the session.
+ * `sha` finds a push's runs; `runIds` names the runs a dispatch or rerun started; `error` stops the polling.
+ */
+export type CiWatch = {
+  trigger: CiTriggerKind
+  since: number
+  sha?: string
+  branch?: string
+  runIds: number[]
+  runs: CiRun[]
+  error?: string
+}
+
+/**
+ * A Jira issue the conversation mentioned, as the Atlassian MCP server read it.
+ * `readAt` is absent while the read runs; `error` holds why it failed; `updated` in epoch milliseconds.
+ */
+export type JiraIssue = {
+  key: string
+  at: number
+  readAt?: number
+  summary?: string
+  status?: string
+  priority?: string
+  assignee?: string
+  updated?: number
+  url?: string
+  error?: string
+  /** The tool a permission check refused to the mod's read, which an allow rule would let through. */
+  blockedTool?: string
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'session-info': {
@@ -118,6 +174,14 @@ declare module 'claude-code' {
       lastTurn: TurnRecord | null
       /** The task list of the main conversation, as its last todo_write call sent it. */
       todos: Todo[]
+      /** The skills loaded in this conversation, newest first. */
+      skills: SkillUse[]
+      /** The GitHub Actions runs the session started last; null before the first push or dispatch. */
+      ci: CiWatch | null
+      /** The MCP server that serves getJiraIssue, as its tools spell it; null while none is connected. */
+      jiraServer: string | null
+      /** The Jira issues the conversation mentioned, the last one first. */
+      jiraIssues: JiraIssue[]
     }
   }
 }

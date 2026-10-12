@@ -1,10 +1,13 @@
 # session-info
 
-A Claude Code mod with one pane and eight sections:
+A Claude Code mod with one pane and eleven sections:
 
 - **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
 - **Last turn**: how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, and the tools it called.
 - **Todos**: the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it.
+- **Skills**: the skills the conversation loaded, which agent loaded each one, and the ones still active.
+- **CI**: the GitHub Actions runs that a push, a pull request, a workflow dispatch or a rerun of the session started, with their jobs, a link and a notification when each run ends.
+- **Jira**: the Jira issues the chat mentions, with summary, status, priority and assignee, read through the Atlassian MCP server you connected.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
 - **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
 - **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests. .NET, Node, Bun, Rust, Go and Python tools are recognized.
@@ -37,6 +40,22 @@ Each section is a card with a rounded frame that lights up under the pointer in 
 │ ◐ Writing the Last turn section                                      │
 │ ○ Add tests                                                          │
 │ ⊘ Draw a band above the prompt                                       │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Skills                                                    1 active │
+│ ⟳ plugin-authoring                                     main · 2m ago │
+│ ✓ code-review                                      Explore · 14m ago │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ CI                                                       ⟳ running │
+│ ⟳ CI                                         main · a1b2c3d · 2m 10s │
+│   ✓ build  ✓ lint  ⟳ test  ◌ deploy                                  │
+│   ↗ Open on GitHub                                                   │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Jira                                                               │
+│ WIN-3159 · Fix the login timeout                             In test │
+│   P3 · Ana Souza · updated 2h ago                                    │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
 │ ▾ Usage                                                              │
@@ -96,7 +115,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Action | How |
 | --- | --- |
 | Open the pane | `/session-info` (or `/changes`). To open it when the session starts, set `session-info.openOnStart` to `true` |
-| Fold or unfold a section | Press its `▾ Session`, `▾ Usage`, `▾ Agents`, `▾ Checks`, `▾ Git` or `▾ Changes` header |
+| Fold or unfold a section | Press its header, for example `▾ Session` or `▾ Changes` |
 | Open the Git client | Press the branch name in the `▾ Git` header, or press `g` while the pane has the focus |
 | Show the legend of the context bar | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
@@ -128,7 +147,7 @@ The section shows the last turn of the main conversation. It updates when the tu
 | Tokens | Input, output, cache read and cache write tokens, summed over the turn's requests, and the share of the input that the prompt cache served (`cache read / (input + cache read + cache write)`) |
 | Tools | The tools the main conversation called in the turn, most-called first, four names and then `+N more`. An MCP tool shows by its own name. Then the subagents the turn spawned and the tokens of the subagent runs that ended during the turn |
 
-The token counts of the main turn do not include its subagents; the Tools row shows them apart. A subagent that runs in the background and ends after the turn is not counted. When the mod loads while a turn runs, for example after a reload, that turn's record has no effort, request count, tools or cost.
+The token counts of the main turn do not include its subagents; the Tools row shows them apart. A subagent that runs in the background and ends after the turn is not counted. When the mod loads while a turn runs, for example after a reload, that turn's record has no effort, request count, tools or cost. `/clear` empties the section.
 
 ## What the Agents section shows
 
@@ -252,7 +271,62 @@ Claude Code gives the model no task tool in every setup, so the mod registers it
 
 The header counts the completed tasks out of the tasks not cancelled. The section draws 12 tasks and folds the rest into `… N more`. Only the main conversation keeps the list: a subagent's call changes nothing. A resumed session takes the list back from the last call in its transcript.
 
+Claude still decides when to write a list: the prompt section only asks for one. Two settings shape what it asks, so the rule lives with the tool instead of in a CLAUDE.md that would keep it after the mod is off:
+
+- `todoMinSteps`: the step count that calls for a list, 3 by default. With 1, the section asks for a list for any work, but not for a question that needs only an answer.
+- `todoInstruction`: your own text for the section, in place of the built-in one, under the `# Task list` heading. Empty keeps the built-in text.
+
 The tool and the prompt section use tokens on each request. Set `showTodos` to `false` to remove both, with the section.
+
+The list belongs to the conversation: `/clear` empties it, a new session starts without one, and `/reload-plugins` keeps it.
+
+## What the Skills section shows
+
+Each skill the conversation loaded, newest first: by the Skill tool (Claude's own choice, or a subagent's) or by a slash command you typed. The row shows the agent that loaded it, `main` for the main conversation, and how long ago.
+
+A skill has no end of its own: its text stays in the conversation. The section shows a skill as active (`⟳`) until the turn of the agent that loaded it ends, then as done (`✓`). The section draws the last 6 skills. `/clear` empties it.
+
+## What the CI section shows
+
+The section follows the GitHub Actions runs that the session started through a shell command:
+
+| Command | Runs it follows |
+| --- | --- |
+| `git push` | The runs of the commit at `HEAD`, found with `gh run list --commit` for 2 minutes after the push |
+| `gh pr create` | The same, for the commit at `HEAD` |
+| `gh workflow run` | The run whose URL the command printed; with an older `gh` that prints none, the dispatched runs created after the command |
+| `gh run rerun <id>` | That run |
+
+Each run shows its workflow, branch, commit and time, a row of its jobs and an `↗ Open on GitHub` button that opens the run in your browser. While a run is open the section asks GitHub every 15 seconds with `gh run view`; when a run ends it raises a native notification with the result. The header shows `⟳ running` while a run is open, else the worst result. A new push replaces the runs of the previous one.
+
+The section needs the [GitHub CLI](https://cli.github.com/) on the `PATH`, logged in with `gh auth login`; the mod never reads a token. When `gh` is missing or fails, the section shows its message and stops asking.
+
+## What the Jira section shows
+
+The issues the chat mentions, the last one first, read with `getJiraIssue` on the Atlassian MCP server you connected (for example the Atlassian plugin). The mod calls the server with Claude Code's own connection, so it never reads a credential. Without a connected server that serves `getJiraIssue`, the section stays hidden.
+
+The section finds an issue key in three places:
+
+- Your prompt and Claude's answer, when `jiraKeyPattern` matches. Set it to your keys, for example `WIN-\d+|ABC-\d+`. An empty pattern finds nothing, so `UTF-8` or `SHA-256` never reads as an issue.
+- A `/browse/KEY-123` link, with or without the pattern.
+- Claude's own `getJiraIssue` calls. The section takes the issue from Claude's answer and makes no call of its own.
+
+A key from your prompt or Claude's answer is read by the mod's own call. That call goes through Claude Code's permission check like a tool call of Claude's, so in the default or auto mode it can be refused. Auto mode refuses it every time: its classifier judges only the calls a request of Claude's asked for, and gives no verdict for the mod's own. The row then says which tool to allow, and the transcript gets the whole message. Under it, while no allow rule covers the tool, two buttons help: `Allow reads` puts a request for the rule in the prompt, after any draft, for you to send, and `Copy rule` copies the tool name. The mod never writes your settings itself: the API has no call to add a permission rule, and a plugin that granted itself one would skip your approval. A read Claude made itself is not replaced by a refusal that comes later. To let the mod read issues, allow the two tools it calls in your settings:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_atlassian_atlassian__getJiraIssue",
+      "mcp__plugin_atlassian_atlassian__getAccessibleAtlassianResources"
+    ]
+  }
+}
+```
+
+With `jiraSite` set, the mod never calls `getAccessibleAtlassianResources`. The tool names follow the server you connected; `/mcp` lists them.
+
+Each issue shows its key, summary, status, priority, assignee and when it was last updated. Pressing the key opens the issue in your browser. A key read in the last 5 minutes is not read again. The section draws the last 3 issues. `jiraSite` names your site (`https://company.atlassian.net`); left empty, the mod asks the server for the first Jira site your account reaches. `/clear` empties the section.
 
 ## Settings
 
@@ -264,6 +338,13 @@ Change these in `/config`:
 | `session-info.showSession` | `true`, `false` | `true` |
 | `session-info.showLastTurn` | `true`, `false` | `true` |
 | `session-info.showTodos` | `true`, `false` | `true` |
+| `session-info.todoMinSteps` | A whole number from 1: the steps that call for a task list | `3` |
+| `session-info.todoInstruction` | Your own text for the prompt section that asks for the task list. Empty uses the built-in text | empty |
+| `session-info.showSkills` | `true`, `false` | `true` |
+| `session-info.showCi` | `true`, `false` | `true` |
+| `session-info.showJira` | `true`, `false` | `true` |
+| `session-info.jiraKeyPattern` | A regular expression for your issue keys, for example `WIN-\d+\|ABC-\d+` | empty |
+| `session-info.jiraSite` | Your Jira site URL, for example `https://company.atlassian.net`, or its cloud id. Empty uses the first site your account reaches | empty |
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
 | `session-info.showChecks` | `true`, `false` | `true` |

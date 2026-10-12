@@ -1,7 +1,7 @@
 {
   "name": "session-info",
-  "version": "0.14.0",
-  "description": "Session pane: context, cost and turns, the last turn's tokens, cache and tools, a task list Claude keeps, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
+  "version": "0.15.0",
+  "description": "Session pane: context, cost and turns, the last turn's tokens, cache and tools, a task list Claude keeps, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -33,6 +33,48 @@
       "title": "Show the Todos section",
       "description": "Give Claude a todo_write tool and show the task list it keeps for work with several steps. Off removes the tool and its prompt section.",
       "default": true
+    },
+    "todoMinSteps": {
+      "type": "number",
+      "title": "Steps before a task list",
+      "description": "The prompt section asks Claude to write a task list for work with at least this many distinct steps. 1 asks for a list for any work, but not for a question that needs only an answer.",
+      "default": 3
+    },
+    "todoInstruction": {
+      "type": "string",
+      "title": "Task list instruction",
+      "description": "Your own text for the prompt section that tells Claude when to keep the task list, in place of the built-in one. Leave empty to use the built-in text with the step count above.",
+      "default": ""
+    },
+    "showSkills": {
+      "type": "boolean",
+      "title": "Show the Skills section",
+      "description": "The skills the conversation loaded and the agent that loaded each one. A skill stays active until the turn of its agent ends.",
+      "default": true
+    },
+    "showCi": {
+      "type": "boolean",
+      "title": "Show the CI section",
+      "description": "Follow the GitHub Actions runs that a git push, gh pr create, gh workflow run or gh run rerun of the session started, with their jobs, a link and a notification at the end. Needs the GitHub CLI (gh), logged in.",
+      "default": true
+    },
+    "showJira": {
+      "type": "boolean",
+      "title": "Show the Jira section",
+      "description": "Show the Jira issues the chat mentions, read through the connected Atlassian MCP server. The section stays hidden while no such server is connected.",
+      "default": true
+    },
+    "jiraKeyPattern": {
+      "type": "string",
+      "title": "Jira issue key pattern",
+      "description": "A regular expression for your issue keys, for example WIN-\\d+|ABC-\\d+. Leave empty to show only the issues of /browse/ links and the issues Claude reads.",
+      "default": ""
+    },
+    "jiraSite": {
+      "type": "string",
+      "title": "Jira site",
+      "description": "Your Jira site URL, for example https://company.atlassian.net, or its cloud id. Leave empty to use the first Jira site the Atlassian account reaches.",
+      "default": ""
     },
     "showUsage": {
       "type": "boolean",
