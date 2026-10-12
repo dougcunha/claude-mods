@@ -41,6 +41,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
 
     const drawn = await $.ui.mount({ ...PANE, surface })
     expect(await drawn.find({ type: 'Text', text: '✓ answer · 1m 12s · $0.42' })).toBeDefined()
+    expect(await drawn.find({ type: 'Text', text: '▾ Last turn #1' })).toBeDefined()
+    expect(await drawn.find({ type: 'Text', text: 'turns' })).toBeUndefined()
     expect(await drawn.find({ type: 'Text', text: 'claude-opus-5-5' })).toBeDefined()
     expect(await drawn.find({ type: 'Text', text: 'in 3.2k · out 4.1k · cache 182k read / 12k write · 92% hit' })).toBeDefined()
     expect(await drawn.find({ type: 'Text', text: 'Read 2 · Grep 1 · subagents (201k tok)' })).toBeDefined()

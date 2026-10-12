@@ -309,7 +309,7 @@ export const register: Register = (on, options) => {
     const usage = isLive ? await $.session.usage() : undefined
     const reading = shows.session ? await read($, contextState) : null
     const limits: Limit[] = shows.usage && usage ? ordered(usage.rateLimits) : []
-    const stats = shows.session ? await read($, turns) : NO_TURNS
+    const stats = shows.session || shows.turn ? await read($, turns) : NO_TURNS
     const compacted = shows.session ? await read($, compactions) : 0
     const turnRecord = shows.turn ? await read($, lastTurn) : null
     const agents = shows.agents ? await $.agent.list() : []
@@ -322,8 +322,6 @@ export const register: Register = (on, options) => {
         ? [
             ...(usage.cost === undefined ? [] : [{ key: 'cost', value: cost(usage.cost.usd), label: 'cost' }]),
             { key: 'elapsed', value: duration(Date.now() - usage.startedAt), label: 'elapsed' },
-            { key: 'turns', value: `${(stats ?? NO_TURNS).count}`, label: (stats ?? NO_TURNS).count === 1 ? 'turn' : 'turns' },
-            { key: 'context', value: percentText(context?.percent ?? 0), label: 'context', color: colorOf(context?.percent ?? 0) },
           ]
         : []
     const tileRows = tileLayout(figures.length, cols).rows
@@ -518,10 +516,12 @@ export const register: Register = (on, options) => {
 
     const turnModel = turnRecord ? modelText(turnRecord) : ''
     const turnTools = turnRecord ? toolsText(turnRecord) : ''
+    // The turn counter and the record update in the same turn.complete, so the count numbers the turn shown.
+    const turnCount = (stats ?? NO_TURNS).count
     const turnSection = section('#turn', [
       header(
         '#turn',
-        'Last turn',
+        turnRecord && turnCount > 0 ? `Last turn #${turnCount}` : 'Last turn',
         '',
         turnRecord ? <Text color={RESULT[turnRecord.reason].color}>{resultText(turnRecord)}</Text> : undefined,
       ),

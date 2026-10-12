@@ -12,12 +12,12 @@ A Claude Code mod with one pane and seven sections:
 
 It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed.
 
-Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost, the elapsed time, the turn count and the context fill at a glance. Bars fill to the eighth of a cell. In a terminal pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions. The desktop app always draws the frames and tiles, sizing them and the bars by percentage instead of terminal cells.
+Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost and the elapsed time at a glance. Bars fill to the eighth of a cell. In a terminal pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions. The desktop app always draws the frames and tiles, sizing them and the bars by percentage instead of terminal cells.
 
 ```text
-╭────────────────╮╭────────────────╮╭────────────────╮╭────────────────╮
-│ $1.84 cost     ││ 1h 12m elapsed ││ 14 turns       ││ 62% context    │
-╰────────────────╯╰────────────────╯╰────────────────╯╰────────────────╯
+╭──────────────────────────────────╮╭──────────────────────────────────╮
+│ $1.84 cost                       ││ 1h 12m elapsed                   │
+╰──────────────────────────────────╯╰──────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
 │ ▾ Session                                                            │
 │ ▸ Context                                 124k / 200k · 1 compaction │
@@ -25,7 +25,7 @@ Each section is a card with a rounded frame that lights up under the pointer in 
 │ 14 turns · ~250 output tok/turn · last 38s                           │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
-│ ▾ Last turn                                ✓ answer · 1m 12s · $0.42 │
+│ ▾ Last turn #14                            ✓ answer · 1m 12s · $0.42 │
 │ claude-opus-5-5 · high · 6 requests                                  │
 │ in 3.2k · out 4.1k · cache 182k read / 12k write · 92% hit           │
 │ Bash 4 · Edit 3 · Read 2 · 1 subagent (45k tok)                      │
@@ -102,7 +102,7 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 
 | Row | Source |
 | --- | --- |
-| Cost, elapsed and turns (tiles) | The session's cost as `/cost` totals it, the time since the session started, and the main-thread turn count. In a narrow pane, cost and duration move to the section header |
+| Cost and elapsed (tiles) | The session's cost as `/cost` totals it and the time since the session started. In a narrow pane, they move to the section header |
 | Context bar | The live context window: tokens used, the window size, where auto-compaction runs (`compacts at 967k`) and the percentage. The bar is stacked, one color per category (system prompt, tools, memory files, skills, messages), then the free space as a thin line and the compaction buffer shaded. Pressing `▸ Context` unfolds a legend with each category's tokens and share. The categories are estimated locally after each turn and compaction; before the first reading the bar has one color |
 | Compactions | Compactions that went through in the main conversation |
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
@@ -115,7 +115,7 @@ The section shows the last turn of the main conversation. It updates when the tu
 
 | Row | Source |
 | --- | --- |
-| Header | How the turn ended (`✓ answer`, `⊘ aborted`, `✖ refusal`, `✖ error`), its duration, and its cost: the session's cost when the turn ended minus the cost when it started, so it includes the subagents that ran during the turn |
+| Header | The turn's number (`#14`), how the turn ended (`✓ answer`, `⊘ aborted`, `✖ refusal`, `✖ error`), its duration, and its cost: the session's cost when the turn ended minus the cost when it started, so it includes the subagents that ran during the turn |
 | Model | The model of the last request of the turn, the effort it sent, and how many model requests the turn made |
 | Tokens | Input, output, cache read and cache write tokens, summed over the turn's requests, and the share of the input that the prompt cache served (`cache read / (input + cache read + cache write)`) |
 | Tools | The tools the main conversation called in the turn, most-called first, four names and then `+N more`. An MCP tool shows by its own name. Then the subagents the turn spawned and the tokens of the subagent runs that ended during the turn |
@@ -212,7 +212,7 @@ A usage window alerts again after it resets; the context alert re-arms once the 
 
 The bars read the same figures as `/usage` and the status line. Claude Code learns them from each API response, so they move after a reply, not while the session is idle. The pane redraws when a window moves a whole point, and once a minute so the reset countdown stays current.
 
-The section shows each window Claude Code reports: the current session (`five_hour`), the current week (`seven_day`) and a gateway's spend limit. A bar and its percentage are green below 50%, yellow from 50%, orange from 70% and red from 90%. The context tile and the single-color context bar use the same scale. On API-key or other non-subscription accounts there are no windows to show.
+The section shows each window Claude Code reports: the current session (`five_hour`), the current week (`seven_day`) and a gateway's spend limit. A bar and its percentage are green below 50%, yellow from 50%, orange from 70% and red from 90%. The single-color context bar uses the same scale. On API-key or other non-subscription accounts there are no windows to show.
 
 ## How a file opens
 
