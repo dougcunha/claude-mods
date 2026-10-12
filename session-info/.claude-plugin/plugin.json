@@ -1,7 +1,7 @@
 {
   "name": "session-info",
-  "version": "0.9.0",
-  "description": "Session pane: context, cost and turns, live plan usage bars, running agents, the last build and test run, and a treeview of the files this session created, modified or deleted.",
+  "version": "0.10.0",
+  "description": "Session pane: context, cost and turns, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -39,6 +39,18 @@
       "title": "Show the Checks section",
       "description": "Status of the last build and the last test run the session started, with error lines or failed test names.",
       "default": true
+    },
+    "showGit": {
+      "type": "boolean",
+      "title": "Show the Git section",
+      "description": "Branch and upstream state, working-tree counts, the last commit, an operation in progress and the submodules that changed.",
+      "default": true
+    },
+    "gitClient": {
+      "type": "string",
+      "title": "Git client",
+      "description": "Command that the branch name (or g) opens in a new terminal window, in the repository root, for example lazygit, gitui or tig. Use double quotes around a path with spaces. Leave empty to turn it off.",
+      "default": "lazygit"
     },
     "showChanges": {
       "type": "boolean",

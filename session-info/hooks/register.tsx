@@ -1,19 +1,21 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { Checks, FileChange, InlineDiff } from '../types'
+import type { Checks, FileChange, InlineDiff, Repo } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
 import { crossings } from './alerts'
 import type { AgentRow } from './agents'
 import { FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
+import { openClient } from './client'
 import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, NO_CHECKS, toPattern } from './checks'
 import type { CheckView, Patterns } from './checks'
 import { gitStatus } from './git'
 import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
 import type { IconSet } from './icons'
+import { age, branchText, countParts, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { SHELLS, track } from './track'
 import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
 import { buildTree, flatten } from './tree'
@@ -32,12 +34,19 @@ const compactions = atom({ plugin: 'session-info', key: 'compactions' } as const
 const breakdown = atom({ plugin: 'session-info', key: 'breakdown' } as const, false)
 const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as string[])
 const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECKS as Checks)
+const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
 const MINUTE = 60_000
 
-type SectionKey = '#session' | '#usage' | '#agents' | '#checks' | '#changes'
+type SectionKey = '#session' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
+
+/** Tools whose calls can change the working tree, so the Git section reads the repository again after them. */
+const FILE_TOOLS: readonly string[] = [...SHELLS, 'Write', 'Edit', 'NotebookEdit']
+
+let reading: Promise<void> | undefined
+let isStale = false
 
 const toggle = (list: readonly string[], key: string): string[] =>
   list.includes(key) ? list.filter(one => one !== key) : [...list, key]
@@ -53,7 +62,7 @@ function summary(changes: readonly FileChange[]): string {
 function hostOf($: EngineInterface): Host {
   return {
     run: (argv, cwd) => $.process.run(argv, cwd === undefined ? undefined : { cwd }),
-    spawn: argv => $.process.spawn({ argv }),
+    spawn: (argv, cwd) => $.process.spawn(cwd === undefined ? { argv } : { argv, cwd }),
     readFile: path => $.fs.read(path),
     writeFile: (path, text) => $.fs.write(path, text),
     exists: path => $.fs.exists(path),
@@ -112,7 +121,29 @@ async function inspect($: EngineInterface, input: Record<string, unknown>, ran: 
   await update($, checks, current => runs.reduce((all, run) => ({ ...all, [run.kind]: run }), current ?? NO_CHECKS))
 }
 
-async function openPane($: EngineInterface): Promise<{ text: string }> {
+/** Reads the repository into the Git section; a call made while a read runs makes that read go once more. */
+function refreshRepo($: EngineInterface): Promise<void> {
+  if (reading !== undefined) {
+    isStale = true
+
+    return reading
+  }
+  reading = (async () => {
+    do {
+      isStale = false
+      // A read that fails keeps the last state on screen; only git's own answer says the folder is outside a repository.
+      const repo = await readRepo(hostOf($), Date.now()).catch(() => undefined)
+      if (repo !== undefined) await update($, repoState, () => repo ?? 'outside')
+    } while (isStale)
+  })().finally(() => {
+    reading = undefined
+  })
+
+  return reading
+}
+
+async function openPane($: EngineInterface, isGitShown: boolean): Promise<{ text: string }> {
+  if (isGitShown) void refreshRepo($)
   await $.ui.open({ id: PANE, title: TITLE, focus: true })
 
   return { text: 'Session info pane opened.' }
@@ -129,8 +160,10 @@ export const register: Register = (on, options) => {
     usage: options.showUsage !== false,
     agents: options.showAgents !== false,
     checks: options.showChecks !== false,
+    git: options.showGit !== false,
     changes: options.showChanges !== false,
   }
+  const gitClient = typeof options.gitClient === 'string' ? options.gitClient.trim() : 'lazygit'
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
   const isLive = shows.session || shows.usage || shows.agents || shows.checks
@@ -142,16 +175,28 @@ export const register: Register = (on, options) => {
       description: 'Show the session, plan usage and the files this session created, modified or deleted',
     })
     await $.command.register({ name: 'changes', description: 'Same as /session-info' })
-    if (isLive) $.clock.every(MINUTE, () => void update($, now, () => Date.now()))
+    if (isLive || shows.git)
+      $.clock.every(MINUTE, () => {
+        if (isLive) void update($, now, () => Date.now())
+        if (shows.git) void refreshRepo($)
+      })
+    if (shows.git) void refreshRepo($)
     // The engine draws a pane that the person did not ask for only on a wide terminal; a narrow one keeps it until /session-info.
     if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: TITLE })
 
     return next(e)
   })
 
-  on('command.run', { command: 'session-info' }, async $ => openPane($))
+  on('command.run', { command: 'session-info' }, async $ => openPane($, shows.git))
 
-  on('command.run', { command: 'changes' }, async $ => openPane($))
+  on('command.run', { command: 'changes' }, async $ => openPane($, shows.git))
+
+  // A commit made outside the session, in the Git client for example, shows by the next prompt.
+  on('prompt.submit', async ($, e, next) => {
+    if (shows.git) void refreshRepo($)
+
+    return next(e)
+  })
 
   on('session.measure', async ($, e, next) => {
     if (isLive) await update($, now, () => Date.now())
@@ -191,12 +236,14 @@ export const register: Register = (on, options) => {
   on('tool.call', async ($, e, next) => {
     const isShell = (SHELLS as readonly string[]).includes(e.tool)
     const isChecked = shows.checks && isShell
-    if (!shows.changes && !isChecked) return next(e)
+    const isRepoTool = shows.git && FILE_TOOLS.includes(e.tool)
+    if (!shows.changes && !isChecked && !isRepoTool) return next(e)
     const before = shows.changes && isShell ? await gitStatus(hostOf($)).catch(() => undefined) : undefined
     const ran = await next(e)
     const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
     if (shows.changes && ran.deny === undefined && !ran.isError) await track(hostOf($), e.tool, ran.result, before).catch(toast)
     if (isChecked) await inspect($, e as Record<string, unknown>, ran as Record<string, unknown>, patterns).catch(toast)
+    if (isRepoTool && ran.deny === undefined) void refreshRepo($)
 
     return ran
   }).catch(($, e, next) => next(e))
@@ -243,8 +290,10 @@ export const register: Register = (on, options) => {
     const lastChecks = shows.checks ? await read($, checks) : NO_CHECKS
     const views = checkViews(lastChecks)
     const checksRows = shows.checks ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
+    const repo = shows.git ? await read($, repoState) : null
+    const gitRows = shows.git ? chrome + (isOpen('#git') ? repoRowCount(repo) : 0) : 0
     const changesFrame = isCards ? FRAME_ROWS : 0
-    const above = tileRows + usageRows + sessionRows + agentsRows + checksRows + changesFrame
+    const above = tileRows + usageRows + sessionRows + agentsRows + checksRows + gitRows + changesFrame
     const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
 
     const section = (key: SectionKey, children: RenderChildren, isLast = false) =>
@@ -254,12 +303,12 @@ export const register: Register = (on, options) => {
         </Box>
       )
 
-    const header = (key: SectionKey, title: string, right: string) => (
+    const header = (key: SectionKey, title: string, right: string, aside?: RenderChildren) => (
       <Box flexDirection="row" justifyContent="space-between">
         <Button plain key={`section:${key}`} onPress={() => void update($, collapsed, list => toggle(list ?? [], key))}>
           <Text bold color="claude">{`${isOpen(key) ? '▾' : '▸'} ${title}`}</Text>
         </Button>
-        <Text dimColor>{right}</Text>
+        {aside ?? <Text dimColor>{right}</Text>}
       </Box>
     )
 
@@ -415,6 +464,69 @@ export const register: Register = (on, options) => {
       isOpen('#checks') && views.map(checkRows),
     ])
 
+    const openGitClient = (root: string) =>
+      void openClient(hostOf($), root, gitClient).catch(error => $.ui.toast(`session-info: ${String(error)}`))
+
+    const branchAside = (repo: Repo) =>
+      gitClient === '' ? undefined : (
+        <Button plain key="git-client" hotkey="g" onPress={() => openGitClient(repo.root)}>
+          {`⎇ ${branchText(repo)}`}
+        </Button>
+      )
+
+    const repoLines = (repo: Repo) => {
+      const parts = countParts(repo.counts)
+      const { total, changed } = repo.submodules
+
+      return [
+        repo.operation && <Text color="warning" wrap="truncate-end">{`⚠ ${operationText(repo.operation)}`}</Text>,
+        parts.length > 0 && (
+          <Box flexDirection="row" gap={2}>
+            {parts.map(part => (
+              <Text color={part.color}>{part.text}</Text>
+            ))}
+          </Box>
+        ),
+        repo.commit ? (
+          <Box flexDirection="row" justifyContent="space-between">
+            <Box flexDirection="row" flexShrink={1}>
+              <Text dimColor>{`◆ ${repo.commit.hash} `}</Text>
+              <Text wrap="truncate-end">{repo.commit.subject}</Text>
+            </Box>
+            <Text dimColor>{` ${age(Date.now() - repo.commit.at)}`}</Text>
+          </Box>
+        ) : (
+          <Text dimColor>No commits yet.</Text>
+        ),
+        total > 0 && (
+          <Text dimColor wrap="truncate-end">
+            {changed.length === 0
+              ? `◇ ${total} submodule${total === 1 ? '' : 's'}, all clean`
+              : `◇ ${total} submodule${total === 1 ? '' : 's'} · ${changed.length} changed`}
+          </Text>
+        ),
+        ...changed.slice(0, SUBMODULE_ROWS).map(sub => (
+          <Box flexDirection="row">
+            <Text wrap="truncate-end">{`  ${sub.path}  `}</Text>
+            {sub.issues.map((issue, index) => (
+              <Text color={ISSUE_COLOR[issue]} dimColor={ISSUE_COLOR[issue] === undefined}>
+                {`${index === 0 ? '' : ' · '}${issueText(issue)}`}
+              </Text>
+            ))}
+          </Box>
+        )),
+        changed.length > SUBMODULE_ROWS && <Text dimColor>{`  … ${changed.length - SUBMODULE_ROWS} more`}</Text>,
+      ]
+    }
+
+    const isRepo = repo !== null && repo !== 'outside'
+    const gitSection = section('#git', [
+      header('#git', 'Git', isRepo ? `⎇ ${branchText(repo)}` : '', isRepo ? branchAside(repo) : undefined),
+      isOpen('#git') && repo === null && <Text dimColor>Reading the repository…</Text>,
+      isOpen('#git') && repo === 'outside' && <Text dimColor>Not a Git repository.</Text>,
+      isOpen('#git') && isRepo && repoLines(repo),
+    ])
+
     const diffView = diff && (
       <Box flexDirection="column" marginTop={1}>
         <Box flexDirection="row" justifyContent="space-between">
@@ -465,6 +577,7 @@ export const register: Register = (on, options) => {
         {shows.usage && usageSection}
         {shows.agents && agentsSection}
         {shows.checks && checksSection}
+        {shows.git && gitSection}
         {shows.changes && changesSection}
         {shows.changes && diffView}
       </Box>

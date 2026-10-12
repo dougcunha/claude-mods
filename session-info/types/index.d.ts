@@ -31,6 +31,32 @@ export type CheckRun = {
 
 export type Checks = { build: CheckRun | null; test: CheckRun | null }
 
+export type SubmoduleIssue = 'conflict' | 'uninitialized' | 'commit' | 'modified'
+
+/** A submodule that needs a look: its path in the repository and what is wrong with it. */
+export type Submodule = { path: string; issues: SubmoduleIssue[] }
+
+/** `none`: the branch has no upstream (local only); `gone`: the upstream was deleted on the remote. */
+export type Upstream = 'none' | 'gone' | { ahead: number; behind: number }
+
+export type Operation = { kind: 'merge' | 'rebase' | 'cherry-pick' | 'revert' | 'bisect'; step?: number; total?: number }
+
+/**
+ * The repository of the session's folder, as the Git section draws it.
+ * `branch` is null on a detached HEAD; `head` is the short hash, null before the first commit.
+ */
+export type Repo = {
+  root: string
+  branch: string | null
+  head: string | null
+  upstream: Upstream
+  counts: { staged: number; modified: number; untracked: number; conflicts: number }
+  commit: { hash: string; subject: string; at: number } | null
+  operation: Operation | null
+  submodules: { total: number; changed: Submodule[] }
+  at: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'session-info': {
@@ -50,6 +76,8 @@ declare module 'claude-code' {
       alerted: string[]
       /** The last build and the last test run of the session. */
       checks: Checks
+      /** The repository the Git section shows; `outside` when the folder is in none, null before the first read. */
+      repo: Repo | 'outside' | null
     }
   }
 }

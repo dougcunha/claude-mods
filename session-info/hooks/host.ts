@@ -3,7 +3,7 @@ import type { FileChange, InlineDiff } from '../types'
 /** What the helper modules need from the engine; register.tsx builds it from `$`, which never crosses an import. */
 export type Host = {
   run: (argv: string[], cwd?: string) => Promise<{ exitCode: number; stdout: string }>
-  spawn: (argv: string[]) => AsyncIterable<{ stream: string; text: string }>
+  spawn: (argv: string[], cwd?: string) => AsyncIterable<{ stream: string; text: string }>
   readFile: (path: string) => Promise<string>
   writeFile: (path: string, text: string) => Promise<void>
   exists: (path: string) => Promise<boolean>

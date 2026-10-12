@@ -9,16 +9,16 @@ export type Editor = 'auto' | 'vscode' | 'system'
 
 export type Prefs = { viewer: Viewer; editor: Editor }
 
-type Platform = 'windows' | 'mac' | 'linux'
+export type Platform = 'windows' | 'mac' | 'linux'
 
 let picked: Exclude<Viewer, 'auto'> | undefined
 let platform: Platform | undefined
 let hasCode: boolean | undefined
 
-const succeeds = async (host: Host, argv: string[]): Promise<boolean> =>
+export const succeeds = async (host: Host, argv: string[]): Promise<boolean> =>
   (await host.run(argv).catch(() => ({ exitCode: 1 }))).exitCode === 0
 
-async function platformOf(host: Host): Promise<Platform> {
+export async function platformOf(host: Host): Promise<Platform> {
   if (platform !== undefined) return platform
   if ((await host.env()).os === 'Windows_NT') platform = 'windows'
   else {
@@ -52,11 +52,11 @@ async function pick(host: Host): Promise<Exclude<Viewer, 'auto'>> {
 }
 
 /** Starts the program and lets it run on after the press: the loop is the child's life. */
-function launch(host: Host, argv: string[]): void {
+export function launch(host: Host, argv: string[], cwd?: string): void {
   void (async () => {
     let errors = ''
     try {
-      for await (const { stream, text } of host.spawn(argv)) if (stream === 'stderr') errors += text
+      for await (const { stream, text } of host.spawn(argv, cwd)) if (stream === 'stderr') errors += text
     } catch (error) {
       errors = String(error)
     }

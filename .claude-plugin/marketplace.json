@@ -11,7 +11,7 @@
     {
       "name": "session-info",
       "source": "./session-info",
-      "description": "Session pane: context, cost and turns, live plan usage bars, running agents, and a treeview of the files this session created, modified or deleted."
+      "description": "Session pane: context, cost and turns, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted."
     }
   ]
 }

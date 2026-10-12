@@ -1,11 +1,12 @@
 # session-info
 
-A Claude Code mod with one pane and five sections:
+A Claude Code mod with one pane and six sections:
 
 - **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
 - **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
 - **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests. .NET, Node, Bun, Rust, Go and Python tools are recognized.
+- **Git**: the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, and the submodules that changed. Pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
 - **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
 It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed.
@@ -74,7 +75,8 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Action | How |
 | --- | --- |
 | Open the pane | `/session-info` (or `/changes`). To open it when the session starts, set `session-info.openOnStart` to `true` |
-| Fold or unfold a section | Press its `▾ Session`, `▾ Usage`, `▾ Agents`, `▾ Checks` or `▾ Changes` header |
+| Fold or unfold a section | Press its `▾ Session`, `▾ Usage`, `▾ Agents`, `▾ Checks`, `▾ Git` or `▾ Changes` header |
+| Open the Git client | Press the branch name in the `▾ Git` header, or press `g` while the pane has the focus |
 | Show the context breakdown by category | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
 | Collapse or expand a folder | Press the folder |
@@ -133,6 +135,42 @@ The output is read as the model got it: raw, filtered by RTK, or localized. Loca
 
 The readers were checked against real output of `dotnet build` and `dotnet test` (VSTest and Microsoft.Testing.Platform, English and Portuguese), tsc, jest, vitest, `node --test`, Bun and `cargo test`, each with and without RTK. Go and pytest are read by their documented formats.
 
+## What the Git section shows
+
+The section shows the repository of the session's folder and only what differs from a clean state. A row with nothing to say is left out, so a clean repository takes one row under the header.
+
+```text
+▾ Git                                      ⎇ main ↑2 ↓1
+  ⚠ Rebase in progress: step 3 of 7
+  ✖ 1 conflict  ● 2 staged  ✎ 3 modified  ? 1 untracked
+  ◆ a1b2c3d feat: add the Git section               12m
+  ◇ 4 submodules · 2 changed
+    libs/core  new commit · modified
+    libs/ui  not initialized
+```
+
+| Row | Shows |
+| --- | --- |
+| Header | The branch, then `↑` commits ahead of and `↓` commits behind its upstream. `local only` when the branch has no upstream, `upstream gone` when the upstream was deleted on the remote, `detached` and the short hash on a detached HEAD |
+| Operation | A merge, rebase (with its step), cherry-pick, revert or bisect that stopped halfway |
+| Counts | Conflicts, staged, modified and untracked files, the non-zero ones only. Submodules are not counted here |
+| Last commit | Short hash, subject and age |
+| Submodules | The submodule count, then one row per submodule that is in conflict, not initialized, on a commit other than the one the repository records (`new commit`), or with changed files (`modified`). Up to 5 rows. Only the submodules of the repository itself are listed; a change in a nested submodule shows as `modified` on its parent |
+
+The mod reads the repository when the session starts, after each shell command or file edit, when you send a prompt, when you open the pane, and once a minute. It runs `git status --porcelain=v2 --branch`, `git log -1`, and `git submodule status` when the repository has a `.gitmodules` file. It never runs `git fetch`, so `↑` and `↓` compare with the last fetch.
+
+### Git client
+
+Pressing the branch name, or `g`, opens the `gitClient` command (default `lazygit`) in a new terminal window, in the repository root:
+
+| System | Window |
+| --- | --- |
+| Windows | `start`, which opens the default terminal app: Windows Terminal on Windows 11 |
+| macOS | Terminal.app |
+| Linux | The first of `x-terminal-emulator`, `gnome-terminal`, `konsole` and `xterm` found on the `PATH` |
+
+A toast tells you when the command is not on the `PATH`. Set `gitClient` to empty to make the branch name plain text.
+
 ## Alerts
 
 The mod notifies once per threshold through your Claude Code notification channel (`preferredNotifChannel`):
@@ -178,6 +216,8 @@ Change these in `/config`:
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
 | `session-info.showChecks` | `true`, `false` | `true` |
+| `session-info.showGit` | `true`, `false` | `true` |
+| `session-info.gitClient` | A command, for example `lazygit`, `gitui` or `tig`. Put a path with spaces in double quotes. Empty turns it off | `lazygit` |
 | `session-info.showChanges` | `true`, `false` | `true` |
 | `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
@@ -202,7 +242,7 @@ After every shell command, the mod also checks that each listed file still exist
 
 - **PowerShell commands:** a file that was already modified before the command and is modified again is not detected. Outside a git repository, only deletions of files already in the list are detected.
 - **Mouse clicks** work in the fullscreen terminal. Elsewhere, use the keyboard.
-- **The diff viewer** runs as a child of the mod, so it closes when the mod reloads.
+- **The diff viewer** runs as a child of the mod, so it closes when the mod reloads. On Linux the terminal window of the Git client does too.
 - **Binary files** are not handled. The snapshot stores text only.
 - **Checks of background commands** stay `running in background`: mods get no event when a background command ends, so the row updates on the next run of that kind.
 - **Check details** depend on the tool's output format. When a format is not recognized, the row shows the status and, for a failure, the last lines of the output. `rtk dotnet test` on a Microsoft.Testing.Platform project prints no counts when it passes, so the row says `passed`.
@@ -218,7 +258,7 @@ claude --plugin-dir .
 
 | File | Role |
 | --- | --- |
-| `hooks/register.tsx` | The commands, the `tool.call`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh timer and the pane |
+| `hooks/register.tsx` | The commands, the `tool.call`, `prompt.submit`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh timer and the pane |
 | `hooks/cards.tsx` | Framed cards, the tiles row and how the tiles wrap |
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
@@ -228,6 +268,8 @@ claude --plugin-dir .
 | `hooks/parse.ts` | Reads error lines, error counts, test counts and failed test names from build and test output |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |
 | `hooks/git.ts` | `git status`, `HEAD` content and snapshots |
+| `hooks/repo.ts` | Reads and parses the repository state for the Git section, and its row texts |
+| `hooks/client.ts` | Opens the Git client in a new terminal window |
 | `hooks/viewer.ts` | Opens a change: the editor for new files, the diff viewer for the rest |
 | `hooks/tree.ts` | Builds and flattens the tree |
 | `hooks/icons.ts` | Icon sets and status colors |
