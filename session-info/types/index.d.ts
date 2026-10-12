@@ -86,6 +86,11 @@ export type TurnRecord = {
   costUsd?: number
 }
 
+export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
+
+/** One task of the list the model writes with the mod's todo_write tool; `activeForm` is the task as it runs. */
+export type Todo = { content: string; status: TodoStatus; activeForm?: string }
+
 declare module 'claude-code' {
   interface PluginState {
     'session-info': {
@@ -111,6 +116,8 @@ declare module 'claude-code' {
       repo: Repo | 'outside' | null
       /** The last main-thread turn; null before the first one ends. */
       lastTurn: TurnRecord | null
+      /** The task list of the main conversation, as its last todo_write call sent it. */
+      todos: Todo[]
     }
   }
 }

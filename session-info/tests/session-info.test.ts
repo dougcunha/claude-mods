@@ -269,15 +269,15 @@ test('a narrow desktop pane still draws the tiles and percentage bars, not block
   expect(await ui.find({ type: 'Text', text: 'cost' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '62%' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '44%' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /█|░/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /█|░|─/ })).toBeUndefined()
   await ui.unmount()
 })
 
 test('bars fill to the eighth of a cell and show any use', async () => {
-  expect(bar(50, 10)).toEqual({ filled: '█████', empty: '░░░░░' })
-  expect(bar(55, 10)).toEqual({ filled: '█████▌', empty: '░░░░' })
-  expect(bar(0.1, 10)).toEqual({ filled: '▏', empty: '░░░░░░░░░' })
-  expect(bar(0, 4)).toEqual({ filled: '', empty: '░░░░' })
+  expect(bar(50, 10)).toEqual({ filled: '█████', empty: '─────' })
+  expect(bar(55, 10)).toEqual({ filled: '█████▌', empty: '────' })
+  expect(bar(0.1, 10)).toEqual({ filled: '▏', empty: '─────────' })
+  expect(bar(0, 4)).toEqual({ filled: '', empty: '────' })
   expect(bar(120, 4)).toEqual({ filled: '████', empty: '' })
 })
 

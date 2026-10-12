@@ -1,9 +1,10 @@
 # session-info
 
-A Claude Code mod with one pane and seven sections:
+A Claude Code mod with one pane and eight sections:
 
 - **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
 - **Last turn**: how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, and the tools it called.
+- **Todos**: the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
 - **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
 - **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests. .NET, Node, Bun, Rust, Go and Python tools are recognized.
@@ -21,7 +22,7 @@ Each section is a card with a rounded frame that lights up under the pointer in 
 ╭──────────────────────────────────────────────────────────────────────╮
 │ ▾ Session                                                            │
 │ ▸ Context                                 124k / 200k · 1 compaction │
-│ ██████████████████████████████████████▌░░░░░░░░░░░░░░░░░░░░░░░ 62%   │
+│ ██████████████████████████████████████▌───────────────────░░░░ 62%   │
 │ 14 turns · ~250 output tok/turn · last 38s                           │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
@@ -31,11 +32,18 @@ Each section is a card with a rounded frame that lights up under the pointer in 
 │ Bash 4 · Edit 3 · Read 2 · 1 subagent (45k tok)                      │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Todos                                                     1/3 done │
+│ ✓ Read the turn.complete types                                       │
+│ ◐ Writing the Last turn section                                      │
+│ ○ Add tests                                                          │
+│ ⊘ Draw a band above the prompt                                       │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
 │ ▾ Usage                                                              │
 │ Current session                                     resets in 2h 10m │
-│ ██▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 3%    │
+│ ██▏─────────────────────────────────────────────────────────── 3%    │
 │ Current week (all models)                           resets in 5d 21h │
-│ █████████████████▍░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 28%   │
+│ █████████████████▍──────────────────────────────────────────── 28%   │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
 │ ▾ Agents                                          2 running · 1 done │
@@ -231,6 +239,21 @@ With the `auto` viewer, the mod opens the first of these that is available:
 2. **VS Code**: `code --diff`, when `code` is on the `PATH`.
 3. **Inline**: the unified diff drawn inside the pane.
 
+## What the Todos section shows
+
+Claude Code gives the model no task tool in every setup, so the mod registers its own: `todo_write`, which the model sees as `mcp__session-info__todo_write`. A short section at the end of the system prompt tells the model to write a list for work with 3 or more steps and to update it as each task starts and ends. Each call sends the whole list and replaces the previous one.
+
+| Glyph | Status |
+| --- | --- |
+| `○` | Pending |
+| `◐` | In progress, drawn bold with the running form of the task (`Writing the section`) |
+| `✓` | Completed, drawn dim |
+| `⊘` | Cancelled, drawn dim and struck through |
+
+The header counts the completed tasks out of the tasks not cancelled. The section draws 12 tasks and folds the rest into `… N more`. Only the main conversation keeps the list: a subagent's call changes nothing. A resumed session takes the list back from the last call in its transcript.
+
+The tool and the prompt section use tokens on each request. Set `showTodos` to `false` to remove both, with the section.
+
 ## Settings
 
 Change these in `/config`:
@@ -240,6 +263,7 @@ Change these in `/config`:
 | `session-info.openOnStart` | `true`, `false` | `false` |
 | `session-info.showSession` | `true`, `false` | `true` |
 | `session-info.showLastTurn` | `true`, `false` | `true` |
+| `session-info.showTodos` | `true`, `false` | `true` |
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
 | `session-info.showChecks` | `true`, `false` | `true` |

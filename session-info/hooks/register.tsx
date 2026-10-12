@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { Checks, ContextReading, FileChange, InlineDiff, Repo, TurnRecord } from '../types'
+import type { Checks, ContextReading, FileChange, InlineDiff, Repo, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
 import { crossings } from './alerts'
@@ -19,6 +19,7 @@ import type { IconSet } from './icons'
 import { age, branchText, countParts, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { SHELLS, track } from './track'
 import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
+import { latestTodos, parseTodos, TODO_PROMPT, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoReply, todoSummary, todoText } from './todos'
 import { buildTree, flatten } from './tree'
 import { modelText, RESULT, resultText, startDraft, toolsText, tokensText, toRecord, turnLines, withSpawn, withStep, withSubagentUsage, withTool } from './turn'
 import type { TurnDraft } from './turn'
@@ -40,12 +41,13 @@ const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as 
 const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECKS as Checks)
 const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
 const lastTurn = atom({ plugin: 'session-info', key: 'lastTurn' } as const, null as TurnRecord | null)
+const todos = atom({ plugin: 'session-info', key: 'todos' } as const, [] as Todo[])
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
 const MINUTE = 60_000
 
-type SectionKey = '#session' | '#turn' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
+type SectionKey = '#session' | '#turn' | '#todos' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
 
 /** Tools whose calls can change the working tree, so the Git section reads the repository again after them. */
 const FILE_TOOLS: readonly string[] = [...SHELLS, 'Write', 'Edit', 'NotebookEdit']
@@ -156,6 +158,14 @@ async function refreshContext($: EngineInterface): Promise<void> {
   if (reading !== null) await update($, contextState, () => reading)
 }
 
+/** A resumed session starts with no list in its state: the last todo_write call of the transcript gives it back. */
+async function restoreTodos($: EngineInterface): Promise<void> {
+  if ((await read($, todos)).length > 0) return
+  const messages = await $.session.messages()
+  const found = Array.isArray(messages) ? latestTodos(messages) : undefined
+  if (found !== undefined) await update($, todos, () => found)
+}
+
 async function openPane($: EngineInterface, isGitShown: boolean, isSessionShown: boolean): Promise<{ text: string }> {
   if (isGitShown) void refreshRepo($)
   if (isSessionShown) void refreshContext($).catch(() => undefined)
@@ -173,6 +183,7 @@ export const register: Register = (on, options) => {
   const shows = {
     session: options.showSession !== false,
     turn: options.showLastTurn !== false,
+    todos: options.showTodos !== false,
     usage: options.showUsage !== false,
     agents: options.showAgents !== false,
     checks: options.showChecks !== false,
@@ -192,6 +203,10 @@ export const register: Register = (on, options) => {
       description: 'Show the session, plan usage and the files this session created, modified or deleted',
     })
     await $.command.register({ name: 'changes', description: 'Same as /session-info' })
+    if (shows.todos) {
+      await $.tool.register(TODO_SPEC).catch(error => $.ui.toast(`session-info: ${String(error)}`))
+      await restoreTodos($).catch(() => undefined)
+    }
     if (isLive || shows.git)
       $.clock.every(MINUTE, () => {
         if (isLive) void update($, now, () => Date.now())
@@ -215,6 +230,25 @@ export const register: Register = (on, options) => {
 
     return next(e)
   })
+
+  if (shows.todos) {
+    // The section rides after the engine's own, on the session side of the cache boundary.
+    on('prompt.compose', async ($, e, next) => {
+      const composed = await next(e)
+      if (!e.tools.includes(TODO_TOOL)) return composed
+
+      return { sections: [...composed.sections, { id: 'session-info:todos', text: TODO_PROMPT, scope: 'session' }] }
+    })
+
+    on('tool.call', { tool: TODO_TOOL }, async ($, e) => {
+      if (e.agentId !== undefined) return { result: 'Ignored: only the main conversation keeps the task list.' }
+      const parsed = parseTodos(e as Record<string, unknown>)
+      if (typeof parsed === 'string') return { deny: parsed }
+      await update($, todos, () => parsed)
+
+      return { result: todoReply(parsed) }
+    })
+  }
 
   if (shows.turn) {
     on('turn.start', async ($, e, next) => {
@@ -312,6 +346,7 @@ export const register: Register = (on, options) => {
     const stats = shows.session || shows.turn ? await read($, turns) : NO_TURNS
     const compacted = shows.session ? await read($, compactions) : 0
     const turnRecord = shows.turn ? await read($, lastTurn) : null
+    const taskList = shows.todos ? await read($, todos) : []
     const agents = shows.agents ? await $.agent.list() : []
     const changes = shows.changes ? Object.values(await read($, files)) : []
     const diff = shows.changes ? await read($, inline) : null
@@ -326,6 +361,8 @@ export const register: Register = (on, options) => {
         : []
     const tileRows = tileLayout(figures.length, cols).rows
     const turnRows = shows.turn ? chrome + (isOpen('#turn') ? (turnRecord ? turnLines(turnRecord).length : 1) : 0) : 0
+    const todoRoom = Math.min(taskList.length, TODO_ROOM)
+    const todosRows = shows.todos ? chrome + (isOpen('#todos') ? Math.max(1, todoRoom + (taskList.length > todoRoom ? 1 : 0)) : 0) : 0
     const usageRows = shows.usage ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
     const legend = isDetailed && reading ? legendLines(reading, inner) : []
     const sessionRows = shows.session ? chrome + (isOpen('#session') ? 3 + legend.length : 0) : 0
@@ -338,7 +375,7 @@ export const register: Register = (on, options) => {
     const repo = shows.git ? await read($, repoState) : null
     const gitRows = shows.git ? chrome + (isOpen('#git') ? repoRowCount(repo) : 0) : 0
     const changesFrame = isCards ? FRAME_ROWS : 0
-    const above = tileRows + usageRows + sessionRows + turnRows + agentsRows + checksRows + gitRows + changesFrame
+    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + agentsRows + checksRows + gitRows + changesFrame
     const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
 
     const section = (key: SectionKey, children: RenderChildren, isLast = false) =>
@@ -531,6 +568,32 @@ export const register: Register = (on, options) => {
       isOpen('#turn') && turnRecord && turnTools !== '' && <Text dimColor wrap="truncate-end">{turnTools}</Text>,
     ])
 
+    const todoLine = (todo: Todo) => {
+      const status = TODO_STATUS[todo.status]
+      const isDone = todo.status === 'completed' || todo.status === 'cancelled'
+
+      return (
+        <Box flexDirection="row">
+          <Text color={status.color}>{`${status.glyph} `}</Text>
+          <Text
+            bold={todo.status === 'in_progress'}
+            dimColor={isDone}
+            strikethrough={todo.status === 'cancelled'}
+            wrap="truncate-end"
+          >
+            {todoText(todo)}
+          </Text>
+        </Box>
+      )
+    }
+
+    const todosSection = section('#todos', [
+      header('#todos', 'Todos', todoSummary(taskList)),
+      isOpen('#todos') && taskList.length === 0 && <Text dimColor>No task list yet. Claude writes one for work with several steps.</Text>,
+      isOpen('#todos') && taskList.slice(0, todoRoom).map(todoLine),
+      isOpen('#todos') && taskList.length > todoRoom && <Text dimColor>{`… ${taskList.length - todoRoom} more`}</Text>,
+    ])
+
     const usageSection = section('#usage', [
       header('#usage', 'Usage', ''),
       isOpen('#usage') && limits.length === 0 && (
@@ -703,6 +766,7 @@ export const register: Register = (on, options) => {
         {figures.length > 0 && tiles(figures, cols)}
         {shows.session && sessionSection}
         {shows.turn && turnSection}
+        {shows.todos && todosSection}
         {shows.usage && usageSection}
         {shows.agents && agentsSection}
         {shows.checks && checksSection}

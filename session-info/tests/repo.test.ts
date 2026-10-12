@@ -144,6 +144,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
       ({ value: { exitCode, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }) as never
     on('session.start', async (_, e) => ({ cwd: e.cwd }))
     on('command.register', async (_, e) => ({ value: { command: e.name } }))
+    on('tool.register', async (_, e) => ({ value: { tool: `mcp__session-info__${e.name}` } }) as never)
+    on('session.messages', async () => ({ value: [] }) as never)
     on('session.cwd', async () => ({ value: 'D:/repo' }))
     on('session.usage', async () => ({ value: { startedAt: 0, context: {}, rateLimits: [] } }) as never)
     on('agent.list', async () => ({ value: [] }))
