@@ -164,6 +164,7 @@ export const register: Register = (on, options) => {
     changes: options.showChanges !== false,
   }
   const gitClient = typeof options.gitClient === 'string' ? options.gitClient.trim() : 'lazygit'
+  const paneBackground = typeof options.paneBackground === 'string' ? options.paneBackground.trim() : ''
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
   const isLive = shows.session || shows.usage || shows.agents || shows.checks
@@ -489,11 +490,15 @@ export const register: Register = (on, options) => {
         ),
         repo.commit ? (
           <Box flexDirection="row" justifyContent="space-between">
-            <Box flexDirection="row" flexShrink={1}>
-              <Text dimColor>{`◆ ${repo.commit.hash} `}</Text>
+            <Box flexDirection="row" flexShrink={1} gap={1}>
+              <Box flexShrink={0}>
+                <Text dimColor>{`◆ ${repo.commit.hash}`}</Text>
+              </Box>
               <Text wrap="truncate-end">{repo.commit.subject}</Text>
             </Box>
-            <Text dimColor>{` ${age(Date.now() - repo.commit.at)}`}</Text>
+            <Box flexShrink={0} paddingLeft={1}>
+              <Text dimColor>{age(Date.now() - repo.commit.at)}</Text>
+            </Box>
           </Box>
         ) : (
           <Text dimColor>No commits yet.</Text>
@@ -570,8 +575,11 @@ export const register: Register = (on, options) => {
       true,
     )
 
+    // The API has no color for the frame the terminal draws around a pane; this paints the body under the tree instead.
+    const paint = isTerminal && paneBackground !== '' ? { backgroundColor: paneBackground, minHeight: e.props.scroll.bodyRows } : {}
+
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" {...paint}>
         {figures.length > 0 && tiles(figures, cols)}
         {shows.session && sessionSection}
         {shows.usage && usageSection}

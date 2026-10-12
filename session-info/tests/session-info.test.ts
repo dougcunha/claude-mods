@@ -335,3 +335,18 @@ for (const openOnStart of [true, false]) {
     expect(opened).toEqual(openOnStart ? ['session-info'] : [])
   })
 }
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`paneBackground paints the pane body in the terminal only (${surface})`, { options: { paneBackground: '#2e3440' } }, async ($, on) => {
+    on('session.cwd', async () => ({ value: '/repo' }))
+    on('agent.list', async () => ({ value: [] }))
+    on('session.usage', async () => usage([]))
+
+    const ui = await $.ui.mount({ ...PANE, surface, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 40 } } } as never)
+    const [root] = await ui.findAll({ type: 'Box' })
+    const props = (root as unknown as { props: Record<string, unknown> }).props
+    expect(props.backgroundColor).toBe(surface === 'terminal' ? '#2e3440' : undefined)
+    expect(props.minHeight).toBe(surface === 'terminal' ? 40 : undefined)
+    await ui.unmount()
+  })
+}

@@ -172,7 +172,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(await ui.find({ text: /⎇ main ↑2 ↓1/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '● 3 staged' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'feat: add the Git section' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^ \d+[smhdwy]$/})).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^\d+[smhdwy]$/ })).toBeDefined()
 
     await ui.press({ key: 'git-client' })
     expect(toasts).toEqual([])

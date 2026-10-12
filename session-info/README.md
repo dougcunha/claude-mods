@@ -140,7 +140,7 @@ The readers were checked against real output of `dotnet build` and `dotnet test`
 The section shows the repository of the session's folder and only what differs from a clean state. A row with nothing to say is left out, so a clean repository takes one row under the header.
 
 ```text
-▾ Git                                      ⎇ main ↑2 ↓1
+▾ Git                                   g: ⎇ main ↑2 ↓1
   ⚠ Rebase in progress: step 3 of 7
   ✖ 1 conflict  ● 2 staged  ✎ 3 modified  ? 1 untracked
   ◆ a1b2c3d feat: add the Git section               12m
@@ -222,6 +222,7 @@ Change these in `/config`:
 | `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
+| `session-info.paneBackground` | A color for the body of the pane in the terminal: hex such as `#2e3440`, or a color name. Empty keeps the color Claude Code draws. The frame and the close row keep Claude Code's color | empty |
 | `session-info.icons` | `unicode`, `nerd` (needs a [Nerd Font](https://www.nerdfonts.com/)), `emoji` | `unicode` |
 | `session-info.buildPattern` | A case-insensitive regular expression matched against each command segment, for example `^make( \|$)` | empty |
 | `session-info.testPattern` | The same, for test runs, for example `^make test\|^just test` | empty |
