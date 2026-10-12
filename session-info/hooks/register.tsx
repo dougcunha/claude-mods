@@ -358,14 +358,19 @@ export const register: Register = (on, options) => {
 
         return (
           <Box flexDirection="row">
-            {reading.slices.map((slice, i) =>
-              (widths[i] ?? 0) === 0 ? null : (
-                <Text color={slice.kind === 'used' ? slice.color : undefined} dimColor={slice.kind !== 'used'}>
-                  {GLYPH[slice.kind].repeat(widths[i] ?? 0)}
-                </Text>
-              ),
-            )}
-            <Text>{` ${percentText(percent)}`}</Text>
+            {/* One Text holds every run, so the layout measures the bar as one string and keeps the percentage on its row. */}
+            <Text wrap="truncate-end">
+              {reading.slices.map((slice, i) =>
+                (widths[i] ?? 0) === 0 ? null : (
+                  <Text color={slice.kind === 'used' ? slice.color : undefined} dimColor={slice.kind !== 'used'}>
+                    {GLYPH[slice.kind].repeat(widths[i] ?? 0)}
+                  </Text>
+                ),
+              )}
+            </Text>
+            <Box flexShrink={0}>
+              <Text color={colorOf(percent)}>{` ${percentText(percent)}`}</Text>
+            </Box>
           </Box>
         )
       }

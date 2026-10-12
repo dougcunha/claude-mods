@@ -56,6 +56,12 @@ Each section is a card with a rounded frame that lights up under the pointer in 
 ╰──────────────────────────────────────────────────────────────────────╯
 ```
 
+## Screenshot
+
+The pane in a fullscreen terminal, with two subagents, a passed build and test run, and the context legend unfolded:
+
+![The session-info pane: tiles, Session with the stacked context bar, Usage, Agents, Checks, Git and Changes](images/pane.png)
+
 ## Install
 
 At the Claude Code prompt:

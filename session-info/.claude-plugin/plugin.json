@@ -1,6 +1,6 @@
 {
   "name": "session-info",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Session pane: context, cost and turns, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
