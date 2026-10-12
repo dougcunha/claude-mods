@@ -182,6 +182,8 @@ declare module 'claude-code' {
       jiraServer: string | null
       /** The Jira issues the conversation mentioned, the last one first. */
       jiraIssues: JiraIssue[]
+      /** The active tab of each tab group, as `{ '#repo': '#changes' }`; a group not in it opens on its default tab. */
+      tabs: Record<string, string>
     }
   }
 }

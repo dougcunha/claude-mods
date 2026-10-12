@@ -20,6 +20,8 @@ import type { IconSet } from './icons'
 import { allowRequest, browseUrl, errorText, isAllowed, isIssueKey, isRefusal, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
 import { age, branchText, countParts, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
+import { ORDER, parseTabGroups, TITLES } from './tabs'
+import type { SectionKey, TabGroup } from './tabs'
 import { SHELLS, track } from './track'
 import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
 import { latestTodos, minSteps, parseTodos, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoPrompt, todoReply, todoSummary, todoText } from './todos'
@@ -49,12 +51,11 @@ const skills = atom({ plugin: 'session-info', key: 'skills' } as const, [] as Sk
 const ciState = atom({ plugin: 'session-info', key: 'ci' } as const, null as CiWatch | null)
 const jiraServer = atom({ plugin: 'session-info', key: 'jiraServer' } as const, null as string | null)
 const jiraIssues = atom({ plugin: 'session-info', key: 'jiraIssues' } as const, [] as JiraIssue[])
+const tabs = atom({ plugin: 'session-info', key: 'tabs' } as const, {} as Record<string, string>)
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
 const MINUTE = 60_000
-
-type SectionKey = '#session' | '#turn' | '#todos' | '#skills' | '#ci' | '#jira' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
 
 /** Tools whose calls can change the working tree, so the Git section reads the repository again after them. */
 const FILE_TOOLS: readonly string[] = [...SHELLS, 'Write', 'Edit', 'NotebookEdit']
@@ -354,6 +355,10 @@ export const register: Register = (on, options) => {
   const paneBackground = typeof options.paneBackground === 'string' ? options.paneBackground.trim() : ''
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
+  const groups = parseTabGroups(options.tabGroups)
+  const groupOf = new Map(groups.flatMap(group => group.members.map(key => [key, group] as const)))
+  /** A grouped section folds with its group, whichever members show now. */
+  const foldOf = (key: SectionKey): string => groupOf.get(key)?.key ?? key
   const isLive = shows.session || shows.usage || shows.agents || shows.checks
   const isOpenOnStart = options.openOnStart === true
 
@@ -566,7 +571,45 @@ export const register: Register = (on, options) => {
     const inner = isCards ? cols - FRAME_COLUMNS : cols
     const chrome = isCards ? 1 + FRAME_ROWS : 2
     const shut = new Set(await read($, collapsed))
-    const isOpen = (key: SectionKey): boolean => !shut.has(key)
+    const isOpen = (key: SectionKey): boolean => !shut.has(foldOf(key))
+    const issueList = shows.jira ? await read($, jiraIssues) : []
+    // The section waits for an Atlassian MCP server: without one it has nothing to read.
+    const isJiraShown = shows.jira && (issueList.length > 0 || (await read($, jiraServer)) !== null)
+    const present: Record<SectionKey, boolean> = {
+      '#session': shows.session,
+      '#turn': shows.turn,
+      '#todos': shows.todos,
+      '#skills': shows.skills,
+      '#ci': shows.ci,
+      '#jira': isJiraShown,
+      '#usage': shows.usage,
+      '#agents': shows.agents,
+      '#checks': shows.checks,
+      '#git': shows.git,
+      '#changes': shows.changes,
+    }
+    const activeTabs = groups.length > 0 ? await read($, tabs) : {}
+    const membersOf = (group: TabGroup): SectionKey[] => group.members.filter(key => present[key])
+    /** The stored tab while it still shows, else the first member that does. */
+    const activeOf = (group: TabGroup): SectionKey | undefined => {
+      const members = membersOf(group)
+
+      return members.find(key => key === activeTabs[group.key]) ?? members[0]
+    }
+    /** Whether the section draws now: on, and the active tab when it is in a group. */
+    const counts = (key: SectionKey): boolean => {
+      const group = groupOf.get(key)
+
+      return present[key] && (group === undefined || activeOf(group) === key)
+    }
+    /** The sections to draw, in order; a group sits where its first shown member sits, so a tab switch does not move the card. */
+    const slots = ORDER.flatMap((key): SectionKey[] => {
+      const group = groupOf.get(key)
+      if (group === undefined) return present[key] ? [key] : []
+      const active = activeOf(group)
+
+      return active !== undefined && ORDER.find(one => groupOf.get(one) === group && present[one]) === key ? [active] : []
+    })
     await read($, now)
     const isDetailed = shows.session && isOpen('#session') && (await read($, breakdown))
     const usage = isLive ? await $.session.usage() : undefined
@@ -579,9 +622,6 @@ export const register: Register = (on, options) => {
     const skillList = shows.skills ? await read($, skills) : []
     const ciWatch = shows.ci ? await read($, ciState) : null
     const ciRuns = ciWatch?.runs.slice(0, CI_ROOM) ?? []
-    const issueList = shows.jira ? await read($, jiraIssues) : []
-    // The section waits for an Atlassian MCP server: without one it has nothing to read.
-    const isJiraShown = shows.jira && (issueList.length > 0 || (await read($, jiraServer)) !== null)
     const issues = issueList.slice(0, JIRA_ROOM)
     // The settings are read only while a refusal is on screen: the buttons go once the rule is in place.
     const permissions = issues.some(issue => issue.blockedTool !== undefined) ? await $.settings.read() : undefined
@@ -601,44 +641,93 @@ export const register: Register = (on, options) => {
           ]
         : []
     const tileRows = tileLayout(figures.length, cols).rows
-    const turnRows = shows.turn ? chrome + (isOpen('#turn') ? (turnRecord ? turnLines(turnRecord).length : 1) : 0) : 0
+    const turnRows = counts('#turn') ? chrome + (isOpen('#turn') ? (turnRecord ? turnLines(turnRecord).length : 1) : 0) : 0
     const skillRoom = Math.min(skillList.length, SKILL_ROOM)
-    const skillsRows = shows.skills ? chrome + (isOpen('#skills') ? Math.max(1, skillRoom + (skillList.length > skillRoom ? 1 : 0)) : 0) : 0
+    const skillsRows = counts('#skills') ? chrome + (isOpen('#skills') ? Math.max(1, skillRoom + (skillList.length > skillRoom ? 1 : 0)) : 0) : 0
     const ciBody = ciRuns.reduce((sum, run) => sum + 1 + (run.jobs.length > 0 ? 1 : 0) + (run.url === '' ? 0 : 1), 0)
-    const ciRows = shows.ci ? chrome + (isOpen('#ci') ? Math.max(1, ciBody + (ciWatch?.error === undefined ? 0 : 1)) : 0) : 0
-    const jiraRows = isJiraShown ? chrome + (isOpen('#jira') ? Math.max(1, issues.length * 2 + issues.filter(needsAllow).length) : 0) : 0
+    const ciRows = counts('#ci') ? chrome + (isOpen('#ci') ? Math.max(1, ciBody + (ciWatch?.error === undefined ? 0 : 1)) : 0) : 0
+    const jiraRows = counts('#jira') ? chrome + (isOpen('#jira') ? Math.max(1, issues.length * 2 + issues.filter(needsAllow).length) : 0) : 0
     const todoRoom = Math.min(taskList.length, TODO_ROOM)
-    const todosRows = shows.todos ? chrome + (isOpen('#todos') ? Math.max(1, todoRoom + (taskList.length > todoRoom ? 1 : 0)) : 0) : 0
-    const usageRows = shows.usage ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
+    const todosRows = counts('#todos') ? chrome + (isOpen('#todos') ? Math.max(1, todoRoom + (taskList.length > todoRoom ? 1 : 0)) : 0) : 0
+    const usageRows = counts('#usage') ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
     const legend = isDetailed && reading ? legendLines(reading, inner) : []
-    const sessionRows = shows.session ? chrome + (isOpen('#session') ? 3 + legend.length : 0) : 0
+    const sessionRows = counts('#session') ? chrome + (isOpen('#session') ? 3 + legend.length : 0) : 0
     const agentLines = agentRows(agents)
     const agentRoom = Math.min(agentLines.length, 8)
-    const agentsRows = shows.agents ? chrome + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
+    const agentsRows = counts('#agents') ? chrome + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
     const lastChecks = shows.checks ? await read($, checks) : NO_CHECKS
     const views = checkViews(lastChecks)
-    const checksRows = shows.checks ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
+    const checksRows = counts('#checks') ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
     const repo = shows.git ? await read($, repoState) : null
-    const gitRows = shows.git ? chrome + (isOpen('#git') ? repoRowCount(repo) : 0) : 0
+    const gitRows = counts('#git') ? chrome + (isOpen('#git') ? repoRowCount(repo) : 0) : 0
     const changesFrame = isCards ? FRAME_ROWS : 0
     const above = tileRows + usageRows + sessionRows + turnRows + todosRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame
     const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
 
-    const section = (key: SectionKey, children: RenderChildren, isLast = false) =>
-      isCards ? card(key, isOpen(key), children) : (
-        <Box flexDirection="column" marginBottom={isLast ? 0 : 1}>
+    const section = (key: SectionKey, children: RenderChildren) =>
+      isCards ? card(foldOf(key), isOpen(key), children) : (
+        <Box flexDirection="column" marginBottom={key === slots.at(-1) ? 0 : 1}>
           {children}
         </Box>
       )
 
-    const header = (key: SectionKey, title: string, right: string, aside?: RenderChildren) => (
-      <Box flexDirection="row" justifyContent="space-between">
-        <Button plain key={`section:${key}`} onPress={() => void update($, collapsed, list => toggle(list ?? [], key))}>
-          <Text bold color="claude">{`${isOpen(key) ? '▾' : '▸'} ${title}`}</Text>
+    /** What an inactive tab adds to its title, so the hidden section still says it has something. */
+    const badge = (key: SectionKey): string => {
+      if (key === '#ci') {
+        const state = ciWatch ? watchState(ciWatch) : undefined
+
+        return state === undefined ? '' : ` ${CI_STATUS[state].glyph}`
+      }
+      const count: Partial<Record<SectionKey, number>> = {
+        '#changes': changes.length,
+        '#skills': skillList.length,
+        '#jira': issueList.length,
+        '#todos': taskList.length,
+        '#agents': agents.length,
+      }
+
+      return count[key] ? ` ${count[key]}` : ''
+    }
+
+    /** A tab opens its group too, so a press on a folded group shows what was picked. */
+    const pick = async (group: TabGroup, key: SectionKey) => {
+      await update($, tabs, all => ({ ...all, [group.key]: key }))
+      await update($, collapsed, list => (list ?? []).filter(one => one !== group.key))
+    }
+
+    /** The section's title, or the tabs of its group when two or more of them show; the right side is the active one's. */
+    const header = (key: SectionKey, title: string, right: string, aside?: RenderChildren) => {
+      const fold = foldOf(key)
+      const group = groupOf.get(key)
+      const members = group ? membersOf(group) : []
+      const arrow = isOpen(key) ? '▾' : '▸'
+      const foldButton = (label: string) => (
+        <Button plain key={`section:${fold}`} onPress={() => void update($, collapsed, list => toggle(list ?? [], fold))}>
+          <Text bold color="claude">{label}</Text>
         </Button>
-        {aside ?? <Text dimColor>{right}</Text>}
-      </Box>
-    )
+      )
+
+      return (
+        <Box flexDirection="row" justifyContent="space-between">
+          {group === undefined || members.length < 2 ? (
+            foldButton(`${arrow} ${title}`)
+          ) : (
+            <Box flexDirection="row" gap={1}>
+              {foldButton(arrow)}
+              {members.map((member, index) => [
+                index > 0 && <Text dimColor>│</Text>,
+                <Button plain key={`tab:${member}`} onPress={() => void pick(group, member)}>
+                  <Text {...(member === key ? { bold: true, color: 'claude' } : { dimColor: true })}>
+                    {member === key ? title : `${TITLES[member]}${badge(member)}`}
+                  </Text>
+                </Button>,
+              ])}
+            </Box>
+          )}
+          {aside ?? <Text dimColor>{right}</Text>}
+        </Box>
+      )
+    }
 
     /** Block characters are cell-wide only in a terminal; elsewhere the bar is two Boxes sized by percentage. */
     const meter = (percent: number) => {
@@ -1076,12 +1165,14 @@ export const register: Register = (on, options) => {
     }
 
     const isRepo = repo !== null && repo !== 'outside'
-    const gitSection = section('#git', [
-      header('#git', 'Git', isRepo ? `⎇ ${branchText(repo)}` : '', isRepo ? branchAside(repo) : undefined),
-      isOpen('#git') && repo === null && <Text dimColor>Reading the repository…</Text>,
-      isOpen('#git') && repo === 'outside' && <Text dimColor>Not a Git repository.</Text>,
-      isOpen('#git') && isRepo && repoLines(repo),
-    ])
+    const gitRight = isRepo ? `⎇ ${branchText(repo)}` : ''
+    const gitAside = isRepo ? branchAside(repo) : undefined
+    const gitBody = isOpen('#git') && [
+      repo === null && <Text dimColor>Reading the repository…</Text>,
+      repo === 'outside' && <Text dimColor>Not a Git repository.</Text>,
+      isRepo && repoLines(repo),
+    ]
+    const gitSection = section('#git', [header('#git', 'Git', gitRight, gitAside), gitBody])
 
     const diffView = diff && (
       <Box flexDirection="column" marginTop={1}>
@@ -1095,36 +1186,44 @@ export const register: Register = (on, options) => {
       </Box>
     )
 
-    const changesSection = section(
-      '#changes',
-      [
-        header('#changes', 'Changes', `${changes.length} file${changes.length === 1 ? '' : 's'}  ${summary(changes)}`),
-        isOpen('#changes') && rows.length === 0 && <Text dimColor>No files changed in this session yet.</Text>,
-        isOpen('#changes') && rows.slice(0, room).map(line),
-        isOpen('#changes') && rows.length > room && <Text dimColor>{`… ${rows.length - room} more rows`}</Text>,
-        isOpen('#changes') && (
-          <Box flexDirection="row" marginTop={1} gap={2}>
-            <Button
-              key="collapse"
-              hotkey="c"
-              onPress={() => void update($, collapsed, list => [...(list ?? []).filter(isSection), ...rows.filter(r => r.isDir).map(r => r.key)])}
-            >
-              collapse
-            </Button>
-            <Button key="expand" hotkey="e" onPress={() => void update($, collapsed, list => (list ?? []).filter(isSection))}>
-              expand
-            </Button>
-            <Button key="clear" hotkey="x" onPress={() => void update($, files, () => ({}))}>
-              clear
-            </Button>
-          </Box>
-        ),
-        isOpen('#changes') && (
-          <Text dimColor>Click or Enter: new file opens in the editor, changed or deleted one as a diff · folder collapses or expands</Text>
-        ),
-      ],
-      true,
-    )
+    const changesBody = isOpen('#changes') && [
+      rows.length === 0 && <Text dimColor>No files changed in this session yet.</Text>,
+      rows.slice(0, room).map(line),
+      rows.length > room && <Text dimColor>{`… ${rows.length - room} more rows`}</Text>,
+      <Box flexDirection="row" marginTop={1} gap={2}>
+        <Button
+          key="collapse"
+          hotkey="c"
+          onPress={() => void update($, collapsed, list => [...(list ?? []).filter(isSection), ...rows.filter(r => r.isDir).map(r => r.key)])}
+        >
+          collapse
+        </Button>
+        <Button key="expand" hotkey="e" onPress={() => void update($, collapsed, list => (list ?? []).filter(isSection))}>
+          expand
+        </Button>
+        <Button key="clear" hotkey="x" onPress={() => void update($, files, () => ({}))}>
+          clear
+        </Button>
+      </Box>,
+      <Text dimColor>Click or Enter: new file opens in the editor, changed or deleted one as a diff · folder collapses or expands</Text>,
+    ]
+    const changesSection = section('#changes', [
+      header('#changes', 'Changes', `${changes.length} file${changes.length === 1 ? '' : 's'}  ${summary(changes)}`),
+      changesBody,
+    ])
+
+    const nodes: Record<Exclude<SectionKey, '#changes'>, RenderChildren> = {
+      '#session': sessionSection,
+      '#turn': turnSection,
+      '#todos': todosSection,
+      '#skills': skillsSection,
+      '#ci': ciSection,
+      '#jira': jiraSection,
+      '#usage': usageSection,
+      '#agents': agentsSection,
+      '#checks': checksSection,
+      '#git': gitSection,
+    }
 
     // The API has no color for the frame the terminal draws around a pane; this paints the body under the tree instead.
     const paint = isTerminal && paneBackground !== '' ? { backgroundColor: paneBackground, minHeight: e.props.scroll.bodyRows } : {}
@@ -1132,18 +1231,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column" {...paint}>
         {figures.length > 0 && tiles(figures, cols)}
-        {shows.session && sessionSection}
-        {shows.turn && turnSection}
-        {shows.todos && todosSection}
-        {shows.skills && skillsSection}
-        {shows.ci && ciSection}
-        {isJiraShown && jiraSection}
-        {shows.usage && usageSection}
-        {shows.agents && agentsSection}
-        {shows.checks && checksSection}
-        {shows.git && gitSection}
-        {shows.changes && changesSection}
-        {shows.changes && diffView}
+        {slots.map(key => (key === '#changes' ? [changesSection, diffView] : nodes[key]))}
       </Box>
     )
   })

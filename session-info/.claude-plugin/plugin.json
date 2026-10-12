@@ -1,6 +1,6 @@
 {
   "name": "session-info",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Session pane: context, cost and turns, the last turn's tokens, cache and tools, a task list Claude keeps, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
@@ -111,6 +111,12 @@
       "title": "Show the Changes section",
       "description": "Treeview of the files the session created, modified or deleted.",
       "default": true
+    },
+    "tabGroups": {
+      "type": "string",
+      "title": "Tab groups",
+      "description": "Sections that share one card as tabs. Separate groups with commas and the sections of a group with +, for example changes+git, ci+jira+skills. Names: session, lastTurn, todos, skills, ci, jira, usage, agents, checks, git, changes. The first section of a group is the tab it opens on. Leave empty to show each section in its own card.",
+      "default": "changes+git"
     },
     "alerts": {
       "type": "boolean",

@@ -170,6 +170,9 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await clock.settle()
 
     const ui = await $.ui.mount({ ...PANE, surface, viewport: { columns: 100, rows: 60 } })
+    // Git shares a card with Changes by default, and the card opens on Changes.
+    expect(await ui.findAll({ type: 'Button', key: 'git-client' })).toEqual([])
+    await ui.press({ key: 'tab:#git' })
     expect(await ui.find({ type: 'Button', key: 'git-client' })).toBeDefined()
     expect(await ui.find({ text: /⎇ main ↑2 ↓1/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '● 3 staged' })).toBeDefined()
@@ -196,6 +199,7 @@ test('outside a repository the section says so and draws no client button', asyn
   await clock.settle()
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 60 } })
+  await ui.press({ key: 'tab:#git' })
   expect(await ui.find({ type: 'Text', text: 'Not a Git repository.' })).toBeDefined()
   expect(await ui.findAll({ type: 'Button', key: 'git-client' })).toEqual([])
   await ui.unmount()
