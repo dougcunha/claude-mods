@@ -77,7 +77,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Open the pane | `/session-info` (or `/changes`). To open it when the session starts, set `session-info.openOnStart` to `true` |
 | Fold or unfold a section | Press its `▾ Session`, `▾ Usage`, `▾ Agents`, `▾ Checks`, `▾ Git` or `▾ Changes` header |
 | Open the Git client | Press the branch name in the `▾ Git` header, or press `g` while the pane has the focus |
-| Show the context breakdown by category | Press `▸ Context` |
+| Show the legend of the context bar | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
 | Collapse or expand a folder | Press the folder |
 | Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom |
@@ -90,7 +90,7 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 | Row | Source |
 | --- | --- |
 | Cost, elapsed and turns (tiles) | The session's cost as `/cost` totals it, the time since the session started, and the main-thread turn count. In a narrow pane, cost and duration move to the section header |
-| Context bar | The live context window: tokens used, the window size and the percentage. Pressing `▸ Context` unfolds the categories (messages, system prompt, tools, MCP), estimated locally |
+| Context bar | The live context window: tokens used, the window size, where auto-compaction runs (`compacts at 967k`) and the percentage. The bar is stacked, one color per category (system prompt, tools, memory files, skills, messages), then the free space as a thin line and the compaction buffer shaded. Pressing `▸ Context` unfolds a legend with each category's tokens and share. The categories are estimated locally after each turn and compaction; before the first reading the bar has one color |
 | Compactions | Compactions that went through in the main conversation |
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
 
@@ -186,7 +186,7 @@ A usage window alerts again after it resets; the context alert re-arms once the 
 
 The bars read the same figures as `/usage` and the status line. Claude Code learns them from each API response, so they move after a reply, not while the session is idle. The pane redraws when a window moves a whole point, and once a minute so the reset countdown stays current.
 
-The section shows each window Claude Code reports: the current session (`five_hour`), the current week (`seven_day`) and a gateway's spend limit. Bars turn yellow at 70% and red at 90%. On API-key or other non-subscription accounts there are no windows to show.
+The section shows each window Claude Code reports: the current session (`five_hour`), the current week (`seven_day`) and a gateway's spend limit. A bar and its percentage are green below 50%, yellow from 50%, orange from 70% and red from 90%. The context tile and the single-color context bar use the same scale. On API-key or other non-subscription accounts there are no windows to show.
 
 ## How a file opens
 
@@ -263,6 +263,7 @@ claude --plugin-dir .
 | `hooks/cards.tsx` | Framed cards, the tiles row and how the tiles wrap |
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
+| `hooks/context.ts` | The stacked context bar: slices, cell widths, legend lines |
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
 | `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, and its rows |
@@ -277,6 +278,10 @@ claude --plugin-dir .
 | `hooks/patch.ts` | Reverses hunks to recover a file's previous content |
 | `hooks/host.ts` | The engine calls the helper modules use |
 | `types/index.d.ts` | The `$.state` contract |
+
+## Credits
+
+The stacked context bar follows the design of [context-bar](https://github.com/hamzafer/claude-code-mods/tree/main/mods/context-bar) by Hamza Zafar (MIT).
 
 ## License
 

@@ -4,7 +4,8 @@ import { agentRows, agentSummary } from '../hooks/agents'
 import { crossings } from '../hooks/alerts'
 import { tileLayout } from '../hooks/cards'
 import { duration, tokens, turnLine } from '../hooks/session'
-import { bar } from '../hooks/usage'
+import { cellWidths, legendLines, legendText, share, toReading } from '../hooks/context'
+import { bar, colorOf } from '../hooks/usage'
 
 const PANE = {
   plugin: 'session-info',
@@ -161,40 +162,82 @@ test('with no reading yet the usage section says so', async ($, on) => {
   await ui.unmount()
 })
 
-test('the session section shows context, cost, duration and the context breakdown', async ($, on) => {
-  const startedAt = Date.now() - 72 * 60_000
-  on('session.cwd', async () => ({ value: '/repo' }))
-  on('agent.list', async () => ({ value: [] }))
-  on('session.usage', async (_, e) =>
-    ({
-      value: {
-        startedAt,
-        cost: { usd: 1.844 },
-        rateLimits: [],
-        context: {
-          tokens: 124_000,
-          window: 200_000,
-          percent: 62,
-          breakdown: e.breakdown
-            ? { categories: [{ name: 'Messages', tokens: 90_000, isDeferred: false }, { name: 'System tools', tokens: 20_000, isDeferred: false }] }
-            : undefined,
+const BREAKDOWN = {
+  categories: [
+    { name: 'System prompt', tokens: 2_000, kind: 'used', isDeferred: false },
+    { name: 'System tools', tokens: 20_000, kind: 'used', isDeferred: false },
+    { name: 'MCP tools', tokens: 5_000, kind: 'deferred', isDeferred: true },
+    { name: 'Messages', tokens: 102_000, kind: 'used', isDeferred: false },
+    { name: 'Free space', tokens: 63_000, kind: 'free', isDeferred: false },
+    { name: 'Autocompact buffer', tokens: 13_000, kind: 'buffer', isDeferred: false },
+  ],
+  totalTokens: 124_000,
+  maxTokens: 200_000,
+  rawMaxTokens: 200_000,
+  percentage: 62,
+  autoCompactThreshold: 187_000,
+  isAutoCompactEnabled: true,
+}
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`the session section draws the context as a stacked bar with a legend when unfolded (${surface})`, async ($, on) => {
+    const startedAt = Date.now() - 72 * 60_000
+    on('session.cwd', async () => ({ value: '/repo' }))
+    on('agent.list', async () => ({ value: [] }))
+    on('session.usage', async (_, e) =>
+      ({
+        value: {
+          startedAt,
+          cost: { usd: 1.844 },
+          rateLimits: [],
+          context: { tokens: 124_000, window: 200_000, percent: 62, breakdown: e.breakdown ? BREAKDOWN : undefined },
         },
-      },
-    }) as never)
+      }) as never)
 
-  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: '$1.84' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: '1h 12m' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'context' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: '124k / 200k' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: ' 62%' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'No turns yet' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: '  Messages' })).toBeUndefined()
+    const ui = await $.ui.mount({ ...PANE, surface })
+    expect(await ui.find({ type: 'Text', text: '$1.84' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1h 12m' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'No turns yet' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^messages / })).toBeUndefined()
 
-  await ui.press({ key: 'context' })
-  expect(await ui.find({ type: 'Text', text: '  Messages' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: '90k' })).toBeDefined()
-  await ui.unmount()
+    await ui.press({ key: 'context' })
+    expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'messages 102k 51%' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'free space 63k' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /mcp tools/ })).toBeUndefined()
+    expect(Boolean(await ui.find({ type: 'Text', text: /█/ }))).toBe(surface === 'terminal')
+
+    await ui.press({ key: 'context' })
+    expect(await ui.find({ type: 'Text', text: /^messages / })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k' })).toBeDefined()
+    await ui.unmount()
+  })
+}
+
+test('the context reading orders, colors and sizes the slices', async () => {
+  const reading = toReading(BREAKDOWN)!
+  expect(reading.slices.map(slice => `${slice.kind}:${slice.name}`)).toEqual([
+    'used:system prompt',
+    'used:system tools',
+    'used:messages',
+    'free:free space',
+    'buffer:autocompact buffer',
+  ])
+  expect(reading.slices.find(slice => slice.name === 'messages')?.color).toBe('claude')
+  expect(reading.compactsAt).toBe(187_000)
+  expect(toReading({ ...BREAKDOWN, isAutoCompactEnabled: false })?.compactsAt).toBe(undefined)
+  expect(toReading({ ...BREAKDOWN, rawMaxTokens: 0 })).toBe(null)
+
+  const widths = cellWidths(reading, 50)
+  expect(widths.reduce((sum, n) => sum + n, 0)).toBe(50)
+  expect(widths[0]).toBe(1)
+  expect(share(400, 1_000_000)).toBe('<0.1%')
+  expect(share(21_000, 1_000_000)).toBe('2.1%')
+  expect(share(233_000, 1_000_000)).toBe('23%')
+
+  const lines = legendLines(reading, 40)
+  expect(lines.flat().length).toBe(5)
+  expect(lines.every(line => line.map(slice => 2 + legendText(slice, reading.window).length).reduce((a, n) => a + n, 0) + 3 * (line.length - 1) <= 40)).toBe(true)
 })
 
 test('a narrow pane draws bare sections with cost and duration in the session header', async ($, on) => {
@@ -350,3 +393,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.unmount()
   })
 }
+
+test('usage colors go from green to red as a window nears its limit', async () => {
+  expect([0, 49, 50, 69, 70, 89, 90, 100].map(colorOf)).toEqual(['success', 'success', 'warning', 'warning', '#ff8700', '#ff8700', 'error', 'error'])
+})

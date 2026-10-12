@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { Checks, FileChange, InlineDiff, Repo } from '../types'
+import type { Checks, ContextReading, FileChange, InlineDiff, Repo } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
 import { crossings } from './alerts'
@@ -9,6 +9,7 @@ import type { AgentRow } from './agents'
 import { FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
 import { openClient } from './client'
+import { cellWidths, contextText, GLYPH, LEGEND_GAP, legendLines, legendText, SWATCH, toReading } from './context'
 import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, NO_CHECKS, toPattern } from './checks'
 import type { CheckView, Patterns } from './checks'
 import { gitStatus } from './git'
@@ -32,6 +33,7 @@ const now = atom({ plugin: 'session-info', key: 'now' } as const, 0)
 const turns = atom({ plugin: 'session-info', key: 'turns' } as const, NO_TURNS)
 const compactions = atom({ plugin: 'session-info', key: 'compactions' } as const, 0)
 const breakdown = atom({ plugin: 'session-info', key: 'breakdown' } as const, false)
+const contextState = atom({ plugin: 'session-info', key: 'context' } as const, null as ContextReading | null)
 const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as string[])
 const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECKS as Checks)
 const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
@@ -142,8 +144,16 @@ function refreshRepo($: EngineInterface): Promise<void> {
   return reading
 }
 
-async function openPane($: EngineInterface, isGitShown: boolean): Promise<{ text: string }> {
+/** Reads /context's breakdown, estimated locally (no token-count calls), for the stacked bar. */
+async function refreshContext($: EngineInterface): Promise<void> {
+  const usage = await $.session.usage({ breakdown: 'summary' })
+  const reading = usage.context.breakdown ? toReading(usage.context.breakdown) : null
+  if (reading !== null) await update($, contextState, () => reading)
+}
+
+async function openPane($: EngineInterface, isGitShown: boolean, isSessionShown: boolean): Promise<{ text: string }> {
   if (isGitShown) void refreshRepo($)
+  if (isSessionShown) void refreshContext($).catch(() => undefined)
   await $.ui.open({ id: PANE, title: TITLE, focus: true })
 
   return { text: 'Session info pane opened.' }
@@ -182,15 +192,16 @@ export const register: Register = (on, options) => {
         if (shows.git) void refreshRepo($)
       })
     if (shows.git) void refreshRepo($)
+    if (shows.session) void refreshContext($).catch(() => undefined)
     // The engine draws a pane that the person did not ask for only on a wide terminal; a narrow one keeps it until /session-info.
     if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: TITLE })
 
     return next(e)
   })
 
-  on('command.run', { command: 'session-info' }, async $ => openPane($, shows.git))
+  on('command.run', { command: 'session-info' }, async $ => openPane($, shows.git, shows.session))
 
-  on('command.run', { command: 'changes' }, async $ => openPane($, shows.git))
+  on('command.run', { command: 'changes' }, async $ => openPane($, shows.git, shows.session))
 
   // A commit made outside the session, in the Git client for example, shows by the next prompt.
   on('prompt.submit', async ($, e, next) => {
@@ -209,6 +220,7 @@ export const register: Register = (on, options) => {
   on('turn.complete', async ($, e, next) => {
     const answered = await next(e)
     if (e.agentId !== undefined && shows.agents) await update($, now, () => Date.now())
+    if (e.agentId === undefined && shows.session) void refreshContext($).catch(() => undefined)
     if (e.agentId === undefined)
       await update($, turns, stats => ({
         count: (stats ?? NO_TURNS).count + 1,
@@ -228,8 +240,10 @@ export const register: Register = (on, options) => {
 
   on('session.compact', async ($, e, next) => {
     const compacted = await next(e)
-    if (e.agentId === undefined && e.trigger !== 'precompute' && 'messages' in compacted)
+    if (e.agentId === undefined && e.trigger !== 'precompute' && 'messages' in compacted) {
       await update($, compactions, count => (count ?? 0) + 1)
+      if (shows.session) void refreshContext($).catch(() => undefined)
+    }
 
     return compacted
   })
@@ -261,13 +275,11 @@ export const register: Register = (on, options) => {
     const isOpen = (key: SectionKey): boolean => !shut.has(key)
     await read($, now)
     const isDetailed = shows.session && isOpen('#session') && (await read($, breakdown))
-    const usage = isLive ? await $.session.usage(isDetailed ? { breakdown: 'summary' } : undefined) : undefined
+    const usage = isLive ? await $.session.usage() : undefined
+    const reading = shows.session ? await read($, contextState) : null
     const limits: Limit[] = shows.usage && usage ? ordered(usage.rateLimits) : []
     const stats = shows.session ? await read($, turns) : NO_TURNS
     const compacted = shows.session ? await read($, compactions) : 0
-    const categories = (usage?.context.breakdown?.categories ?? [])
-      .filter(category => category.tokens > 0 && !category.isDeferred)
-      .sort((a, b) => b.tokens - a.tokens)
     const agents = shows.agents ? await $.agent.list() : []
     const changes = shows.changes ? Object.values(await read($, files)) : []
     const diff = shows.changes ? await read($, inline) : null
@@ -284,7 +296,8 @@ export const register: Register = (on, options) => {
         : []
     const tileRows = tileLayout(figures.length, cols).rows
     const usageRows = shows.usage ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
-    const sessionRows = shows.session ? chrome + (isOpen('#session') ? 3 + (isDetailed ? categories.length : 0) : 0) : 0
+    const legend = isDetailed && reading ? legendLines(reading, inner) : []
+    const sessionRows = shows.session ? chrome + (isOpen('#session') ? 3 + legend.length : 0) : 0
     const agentLines = agentRows(agents)
     const agentRoom = Math.min(agentLines.length, 8)
     const agentsRows = shows.agents ? chrome + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
@@ -322,7 +335,7 @@ export const register: Register = (on, options) => {
           <Box flexDirection="row">
             <Text color={colorOf(percent)}>{filled}</Text>
             <Text dimColor>{empty}</Text>
-            <Text>{` ${percentText(percent)}`}</Text>
+            <Text color={colorOf(percent)}>{` ${percentText(percent)}`}</Text>
           </Box>
         )
       }
@@ -333,10 +346,63 @@ export const register: Register = (on, options) => {
           <Box flexGrow={1} flexDirection="row" height={1} backgroundColor="subtle">
             <Box width={`${share}%`} height={1} backgroundColor={colorOf(percent)} />
           </Box>
+          <Text color={colorOf(percent)}>{percentText(percent)}</Text>
+        </Box>
+      )
+    }
+
+    /** The context window as one bar of runs, a color per category; the free space a thin line, the compaction buffer shaded. */
+    const stackedBar = (reading: ContextReading, percent: number) => {
+      if (isTerminal) {
+        const widths = cellWidths(reading, inner - 6)
+
+        return (
+          <Box flexDirection="row">
+            {reading.slices.map((slice, i) =>
+              (widths[i] ?? 0) === 0 ? null : (
+                <Text color={slice.kind === 'used' ? slice.color : undefined} dimColor={slice.kind !== 'used'}>
+                  {GLYPH[slice.kind].repeat(widths[i] ?? 0)}
+                </Text>
+              ),
+            )}
+            <Text>{` ${percentText(percent)}`}</Text>
+          </Box>
+        )
+      }
+
+      return (
+        <Box flexDirection="row" alignItems="center" gap={1}>
+          <Box flexGrow={1} flexDirection="row" height={1}>
+            {reading.slices.map(slice => {
+              const width = Math.max(slice.kind === 'used' ? 1 : 0, Math.round((slice.tokens / reading.window) * 100))
+
+              return width === 0 ? null : (
+                <Box
+                  width={`${width}%`}
+                  height={1}
+                  backgroundColor={slice.kind === 'used' ? slice.color : slice.kind === 'free' ? 'subtle' : 'inactive'}
+                />
+              )
+            })}
+          </Box>
           <Text>{percentText(percent)}</Text>
         </Box>
       )
     }
+
+    const legendRows = (reading: ContextReading) =>
+      legend.map(line => (
+        <Box flexDirection="row" gap={LEGEND_GAP}>
+          {line.map(slice => (
+            <Box flexDirection="row" gap={1} flexShrink={0}>
+              <Text color={slice.kind === 'used' ? slice.color : undefined} dimColor={slice.kind !== 'used'}>
+                {SWATCH[slice.kind]}
+              </Text>
+              <Text dimColor={slice.kind !== 'used'}>{legendText(slice, reading.window)}</Text>
+            </Box>
+          ))}
+        </Box>
+      ))
 
     const limitRows = (limit: Limit) => {
       const reset = resetIn(limit.resetsAt, Date.now())
@@ -388,23 +454,24 @@ export const register: Register = (on, options) => {
         isOpen('#session') && (
           <Box flexDirection="column">
             <Box flexDirection="row" justifyContent="space-between">
-              <Button plain key="context" onPress={() => void update($, breakdown, open => !open)}>
+              <Button
+                plain
+                key="context"
+                onPress={() => {
+                  void update($, breakdown, open => !open)
+                  void refreshContext($).catch(() => undefined)
+                }}
+              >
                 {`${isDetailed ? '▾' : '▸'} Context`}
               </Button>
               <Text dimColor wrap="truncate-end">
                 {context?.tokens === undefined
                   ? 'after the first reply'
-                  : `${tokens(context.tokens)} / ${tokens(context.window)}${compactionText(compacted)}`}
+                  : contextText(context.tokens, context.window, reading?.compactsAt, compactionText(compacted))}
               </Text>
             </Box>
-            {meter(context?.percent ?? 0)}
-            {isDetailed &&
-              categories.map(category => (
-                <Box flexDirection="row" justifyContent="space-between">
-                  <Text wrap="truncate-end">{`  ${category.name}`}</Text>
-                  <Text dimColor>{tokens(category.tokens)}</Text>
-                </Box>
-              ))}
+            {reading ? stackedBar(reading, context?.percent ?? 0) : meter(context?.percent ?? 0)}
+            {reading && legendRows(reading)}
             <Text dimColor wrap="truncate-end">{turnLine(stats ?? NO_TURNS)}</Text>
           </Box>
         ),

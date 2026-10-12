@@ -51,7 +51,16 @@ export function bar(percent: number, width: number): { filled: string; empty: st
   return { filled: '█'.repeat(full) + partial, empty: '░'.repeat(cells - full - (partial === '' ? 0 : 1)) }
 }
 
-export const colorOf = (percent: number): 'suggestion' | 'warning' | 'error' =>
-  percent >= 90 ? 'error' : percent >= 70 ? 'warning' : 'suggestion'
+/** Between the theme's warning and error colors; no theme key holds an orange. */
+const ORANGE = '#ff8700'
+
+/** Green while there is room, then yellow, orange and red as the window nears its limit; the alerts fire at 80% and 90%. */
+export function colorOf(percent: number): string {
+  if (percent >= 90) return 'error'
+  if (percent >= 70) return ORANGE
+  if (percent >= 50) return 'warning'
+
+  return 'success'
+}
 
 export const percentText = (percent: number): string => `${Math.round(percent)}%`

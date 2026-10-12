@@ -57,6 +57,12 @@ export type Repo = {
   at: number
 }
 
+/** One row of the context breakdown as the bar draws it: `used` content, the `free` window or the compaction `buffer`. */
+export type ContextSlice = { name: string; tokens: number; kind: 'used' | 'free' | 'buffer'; color: string }
+
+/** The context window by category, read after each turn; `compactsAt` is absent when auto-compaction is off. */
+export type ContextReading = { slices: ContextSlice[]; total: number; window: number; compactsAt?: number }
+
 declare module 'claude-code' {
   interface PluginState {
     'session-info': {
@@ -72,6 +78,8 @@ declare module 'claude-code' {
       compactions: number
       /** Whether the context breakdown by category is unfolded. */
       breakdown: boolean
+      /** The context window by category, for the stacked bar and its legend; null before the first read. */
+      context: ContextReading | null
       /** Alert thresholds already notified: `<window>@<resetsAt>:<threshold>` or `context:<threshold>`. */
       alerted: string[]
       /** The last build and the last test run of the session. */
