@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { Checks, ContextReading, FileChange, InlineDiff, Repo } from '../types'
+import type { Checks, ContextReading, FileChange, InlineDiff, Repo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
 import { crossings } from './alerts'
@@ -20,6 +20,8 @@ import { age, branchText, countParts, ISSUE_COLOR, issueText, operationText, rea
 import { SHELLS, track } from './track'
 import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
 import { buildTree, flatten } from './tree'
+import { modelText, RESULT, resultText, startDraft, toolsText, tokensText, toRecord, turnLines, withSpawn, withStep, withSubagentUsage, withTool } from './turn'
+import type { TurnDraft } from './turn'
 import type { Row } from './tree'
 import { bar, colorOf, labelOf, ordered, percentText, resetIn } from './usage'
 import type { Limit } from './usage'
@@ -37,18 +39,21 @@ const contextState = atom({ plugin: 'session-info', key: 'context' } as const, n
 const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as string[])
 const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECKS as Checks)
 const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
+const lastTurn = atom({ plugin: 'session-info', key: 'lastTurn' } as const, null as TurnRecord | null)
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
 const MINUTE = 60_000
 
-type SectionKey = '#session' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
+type SectionKey = '#session' | '#turn' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
 
 /** Tools whose calls can change the working tree, so the Git section reads the repository again after them. */
 const FILE_TOOLS: readonly string[] = [...SHELLS, 'Write', 'Edit', 'NotebookEdit']
 
 let reading: Promise<void> | undefined
 let isStale = false
+/** The main-thread turn that runs now; a reload during a turn starts without it. */
+let draft: TurnDraft | undefined
 
 const toggle = (list: readonly string[], key: string): string[] =>
   list.includes(key) ? list.filter(one => one !== key) : [...list, key]
@@ -167,6 +172,7 @@ export const register: Register = (on, options) => {
   const icons = (options.icons as IconSet | undefined) ?? 'unicode'
   const shows = {
     session: options.showSession !== false,
+    turn: options.showLastTurn !== false,
     usage: options.showUsage !== false,
     agents: options.showAgents !== false,
     checks: options.showChecks !== false,
@@ -210,6 +216,22 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  if (shows.turn) {
+    on('turn.start', async ($, e, next) => {
+      const usage = await $.session.usage().catch(() => undefined)
+      draft = startDraft(e.turnId, usage?.cost?.usd)
+
+      return next(e)
+    })
+
+    // The step only notes the request; it leaves the stream to the hooks beneath it.
+    on('turn.step', async function* ($, e, next) {
+      if (e.agentId === undefined && draft !== undefined) draft = withStep(draft, e)
+
+      return yield* next(e)
+    })
+  }
+
   on('session.measure', async ($, e, next) => {
     if (isLive) await update($, now, () => Date.now())
     if (isAlerting) await alert($, e.rateLimits, e.context)
@@ -227,12 +249,20 @@ export const register: Register = (on, options) => {
         outputTokens: (stats ?? NO_TURNS).outputTokens + (e.usage?.output_tokens ?? 0),
         lastMs: e.durationMs,
       }))
+    if (shows.turn && e.agentId !== undefined && draft !== undefined) draft = withSubagentUsage(draft, e.usage)
+    if (shows.turn && e.agentId === undefined) {
+      const own = draft
+      draft = undefined
+      const usage = await $.session.usage().catch(() => undefined)
+      await update($, lastTurn, () => toRecord(own, e, usage?.cost?.usd, Date.now()))
+    }
 
     return answered
   })
 
   on('agent.spawn', async ($, e, next) => {
     const spawned = await next(e)
+    if (shows.turn && draft !== undefined) draft = withSpawn(draft)
     if (shows.agents) await update($, now, () => Date.now())
 
     return spawned
@@ -249,6 +279,7 @@ export const register: Register = (on, options) => {
   })
 
   on('tool.call', async ($, e, next) => {
+    if (shows.turn && e.agentId === undefined && draft !== undefined) draft = withTool(draft, e.tool)
     const isShell = (SHELLS as readonly string[]).includes(e.tool)
     const isChecked = shows.checks && isShell
     const isRepoTool = shows.git && FILE_TOOLS.includes(e.tool)
@@ -280,6 +311,7 @@ export const register: Register = (on, options) => {
     const limits: Limit[] = shows.usage && usage ? ordered(usage.rateLimits) : []
     const stats = shows.session ? await read($, turns) : NO_TURNS
     const compacted = shows.session ? await read($, compactions) : 0
+    const turnRecord = shows.turn ? await read($, lastTurn) : null
     const agents = shows.agents ? await $.agent.list() : []
     const changes = shows.changes ? Object.values(await read($, files)) : []
     const diff = shows.changes ? await read($, inline) : null
@@ -295,6 +327,7 @@ export const register: Register = (on, options) => {
           ]
         : []
     const tileRows = tileLayout(figures.length, cols).rows
+    const turnRows = shows.turn ? chrome + (isOpen('#turn') ? (turnRecord ? turnLines(turnRecord).length : 1) : 0) : 0
     const usageRows = shows.usage ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
     const legend = isDetailed && reading ? legendLines(reading, inner) : []
     const sessionRows = shows.session ? chrome + (isOpen('#session') ? 3 + legend.length : 0) : 0
@@ -307,7 +340,7 @@ export const register: Register = (on, options) => {
     const repo = shows.git ? await read($, repoState) : null
     const gitRows = shows.git ? chrome + (isOpen('#git') ? repoRowCount(repo) : 0) : 0
     const changesFrame = isCards ? FRAME_ROWS : 0
-    const above = tileRows + usageRows + sessionRows + agentsRows + checksRows + gitRows + changesFrame
+    const above = tileRows + usageRows + sessionRows + turnRows + agentsRows + checksRows + gitRows + changesFrame
     const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
 
     const section = (key: SectionKey, children: RenderChildren, isLast = false) =>
@@ -483,6 +516,21 @@ export const register: Register = (on, options) => {
       ],
     )
 
+    const turnModel = turnRecord ? modelText(turnRecord) : ''
+    const turnTools = turnRecord ? toolsText(turnRecord) : ''
+    const turnSection = section('#turn', [
+      header(
+        '#turn',
+        'Last turn',
+        '',
+        turnRecord ? <Text color={RESULT[turnRecord.reason].color}>{resultText(turnRecord)}</Text> : undefined,
+      ),
+      isOpen('#turn') && turnRecord === null && <Text dimColor>No turn finished yet.</Text>,
+      isOpen('#turn') && turnRecord && turnModel !== '' && <Text wrap="truncate-end">{turnModel}</Text>,
+      isOpen('#turn') && turnRecord && <Text dimColor wrap="truncate-end">{tokensText(turnRecord)}</Text>,
+      isOpen('#turn') && turnRecord && turnTools !== '' && <Text dimColor wrap="truncate-end">{turnTools}</Text>,
+    ])
+
     const usageSection = section('#usage', [
       header('#usage', 'Usage', ''),
       isOpen('#usage') && limits.length === 0 && (
@@ -654,6 +702,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column" {...paint}>
         {figures.length > 0 && tiles(figures, cols)}
         {shows.session && sessionSection}
+        {shows.turn && turnSection}
         {shows.usage && usageSection}
         {shows.agents && agentsSection}
         {shows.checks && checksSection}

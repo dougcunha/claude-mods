@@ -63,6 +63,29 @@ export type ContextSlice = { name: string; tokens: number; kind: 'used' | 'free'
 /** The context window by category, read after each turn; `compactsAt` is absent when auto-compaction is off. */
 export type ContextReading = { slices: ContextSlice[]; total: number; window: number; compactsAt?: number }
 
+export type TurnReason = 'answer' | 'aborted' | 'refusal' | 'error'
+
+/** Token counts the API reported, summed over the requests of a turn. */
+export type TurnTokens = { input: number; output: number; cacheRead: number; cacheWrite: number }
+
+/**
+ * The last main-thread turn, as the Last turn section draws it.
+ * `requests`, `effort` and `tools` are absent when the mod loaded while the turn ran;
+ * `costUsd` is absent when the session reports no cost.
+ */
+export type TurnRecord = {
+  at: number
+  durationMs: number
+  reason: TurnReason
+  model?: string
+  effort?: string
+  requests?: number
+  tokens: TurnTokens | null
+  tools?: Record<string, number>
+  subagents: { count: number; tokens: number }
+  costUsd?: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'session-info': {
@@ -86,6 +109,8 @@ declare module 'claude-code' {
       checks: Checks
       /** The repository the Git section shows; `outside` when the folder is in none, null before the first read. */
       repo: Repo | 'outside' | null
+      /** The last main-thread turn; null before the first one ends. */
+      lastTurn: TurnRecord | null
     }
   }
 }

@@ -1,8 +1,9 @@
 # session-info
 
-A Claude Code mod with one pane and six sections:
+A Claude Code mod with one pane and seven sections:
 
 - **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
+- **Last turn**: how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, and the tools it called.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
 - **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
 - **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests. .NET, Node, Bun, Rust, Go and Python tools are recognized.
@@ -22,6 +23,12 @@ Each section is a card with a rounded frame that lights up under the pointer in 
 │ ▸ Context                                 124k / 200k · 1 compaction │
 │ ██████████████████████████████████████▌░░░░░░░░░░░░░░░░░░░░░░░ 62%   │
 │ 14 turns · ~250 output tok/turn · last 38s                           │
+╰──────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────╮
+│ ▾ Last turn                                ✓ answer · 1m 12s · $0.42 │
+│ claude-opus-5-5 · high · 6 requests                                  │
+│ in 3.2k · out 4.1k · cache 182k read / 12k write · 92% hit           │
+│ Bash 4 · Edit 3 · Read 2 · 1 subagent (45k tok)                      │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
 │ ▾ Usage                                                              │
@@ -101,6 +108,19 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
 
 The turn and compaction counts start when the mod loads, so a reload or a newly installed mod starts them at zero.
+
+## What the Last turn section shows
+
+The section shows the last turn of the main conversation. It updates when the turn ends.
+
+| Row | Source |
+| --- | --- |
+| Header | How the turn ended (`✓ answer`, `⊘ aborted`, `✖ refusal`, `✖ error`), its duration, and its cost: the session's cost when the turn ended minus the cost when it started, so it includes the subagents that ran during the turn |
+| Model | The model of the last request of the turn, the effort it sent, and how many model requests the turn made |
+| Tokens | Input, output, cache read and cache write tokens, summed over the turn's requests, and the share of the input that the prompt cache served (`cache read / (input + cache read + cache write)`) |
+| Tools | The tools the main conversation called in the turn, most-called first, four names and then `+N more`. An MCP tool shows by its own name. Then the subagents the turn spawned and the tokens of the subagent runs that ended during the turn |
+
+The token counts of the main turn do not include its subagents; the Tools row shows them apart. A subagent that runs in the background and ends after the turn is not counted. When the mod loads while a turn runs, for example after a reload, that turn's record has no effort, request count, tools or cost.
 
 ## What the Agents section shows
 
@@ -219,6 +239,7 @@ Change these in `/config`:
 | --- | --- | --- |
 | `session-info.openOnStart` | `true`, `false` | `false` |
 | `session-info.showSession` | `true`, `false` | `true` |
+| `session-info.showLastTurn` | `true`, `false` | `true` |
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
 | `session-info.showChecks` | `true`, `false` | `true` |

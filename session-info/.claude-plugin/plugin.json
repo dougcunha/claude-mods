@@ -1,7 +1,7 @@
 {
   "name": "session-info",
-  "version": "0.12.1",
-  "description": "Session pane: context, cost and turns, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
+  "version": "0.13.0",
+  "description": "Session pane: context, cost and turns, the last turn's tokens, cache and tools, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -20,6 +20,12 @@
       "type": "boolean",
       "title": "Show the Session section",
       "description": "Context window as a stacked bar by category, cost, duration and turn stats.",
+      "default": true
+    },
+    "showLastTurn": {
+      "type": "boolean",
+      "title": "Show the Last turn section",
+      "description": "Result, duration and cost of the last turn, its model, effort and requests, token and cache counts, and the tools it called.",
       "default": true
     },
     "showUsage": {
