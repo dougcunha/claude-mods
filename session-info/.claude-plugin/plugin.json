@@ -1,6 +1,6 @@
 {
   "name": "session-info",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Session pane: context, cost and turns, the last turn's tokens, cache and tools, a task list Claude keeps, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
@@ -173,7 +173,7 @@
     "testPattern": {
       "type": "string",
       "title": "Extra test commands",
-      "description": "A regular expression (case-insensitive) for more commands to treat as a test run, for example ^make test|^just test. Leave empty for the built-in list.",
+      "description": "A regular expression (case-insensitive) for more commands to treat as a test run, for example ^just test|^task test. Leave empty for the built-in list.",
       "default": ""
     }
   }

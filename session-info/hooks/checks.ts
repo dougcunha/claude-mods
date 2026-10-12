@@ -23,33 +23,54 @@ const MAX_ERRORS = 3
 const MAX_FAILURES = 5
 const MAX_READ = 1_000_000
 
+// Each segment of a shell command is matched against these, so the lists stay anchored and free of nested repeats.
 const TEST = [
   /^dotnet\s+test(?=\s|$)/,
   /^dotnet\s+run\s.*\btests?\b/i,
   /^(?:npm|pnpm|yarn|bun)\s+(?:run(?:-script)?\s+)?test(?::\S+)?(?=\s|$)/,
   /^npm\s+t(?=\s|$)/,
-  /^(?:jest|vitest|mocha|ava)(?=\s|$)/,
+  /^(?:jest|vitest|mocha|ava|cypress\s+run|gotestsum|ctest)(?=\s|$)/,
   /^playwright\s+test(?=\s|$)/,
   /^node\s+(?:\S+\s+)*--test(?=\s|$)/,
+  /^deno\s+test(?=\s|$)/,
+  /^claude\s+plugin\s+test(?=\s|$)/,
+  /^(?:turbo|nx)\s+(?:run\s+)?test(?::\S+)?(?=\s|$)/,
   /^cargo\s+(?:test|nextest)(?=\s|$)/,
   /^go\s+test(?=\s|$)/,
-  /^(?:python3?\s+-m\s+)?pytest(?=\s|$)/,
+  /^(?:(?:py|python3?)\s+-m\s+)?(?:pytest|unittest)(?=\s|$)/,
+  /^(?:tox|nox)(?=\s|$)/,
+  /^(?:\.\/)?(?:gradlew?|mvnw?)(?:\.bat|\.cmd)?\s.*\b(?:test|check|verify)\b/,
+  /^(?:rspec|rake\s+(?:test|spec)|(?:bin\/)?rails\s+test)(?=\s|$)/,
+  /^(?:\S*\/)?(?:phpunit|pest)(?=\s|$)/,
+  /^php\s+artisan\s+test(?=\s|$)/,
+  /^(?:mix|swift|flutter|dart|stack|cabal)\s+test(?=\s|$)/,
+  /^zig\s+(?:build\s+)?test(?=\s|$)/,
+  /^make\s+(?:test|check)(?=\s|$)/,
 ]
 
 const BUILD = [
-  /^dotnet\s+(?:build|publish|pack)(?=\s|$)/,
-  /^(?:npm|pnpm|yarn|bun)\s+(?:run(?:-script)?\s+)?build(?::\S+)?(?=\s|$)/,
+  /^dotnet\s+(?:build|publish|pack|msbuild)(?=\s|$)/,
+  /^msbuild(?:\.exe)?(?=\s|$)/i,
+  /^(?:npm|pnpm|yarn|bun)\s+(?:run(?:-script)?\s+)?(?:build|compile|typecheck|type-check)(?::\S+)?(?=\s|$)/,
   /^bun\s+build(?=\s|$)/,
-  /^tsc(?=\s|$)/,
-  /^(?:vite|next|nuxt|astro|ng)\s+build(?=\s|$)/,
-  /^cargo\s+(?:build|check)(?=\s|$)/,
-  /^go\s+build(?=\s|$)/,
-  /^(?:\.\/)?(?:gradlew?|mvnw?)\s.*\b(?:build|assemble|package|compile|install)\b/,
+  /^(?:tsc|vue-tsc|tsgo|tsup|esbuild|webpack|rollup)(?=\s|$)/,
+  /^(?:vite|next|nuxt|astro|ng|parcel|turbo|nx|flutter)\s+(?:run\s+)?build(?::\S+)?(?=\s|$)/,
+  /^claude\s+plugin\s+validate(?=\s|$)/,
+  /^cargo\s+(?:build|check|clippy)(?=\s|$)/,
+  /^go\s+(?:build|vet)(?=\s|$)/,
+  /^(?:\.\/)?(?:gradlew?|mvnw?)(?:\.bat|\.cmd)?\s.*\b(?:build|assemble|package|compile|install)\b/,
+  /^(?:swift|zig|stack|cabal)\s+build(?=\s|$)/,
+  /^mix\s+compile(?=\s|$)/,
+  /^xcodebuild(?=\s|$)/,
+  /^(?:cmake\s+--build|ninja)(?=\s|$)/,
+  /^make(?:\s+-[\w-]+)*(?:\s+(?:all|build))?\s*$/,
 ]
 
 const IGNORED = /(?:^|\s)(?:--list-tests|--help|--version)(?=\s|$)/
 
-const PREFIX = /^(?:rtk(?:\s+proxy)?|npx|bunx|time|&|(?:pnpm|yarn)\s+(?:exec|dlx)|(?:uv|poetry)\s+run|[A-Za-z_]\w*=\S*)\s+/
+/** Runners in front of the real tool, with the options they take before it: `npx -y -p typescript tsc` runs `tsc`. */
+const PREFIX =
+  /^(?:rtk(?:\s+proxy)?|time|env|&|(?:npx|bunx|uvx|(?:pnpm|yarn)\s+(?:exec|dlx))(?:\s+(?:--package(?:=|\s+)\S+|-p\s+\S+|-[\w-]+))*|(?:uv|poetry|pipenv|hatch)\s+run|bundle\s+exec|[A-Za-z_]\w*=\S*)\s+/
 
 /** A segment without the wrappers that run the real tool: `rtk`, `npx`, env assignments. */
 function unwrap(segment: string): string {

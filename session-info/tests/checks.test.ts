@@ -223,6 +223,53 @@ test('classifies build and test commands through wrappers and compound commands'
   expect(toPattern('(')).toBeUndefined()
 })
 
+test('classifies the commands of other ecosystems and the runners in front of them', async () => {
+  const tests = [
+    'claude plugin test session-info',
+    'deno test -A',
+    'npx cypress run --spec a.cy.ts',
+    'py -m pytest -q',
+    'python3 -m unittest discover',
+    'uv run pytest',
+    'uvx tox -e py312',
+    './gradlew.bat test',
+    'mvn -q verify',
+    'bundle exec rspec spec/a_spec.rb',
+    'bin/rails test',
+    'vendor/bin/phpunit',
+    'php artisan test',
+    'mix test',
+    'swift test',
+    'flutter test',
+    'zig build test',
+    'make check',
+    'turbo run test',
+    'env CI=1 pnpm test:unit',
+  ]
+  for (const command of tests) expect([command, classify(command)]).toEqual([command, ['test']])
+
+  const builds = [
+    'claude plugin validate .',
+    'npx -y -p typescript@5.6.3 tsc -p tsconfig.json',
+    'npx --package=typescript tsc',
+    'pnpm dlx vue-tsc --noEmit',
+    'npm run typecheck',
+    'cargo clippy --all-targets',
+    'go vet ./...',
+    'MSBuild.exe App.sln',
+    'dotnet msbuild App.csproj',
+    'nx build web',
+    'swift build',
+    'mix compile',
+    'cmake --build build',
+    'make',
+    'make -j8 all',
+  ]
+  for (const command of builds) expect([command, classify(command)]).toEqual([command, ['build']])
+
+  for (const command of ['make run', 'make clean', 'npx prettier --write .', 'go run .', 'claude plugin list']) expect([command, classify(command)]).toEqual([command, []])
+})
+
 test('reads build errors and counts from RTK, localized MSBuild, tsc and bun', async () => {
   expect(buildErrors(clean(BUILD_RTK_FAILED))).toEqual([
     "Class1.cs(7,20): CS0029: Cannot implicitly convert type 'int' to 'string'",

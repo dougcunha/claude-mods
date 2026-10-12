@@ -169,14 +169,14 @@ Active agents come first; an agent spawned by another is indented under it. Clau
 
 ## What the Checks section shows
 
-One row for the last build and one for the last test run, from any shell command the session ran, a subagent's included (marked `agent`). A command counts when one of its segments runs a known tool, so `cd app && npm test` and `rtk dotnet test …` count too:
+One row for the last build and one for the last test run, from any shell command the session ran, a subagent's included (marked `agent`). A command counts when one of its segments runs a known tool, so `cd app && npm test` and `rtk dotnet test …` count too. The runners in front of a tool and their options are skipped: `rtk`, `env`, `time`, `npx`/`bunx`/`uvx` (so `npx -y -p typescript tsc` is `tsc`), `pnpm`/`yarn exec` and `dlx`, `uv`/`poetry`/`pipenv`/`hatch run`, `bundle exec` and variable assignments such as `CI=1`.
 
 | Check | Commands |
 | --- | --- |
-| Build | `dotnet build`, `dotnet publish`, `dotnet pack`, `npm`/`pnpm`/`yarn`/`bun run build`, `bun build`, `tsc`, `vite`/`next`/`nuxt`/`astro`/`ng build`, `cargo build`, `cargo check`, `go build`, Gradle and Maven builds |
-| Tests | `dotnet test`, `dotnet run` of a test project, `npm`/`pnpm`/`yarn`/`bun test`, `bun test`, `jest`, `vitest`, `mocha`, `playwright test`, `node --test`, `cargo test`, `go test`, `pytest` |
+| Build | `dotnet build`, `dotnet publish`, `dotnet pack`, `dotnet msbuild`, `msbuild`, `npm`/`pnpm`/`yarn`/`bun run build`, `compile`, `typecheck` or `type-check`, `bun build`, `tsc`, `vue-tsc`, `tsgo`, `tsup`, `esbuild`, `webpack`, `rollup`, `vite`/`next`/`nuxt`/`astro`/`ng`/`parcel`/`turbo`/`nx`/`flutter build`, `claude plugin validate`, `cargo build`, `cargo check`, `cargo clippy`, `go build`, `go vet`, Gradle and Maven builds, `swift`/`zig`/`stack`/`cabal build`, `mix compile`, `xcodebuild`, `cmake --build`, `ninja`, and `make` alone or with `all` or `build` |
+| Tests | `dotnet test`, `dotnet run` of a test project, `npm`/`pnpm`/`yarn`/`bun test`, `bun test`, `jest`, `vitest`, `mocha`, `ava`, `playwright test`, `cypress run`, `node --test`, `deno test`, `claude plugin test`, `turbo`/`nx test`, `cargo test`, `cargo nextest`, `go test`, `gotestsum`, `pytest`, `python -m unittest`, `tox`, `nox`, Gradle and Maven `test`, `check` or `verify`, `rspec`, `rake test`, `rails test`, `phpunit`, `pest`, `php artisan test`, `mix`/`swift`/`flutter`/`dart`/`stack`/`cabal test`, `zig build test`, `ctest`, `make test` and `make check` |
 
-Add your own commands, such as `make test` or `./build.ps1`, with the `buildPattern` and `testPattern` settings.
+Add your own commands, such as `./build.ps1`, with the `buildPattern` and `testPattern` settings.
 
 The status comes from the command's exit code; an interrupted or timed-out command shows as failed. When a pipe hid the exit code (`dotnet test | tail -3`), the summary in the output decides. The details come from the output itself:
 
@@ -188,7 +188,7 @@ The status comes from the command's exit code; an interrupted or timed-out comma
 
 The output is read as the model got it: raw, filtered by RTK, or localized. Localized .NET output (`Com falha! – Com falha: 2, Aprovado: 1, …`) is read by its structure, not its words. When RTK cut the output and points to the whole log (`[full output: …]`), or wrote a vitest JSON report in its place, the mod reads that file for the counts and names.
 
-The readers were checked against real output of `dotnet build` and `dotnet test` (VSTest and Microsoft.Testing.Platform, English and Portuguese), tsc, jest, vitest, `node --test`, Bun and `cargo test`, each with and without RTK. Go and pytest are read by their documented formats.
+The readers were checked against real output of `dotnet build` and `dotnet test` (VSTest and Microsoft.Testing.Platform, English and Portuguese), tsc, jest, vitest, `node --test`, Bun and `cargo test`, each with and without RTK. Go and pytest are read by their documented formats. For the other tools, the status comes from the exit code, and the counts and failed names show when the output has a format the mod already reads, such as `claude plugin test`, which prints Bun's.
 
 ## What the Git section shows
 
@@ -360,7 +360,7 @@ Change these in `/config`:
 | `session-info.paneBackground` | A color for the body of the pane in the terminal: hex such as `#2e3440`, or a color name. Empty keeps the color Claude Code draws. The frame and the close row keep Claude Code's color | empty |
 | `session-info.icons` | `unicode`, `nerd` (needs a [Nerd Font](https://www.nerdfonts.com/)), `emoji` | `unicode` |
 | `session-info.buildPattern` | A case-insensitive regular expression matched against each command segment, for example `^make( \|$)` | empty |
-| `session-info.testPattern` | The same, for test runs, for example `^make test\|^just test` | empty |
+| `session-info.testPattern` | The same, for test runs, for example `^just test\|^task test` | empty |
 
 With `openOnStart`, Claude Code draws the pane at session start only on a terminal of 144 columns or more, or 110 once you have opened the pane and not closed it by hand. On a narrower terminal the pane waits until you widen the terminal or run `/session-info`. A `-p` run does not open it. A reload of the mod opens it again.
 
