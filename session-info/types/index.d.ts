@@ -42,8 +42,15 @@ export type Upstream = 'none' | 'gone' | { ahead: number; behind: number }
 export type Operation = { kind: 'merge' | 'rebase' | 'cherry-pick' | 'revert' | 'bisect'; step?: number; total?: number }
 
 /**
+ * A file `git status` lists, relative to the repository root. `xy` is the porcelain code: the index letter, then
+ * the working-tree letter, `.` for no change, `??` for an untracked file; `from` is the old path of a rename.
+ */
+export type RepoFile = { path: string; xy: string; from?: string }
+
+/**
  * The repository of the session's folder, as the Git section draws it.
  * `branch` is null on a detached HEAD; `head` is the short hash, null before the first commit.
+ * `files` holds up to the first 500 changed files; `fileCount` is how many git listed.
  */
 export type Repo = {
   root: string
@@ -54,6 +61,8 @@ export type Repo = {
   commit: { hash: string; subject: string; at: number } | null
   operation: Operation | null
   submodules: { total: number; changed: Submodule[] }
+  files: RepoFile[]
+  fileCount: number
   at: number
 }
 

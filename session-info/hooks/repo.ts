@@ -1,12 +1,15 @@
-import type { Operation, Repo, Submodule, SubmoduleIssue, Upstream } from '../types'
+import type { ChangeStatus, Operation, Repo, RepoFile, Submodule, SubmoduleIssue, Upstream } from '../types'
 
 import type { Host } from './host'
 import { norm } from './paths'
 
 const ISSUE_ORDER: readonly SubmoduleIssue[] = ['conflict', 'uninitialized', 'commit', 'modified']
 
-/** What `git status --porcelain=v2 --branch -z` says: the branch, its upstream, the counts and the changed submodules. */
-export type StatusV2 = Pick<Repo, 'branch' | 'head' | 'upstream' | 'counts'> & { submodules: Map<string, Set<SubmoduleIssue>> }
+/** What `git status --porcelain=v2 --branch -z` says: the branch, its upstream, the counts, the changed files and submodules. */
+export type StatusV2 = Pick<Repo, 'branch' | 'head' | 'upstream' | 'counts' | 'files'> & { submodules: Map<string, Set<SubmoduleIssue>> }
+
+/** The most files the Git section keeps; a larger working tree shows the first ones and a count. */
+export const FILE_LIMIT = 500
 
 const addIssue = (all: Map<string, Set<SubmoduleIssue>>, path: string, issue: SubmoduleIssue): void => {
   const issues = all.get(path) ?? new Set<SubmoduleIssue>()
@@ -14,7 +17,7 @@ const addIssue = (all: Map<string, Set<SubmoduleIssue>>, path: string, issue: Su
   all.set(path, issues)
 }
 
-/** Submodule entries go to `submodules`, not to the counts: the section shows them on their own rows. */
+/** Submodule entries go to `submodules`, not to the counts or the files: the section shows them on their own rows. */
 export function parseStatus(stdout: string): StatusV2 {
   let branch: string | null = null
   let head: string | null = null
@@ -22,6 +25,7 @@ export function parseStatus(stdout: string): StatusV2 {
   let ab: { ahead: number; behind: number } | undefined
   const counts = { staged: 0, modified: 0, untracked: 0, conflicts: 0 }
   const submodules = new Map<string, Set<SubmoduleIssue>>()
+  const files: RepoFile[] = []
 
   const fields = stdout.split('\0')
   for (let i = 0; i < fields.length; i++) {
@@ -36,13 +40,16 @@ export function parseStatus(stdout: string): StatusV2 {
       else if (parts[1] === 'branch.ab') ab = { ahead: Math.abs(Number(parts[2])), behind: Math.abs(Number(parts[3])) }
       continue
     }
-    if (kind === '?') counts.untracked++
+    if (kind === '?') {
+      counts.untracked++
+      files.push({ path: field.slice(2), xy: '??' })
+    }
     if (kind !== '1' && kind !== '2' && kind !== 'u') continue
 
     const xy = parts[1] ?? '..'
     const sub = parts[2] ?? 'N...'
     const path = parts.slice(kind === '1' ? 8 : kind === '2' ? 9 : 10).join(' ')
-    if (kind === '2') i++
+    const from = kind === '2' ? fields[++i] : undefined
     if (sub.startsWith('S')) {
       if (kind === 'u') addIssue(submodules, path, 'conflict')
       if (sub[1] === 'C') addIssue(submodules, path, 'commit')
@@ -54,11 +61,12 @@ export function parseStatus(stdout: string): StatusV2 {
       if (xy[0] !== '.') counts.staged++
       if (xy[1] !== '.') counts.modified++
     }
+    files.push(from === undefined ? { path, xy } : { path, xy, from })
   }
 
   const upstream: Upstream = !hasUpstream ? 'none' : ab === undefined ? 'gone' : ab
 
-  return { branch, head, upstream, counts, submodules }
+  return { branch, head, upstream, counts, files, submodules }
 }
 
 /** `git submodule status`: every submodule path, and the ones not initialized, out of step or in conflict. */
@@ -130,7 +138,7 @@ export async function readRepo(host: Host, now: number): Promise<Repo | null> {
   const root = norm(top.trim())
   const gitDir = norm(dir.trim())
 
-  const status = await host.run(['git', 'status', '--porcelain=v2', '--branch', '-z'], root)
+  const status = await host.run(['git', 'status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all'], root)
   if (status.exitCode !== 0) return null
   const parsed = parseStatus(status.stdout)
   const log = await host.run(['git', 'log', '-1', '--format=%h%x00%s%x00%ct'], root)
@@ -147,6 +155,8 @@ export async function readRepo(host: Host, now: number): Promise<Repo | null> {
     commit: log.exitCode === 0 ? parseCommit(log.stdout) : null,
     operation: await readOperation(host, gitDir),
     submodules: mergeSubmodules(listed.paths, listed.issues, parsed.submodules),
+    files: parsed.files.slice(0, FILE_LIMIT),
+    fileCount: parsed.files.length,
     at: now,
   }
 }
@@ -198,6 +208,31 @@ export function countParts(counts: Repo['counts']): { key: string; text: string;
     .map(({ key, text, color }) => ({ key, text, color }))
 }
 
+const CONFLICT_CODES: ReadonlySet<string> = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
+
+export const isConflict = (file: RepoFile): boolean => CONFLICT_CODES.has(file.xy)
+
+/** The file as the tree and the viewer take it: gone from the disk, new to HEAD, or else changed. */
+export function fileStatus(file: RepoFile): ChangeStatus {
+  if (isConflict(file)) return 'modified'
+  if (file.xy.includes('D')) return 'deleted'
+  if (file.xy === '??' || file.xy[0] === 'A') return 'created'
+
+  return 'modified'
+}
+
+/** The two letters of the code, colored as the counts row colors them; a `.` shows as a space. */
+export function codeParts(file: RepoFile): { text: string; color: string }[] {
+  if (file.xy === '??') return [{ text: '??', color: 'suggestion' }]
+  if (isConflict(file)) return [{ text: file.xy, color: 'error' }]
+  const [x = '.', y = '.'] = file.xy
+
+  return [
+    { text: x === '.' ? ' ' : x, color: 'success' },
+    { text: y === '.' ? ' ' : y, color: 'warning' },
+  ]
+}
+
 export const SUBMODULE_ROWS = 5
 
 /** 45s, 12m, 3h, 2d, 5w, 1y. */
@@ -215,7 +250,7 @@ export function age(ms: number): string {
   return `${Math.floor(days / 365)}y`
 }
 
-/** How many rows the open section draws, so the Changes tree below keeps its room; the last commit row is always there. */
+/** How many rows the open section draws above its tree, so the trees keep their room; the last commit row is always there. */
 export function repoRowCount(repo: Repo | 'outside' | null): number {
   if (repo === null || repo === 'outside') return 1
   const submoduleRows =

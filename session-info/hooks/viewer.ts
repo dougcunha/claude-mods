@@ -1,7 +1,9 @@
-import type { FileChange } from '../types'
+import type { FileChange, RepoFile } from '../types'
 
 import { emptyFile, headText, snapshot } from './git'
 import type { Host } from './host'
+import { absolute } from './paths'
+import { fileStatus } from './repo'
 
 export type Viewer = 'auto' | 'git' | 'vscode' | 'inline'
 
@@ -109,4 +111,14 @@ export async function openChange(host: Host, change: FileChange, prefs: Prefs): 
   if (mode === 'git') return launch(host, ['git', 'difftool', '--gui', '--no-index', '--no-prompt', left, right])
 
   launch(host, await codeArgv(host, ['--diff', left, right]))
+}
+
+/** Opens a file of the Git section: a new one in the editor, any other as a diff of HEAD (its old path for a rename) against the disk. */
+export async function openRepoFile(host: Host, root: string, file: RepoFile, at: number, prefs: Prefs): Promise<void> {
+  const path = absolute(root, file.path)
+  const status = fileStatus(file)
+  const head = file.from === undefined || status === 'created' ? undefined : await headText(host, absolute(root, file.from))
+  const base = head === undefined ? null : await snapshot(host, path, head)
+
+  await openChange(host, { path, status, base, at }, prefs)
 }

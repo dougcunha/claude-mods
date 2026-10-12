@@ -11,7 +11,7 @@ A Claude Code mod with one pane and eleven sections:
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
 - **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
 - **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests. .NET, Node, Bun, Rust, Go and Python tools are recognized.
-- **Git**: the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, and the submodules that changed. Pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
+- **Git**: the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, the submodules that changed, and every file `git status` lists, in a treeview like the Changes one. Pressing a file opens its diff against HEAD; pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
 - **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
 It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed.
@@ -120,9 +120,9 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Fold or unfold a section | Press its header, for example `▾ Session` or `▾ Changes` |
 | Open the Git client | Press the branch name in the `▾ Git` header, or press `g` while the pane has the focus |
 | Show the legend of the context bar | Press `▸ Context` |
-| Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
+| Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`, or `??` in the Git tree) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff. In the Git tree, the diff is against HEAD |
 | Collapse or expand a folder | Press the folder |
-| Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom |
+| Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom. The Git tree has collapse and expand only; `c` and `e` go to it while the Changes tree is not on screen |
 | Return to the prompt | `Esc` |
 
 Status colors follow your theme: green for created (`A`), yellow for modified (`M`), red and struck through for deleted (`D`). Chains of single-child folders collapse into one row, for example `src/app/ui`.
@@ -202,17 +202,26 @@ The section shows the repository of the session's folder and only what differs f
   ◇ 4 submodules · 2 changed
     libs/core  new commit · modified
     libs/ui  not initialized
+  ├─ ▾ src
+  │  ├─ ● a.ts  M
+  │  ├─ ● b.ts   M
+  │  ├─ ✚ new.ts  A
+  │  └─ ● merge.ts  UU
+  └─ ✚ notes.md  ??
+
+  [ collapse ]  [ expand ]
 ```
 
 | Row | Shows |
 | --- | --- |
 | Header | The branch, then `↑` commits ahead of and `↓` commits behind its upstream. `local only` when the branch has no upstream, `upstream gone` when the upstream was deleted on the remote, `detached` and the short hash on a detached HEAD |
 | Operation | A merge, rebase (with its step), cherry-pick, revert or bisect that stopped halfway |
-| Counts | Conflicts, staged, modified and untracked files, the non-zero ones only. Submodules are not counted here |
+| Counts | Conflicts, staged, modified and untracked files, the non-zero ones only. Each untracked file counts, also inside a new folder. Submodules are not counted here |
 | Last commit | Short hash, subject and age |
 | Submodules | The submodule count, then one row per submodule that is in conflict, not initialized, on a commit other than the one the repository records (`new commit`), or with changed files (`modified`). Up to 5 rows. Only the submodules of the repository itself are listed; a change in a nested submodule shows as `modified` on its parent |
+| Files | Every changed, staged and untracked file, in a treeview from the repository root, with the code of `git status --short`: the staged letter in green, the unstaged letter in yellow, `??` for an untracked file and a red pair such as `UU` for a conflict. Up to 500 files. Pressing a new file opens it in the editor; pressing any other file opens its diff against HEAD (for a rename, against the old path at HEAD) in the configured diff viewer |
 
-The mod reads the repository when the session starts, after each shell command or file edit, when you send a prompt, when you open the pane, and once a minute. It runs `git status --porcelain=v2 --branch`, `git log -1`, and `git submodule status` when the repository has a `.gitmodules` file. It never runs `git fetch`, so `↑` and `↓` compare with the last fetch.
+The mod reads the repository when the session starts, after each shell command or file edit, when you send a prompt, when you open the pane, and once a minute. It runs `git status --porcelain=v2 --branch --untracked-files=all`, `git log -1`, and `git submodule status` when the repository has a `.gitmodules` file. It never runs `git fetch`, so `↑` and `↓` compare with the last fetch.
 
 ### Git client
 

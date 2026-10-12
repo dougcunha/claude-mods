@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { clientArgv, splitCommand } from '../hooks/client'
 import type { Host } from '../hooks/host'
-import { age, branchText, countParts, mergeSubmodules, operationText, parseCommit, parseStatus, parseSubmoduleStatus, readOperation, repoRowCount } from '../hooks/repo'
+import { age, branchText, codeParts, countParts, fileStatus, mergeSubmodules, operationText, parseCommit, parseStatus, parseSubmoduleStatus, readOperation, repoRowCount } from '../hooks/repo'
 import type { Repo } from '../types'
 
 const PANE = {
@@ -46,6 +46,8 @@ const repoOf = (patch: Partial<Repo>): Repo => ({
   commit: { hash: '699b111', subject: 'fix: draw', at: 0 },
   operation: null,
   submodules: { total: 0, changed: [] },
+  files: [],
+  fileCount: 0,
   at: 0,
   ...patch,
 })
@@ -60,6 +62,25 @@ test('parses porcelain v2: branch, upstream, counts and submodules apart from th
     ['libs/core', ['modified']],
     ['libs/ui', ['commit']],
   ])
+  expect(parsed.files).toEqual([
+    { path: 'src/a.ts', xy: 'M.' },
+    { path: 'src/b c.ts', xy: '.M' },
+    { path: 'src/d.ts', xy: 'MM' },
+    { path: 'src/new.ts', xy: 'R.', from: 'src/old.ts' },
+    { path: 'src/conflict.ts', xy: 'UU' },
+    { path: 'notes.md', xy: '??' },
+  ])
+})
+
+test('maps a porcelain code to a tree status and to colored letters', async () => {
+  const status = (xy: string) => fileStatus({ path: 'a', xy })
+  expect(['??', 'A.', 'AM', '.D', 'D.', 'AD', 'UU', 'DD', 'M.', 'R.'].map(status)).toEqual([
+    'created', 'created', 'created', 'deleted', 'deleted', 'deleted', 'modified', 'modified', 'modified', 'modified',
+  ])
+  expect(codeParts({ path: 'a', xy: 'MM' })).toEqual([{ text: 'M', color: 'success' }, { text: 'M', color: 'warning' }])
+  expect(codeParts({ path: 'a', xy: '.M' })).toEqual([{ text: ' ', color: 'success' }, { text: 'M', color: 'warning' }])
+  expect(codeParts({ path: 'a', xy: '??' })).toEqual([{ text: '??', color: 'suggestion' }])
+  expect(codeParts({ path: 'a', xy: 'UU' })).toEqual([{ text: 'UU', color: 'error' }])
 })
 
 test('tells a local-only branch, a gone upstream and a detached HEAD apart', async () => {
@@ -185,6 +206,70 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.unmount()
   })
 }
+
+test('the Git section draws the changed files as a tree that folds and opens a diff against HEAD', async ($, on) => {
+  const clock = mock.clock(on, { now: 1_700_000_600_000 })
+  const runs: string[] = []
+  const run = (stdout: string, exitCode = 0) =>
+    ({ value: { exitCode, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }) as never
+  on('session.start', async (_, e) => ({ cwd: e.cwd }))
+  on('command.register', async (_, e) => ({ value: { command: e.name } }))
+  on('tool.register', async (_, e) => ({ value: { tool: `mcp__session-info__${e.name}` } }) as never)
+  on('session.messages', async () => ({ value: [] }) as never)
+  on('session.cwd', async () => ({ value: 'D:/repo/sub' }))
+  on('session.usage', async () => ({ value: { startedAt: 0, context: {}, rateLimits: [] } }) as never)
+  on('agent.list', async () => ({ value: [] }))
+  on('env.get', async () => ({ value: undefined }))
+  on('fs.exists', async () => ({ value: false }))
+  on('fs.write', async () => ({ value: undefined }) as never)
+  on('session.id', async () => ({ value: 'test-session' }) as never)
+  const toasts: string[] = []
+  on('ui.toast', async (_, e) => (toasts.push(String(e.text)), { value: undefined }))
+  on('process.run', async (_, e) => {
+    const argv = e.argv.join(' ')
+    runs.push(argv)
+    if (argv === 'git rev-parse --show-toplevel') return run('D:/repo\n')
+    if (argv.startsWith('git rev-parse')) return run('D:/repo\nD:/repo/.git\n')
+    if (argv.startsWith('git status --porcelain=v2')) return run(STATUS)
+    if (argv.startsWith('git log -1')) return run('a1b2c3d\0feat: add the Git section\x001700000000\n')
+    if (argv === 'git show HEAD:src/old.ts') return run('old\n')
+    if (argv.startsWith('git diff --no-index')) return run('diff --git a b\n@@ -1 +1 @@\n-old\n+new\n')
+
+    return run('', 1)
+  })
+
+  await $.session.start({ cwd: 'D:/repo/sub', surface: 'terminal', isInteractive: true })
+  await clock.settle()
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 60 } })
+  // The inactive Git tab counts the files git lists.
+  expect(await ui.find({ type: 'Text', text: 'Git 6' })).toBeDefined()
+  await ui.press({ key: 'tab:#git' })
+  expect(runs.some(argv => argv.includes('--untracked-files=all'))).toBe(true)
+  // The tree is rooted at the repository, not at the session's subfolder.
+  expect(await ui.find({ type: 'Button', key: 'git:d:src' })).toBeDefined()
+  expect(await ui.find({ type: 'Button', key: 'git:f:notes.md' })).toBeDefined()
+  expect(await ui.find({ type: 'Button', key: 'git:f:src/b c.ts' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '??' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'UU' })).toBeDefined()
+
+  await ui.press({ key: 'git:d:src' })
+  expect(await ui.findAll({ type: 'Button', key: 'git:f:src/a.ts' })).toEqual([])
+  // The Changes tree's expand leaves the Git tree's folds alone.
+  await ui.press({ key: 'tab:#changes' })
+  await ui.press({ key: 'expand' })
+  await ui.press({ key: 'tab:#git' })
+  expect(await ui.findAll({ type: 'Button', key: 'git:f:src/a.ts' })).toEqual([])
+  await ui.press({ key: 'git-expand' })
+  expect(await ui.find({ type: 'Button', key: 'git:f:src/a.ts' })).toBeDefined()
+
+  // A rename shows the diff of its old path at HEAD.
+  await ui.press({ key: 'git:f:src/new.ts' })
+  expect(toasts).toEqual([])
+  expect(runs).toContain('git show HEAD:src/old.ts')
+  expect(await ui.find({ type: 'Text', text: 'D:/repo/src/new.ts' })).toBeDefined()
+  await ui.unmount()
+})
 
 test('outside a repository the section says so and draws no client button', async ($, on) => {
   const clock = mock.clock(on)

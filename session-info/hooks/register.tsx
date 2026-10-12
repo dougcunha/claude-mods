@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderSurface } from 'claude-code'
 
-import type { Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, SkillUse, Todo, TurnRecord } from '../types'
+import type { ChangeStatus, Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
 import { crossings } from './alerts'
@@ -18,7 +18,7 @@ import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
 import type { IconSet } from './icons'
 import { allowRequest, browseUrl, errorText, isAllowed, isIssueKey, isRefusal, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
-import { age, branchText, countParts, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
+import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
 import { ORDER, parseTabGroups, TITLES } from './tabs'
 import type { SectionKey, TabGroup } from './tabs'
@@ -31,7 +31,7 @@ import type { TurnDraft } from './turn'
 import type { Row } from './tree'
 import { bar, colorOf, labelOf, ordered, percentText, resetIn } from './usage'
 import type { Limit } from './usage'
-import { openChange, openUrl } from './viewer'
+import { openChange, openRepoFile, openUrl } from './viewer'
 import type { Editor, Prefs, Viewer } from './viewer'
 
 const files = atom({ plugin: 'session-info', key: 'files' } as const, {} as Record<string, FileChange>)
@@ -79,6 +79,11 @@ const toggle = (list: readonly string[], key: string): string[] =>
 
 const isSection = (key: string): boolean => key.startsWith('#')
 
+/** Folded folders of the Git tree carry this prefix, so they never mix with the Changes tree's. */
+const GIT_FOLD = 'git:'
+
+const isGitFold = (key: string): boolean => key.startsWith(GIT_FOLD)
+
 function summary(changes: readonly FileChange[]): string {
   const count = (status: FileChange['status']) => changes.filter(one => one.status === status).length
 
@@ -112,6 +117,16 @@ async function press($: EngineInterface, row: Row, prefs: Prefs): Promise<void> 
   try {
     if (row.isDir) await update($, collapsed, list => toggle(list ?? [], row.key))
     else if (row.change) await openChange(hostOf($), row.change, prefs)
+  } catch (error) {
+    $.ui.toast(`session-info: ${String(error)}`)
+  }
+}
+
+/** A folder of the Git tree folds or unfolds; a file opens in the editor or as a diff against HEAD. */
+async function pressRepo($: EngineInterface, repo: Repo, row: Row<RepoFile>, prefs: Prefs): Promise<void> {
+  try {
+    if (row.isDir) await update($, collapsed, list => toggle(list ?? [], `${GIT_FOLD}${row.key}`))
+    else if (row.change) await openRepoFile(hostOf($), repo.root, row.change, repo.at, prefs)
   } catch (error) {
     $.ui.toast(`session-info: ${String(error)}`)
   }
@@ -632,6 +647,12 @@ export const register: Register = (on, options) => {
     const changes = shows.changes ? Object.values(await read($, files)) : []
     const diff = shows.changes ? await read($, inline) : null
     const rows = flatten(buildTree(await $.session.cwd(), changes), shut)
+    const repo = shows.git ? await read($, repoState) : null
+    const isRepo = repo !== null && repo !== 'outside'
+    // A repository read before the files were kept has none until the next read.
+    const repoFiles = isRepo ? (repo.files ?? []) : []
+    const gitShut = new Set([...shut].filter(isGitFold).map(key => key.slice(GIT_FOLD.length)))
+    const gitTree = isRepo ? flatten(buildTree(repo.root, repoFiles), gitShut) : []
     const context = usage?.context
     const figures: Tile[] =
       isCards && shows.session && usage !== undefined
@@ -658,11 +679,17 @@ export const register: Register = (on, options) => {
     const lastChecks = shows.checks ? await read($, checks) : NO_CHECKS
     const views = checkViews(lastChecks)
     const checksRows = counts('#checks') ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
-    const repo = shows.git ? await read($, repoState) : null
-    const gitRows = counts('#git') ? chrome + (isOpen('#git') ? repoRowCount(repo) : 0) : 0
-    const changesFrame = isCards ? FRAME_ROWS : 0
+    const isChangesTree = counts('#changes') && isOpen('#changes')
+    const isGitTree = counts('#git') && isOpen('#git') && gitTree.length > 0
+    // The room below holds one tree's buttons, hint and overflow row; a second tree adds its own 4.
+    const gitExtra = isGitTree && isChangesTree ? 4 : 0
+    const gitRows = counts('#git') ? chrome + (isOpen('#git') ? repoRowCount(repo) + gitExtra : 0) : 0
+    const changesFrame = counts('#changes') && isCards ? FRAME_ROWS : 0
     const above = tileRows + usageRows + sessionRows + turnRows + todosRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame
     const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
+    // Two trees on screen split the room: the Git tree takes up to half, the Changes tree the rest.
+    const gitRoom = isChangesTree ? Math.min(gitTree.length, Math.max(3, Math.floor(room / 2))) : room
+    const changesRoom = isGitTree ? Math.max(3, room - gitRoom) : room
 
     const section = (key: SectionKey, children: RenderChildren) =>
       isCards ? card(foldOf(key), isOpen(key), children) : (
@@ -680,6 +707,7 @@ export const register: Register = (on, options) => {
       }
       const count: Partial<Record<SectionKey, number>> = {
         '#changes': changes.length,
+        '#git': repoFiles.length,
         '#skills': skillList.length,
         '#jira': issueList.length,
         '#todos': taskList.length,
@@ -826,31 +854,46 @@ export const register: Register = (on, options) => {
       )
     }
 
-    const line = (row: Row) => {
-      const status = row.change ? STATUS[row.change.status] : undefined
+    /** One row of a tree: a folder with its file count when folded, or a file with its icon and the mark after its name. */
+    const treeLine = <T,>(row: Row<T>, id: string, onPress: () => void, status: ChangeStatus | undefined, mark: RenderChildren, color?: string) => (
+      <Box flexDirection="row">
+        <Text dimColor>{row.guide}</Text>
+        <Button plain key={`${id}${row.isDir ? 'd' : 'f'}:${row.key}`} onPress={onPress}>
+          {row.isDir || status === undefined
+            ? [
+                <Text color="suggestion">{folderIcon(icons, row.isOpen)}</Text>,
+                ` ${row.name}`,
+                <Text dimColor>{row.isOpen ? '' : `  ${row.fileCount}`}</Text>,
+              ]
+            : [
+                <Text color={color ?? STATUS[status].color}>{fileIcon(icons, row.name, status)}</Text>,
+                ' ',
+                <Text strikethrough={status === 'deleted'} dimColor={status === 'deleted'}>
+                  {row.name}
+                </Text>,
+                mark,
+              ]}
+        </Button>
+      </Box>
+    )
 
-      return (
-        <Box flexDirection="row">
-          <Text dimColor>{row.guide}</Text>
-          <Button plain key={`${row.isDir ? 'd' : 'f'}:${row.key}`} onPress={() => void press($, row, prefs)}>
-            {row.isDir || !status || !row.change
-              ? [
-                  <Text color="suggestion">{folderIcon(icons, row.isOpen)}</Text>,
-                  ` ${row.name}`,
-                  <Text dimColor>{row.isOpen ? '' : `  ${row.fileCount}`}</Text>,
-                ]
-              : [
-                  <Text color={status.color}>{fileIcon(icons, row.name, row.change.status)}</Text>,
-                  ' ',
-                  <Text strikethrough={row.change.status === 'deleted'} dimColor={row.change.status === 'deleted'}>
-                    {row.name}
-                  </Text>,
-                  <Text color={status.color}>{`  ${status.letter}`}</Text>,
-                ]}
-          </Button>
-        </Box>
-      )
+    const line = (row: Row) => {
+      const status = row.change?.status
+      const mark = status && <Text color={STATUS[status].color}>{`  ${STATUS[status].letter}`}</Text>
+
+      return treeLine(row, '', () => void press($, row, prefs), status, mark)
     }
+
+    /** A file of the Git tree carries its porcelain code, staged letter then unstaged letter; a conflict's icon is red too. */
+    const repoLine = (repo: Repo) => (row: Row<RepoFile>) =>
+      treeLine(
+        row,
+        GIT_FOLD,
+        () => void pressRepo($, repo, row, prefs),
+        row.change && fileStatus(row.change),
+        ['  ', ...(row.change ? codeParts(row.change) : []).map(part => <Text color={part.color}>{part.text}</Text>)],
+        row.change && isConflict(row.change) ? 'error' : undefined,
+      )
 
     const spent = usage?.cost === undefined ? '' : `${cost(usage.cost.usd)} · `
     const elapsed = usage === undefined ? '' : duration(Date.now() - usage.startedAt)
@@ -1164,13 +1207,43 @@ export const register: Register = (on, options) => {
       ]
     }
 
-    const isRepo = repo !== null && repo !== 'outside'
+    const gitTreeRows = (repo: Repo) => {
+      const unlisted = repo.fileCount - repoFiles.length
+      // Without the Changes tree on screen, its hotkeys are free for this one.
+      const hotkey = (key: string) => (counts('#changes') ? {} : { hotkey: key })
+
+      return [
+        gitTree.slice(0, gitRoom).map(repoLine(repo)),
+        gitTree.length > gitRoom && <Text dimColor>{`… ${gitTree.length - gitRoom} more rows`}</Text>,
+        unlisted > 0 && <Text dimColor>{`… ${unlisted} more files not listed`}</Text>,
+        <Box flexDirection="row" marginTop={1} gap={2}>
+          <Button
+            key="git-collapse"
+            {...hotkey('c')}
+            onPress={() =>
+              void update($, collapsed, list => [
+                ...(list ?? []).filter(key => !isGitFold(key)),
+                ...gitTree.filter(r => r.isDir).map(r => `${GIT_FOLD}${r.key}`),
+              ])
+            }
+          >
+            collapse
+          </Button>
+          <Button key="git-expand" {...hotkey('e')} onPress={() => void update($, collapsed, list => (list ?? []).filter(key => !isGitFold(key)))}>
+            expand
+          </Button>
+        </Box>,
+        <Text dimColor>Click or Enter: new file opens in the editor, any other as a diff against HEAD · folder collapses or expands</Text>,
+      ]
+    }
+
     const gitRight = isRepo ? `⎇ ${branchText(repo)}` : ''
     const gitAside = isRepo ? branchAside(repo) : undefined
     const gitBody = isOpen('#git') && [
       repo === null && <Text dimColor>Reading the repository…</Text>,
       repo === 'outside' && <Text dimColor>Not a Git repository.</Text>,
       isRepo && repoLines(repo),
+      isRepo && gitTree.length > 0 && gitTreeRows(repo),
     ]
     const gitSection = section('#git', [header('#git', 'Git', gitRight, gitAside), gitBody])
 
@@ -1186,19 +1259,22 @@ export const register: Register = (on, options) => {
       </Box>
     )
 
+    /** What the Changes buttons leave in the fold list: the sections and the Git tree's folders. */
+    const isKept = (key: string): boolean => isSection(key) || isGitFold(key)
+
     const changesBody = isOpen('#changes') && [
       rows.length === 0 && <Text dimColor>No files changed in this session yet.</Text>,
-      rows.slice(0, room).map(line),
-      rows.length > room && <Text dimColor>{`… ${rows.length - room} more rows`}</Text>,
+      rows.slice(0, changesRoom).map(line),
+      rows.length > changesRoom && <Text dimColor>{`… ${rows.length - changesRoom} more rows`}</Text>,
       <Box flexDirection="row" marginTop={1} gap={2}>
         <Button
           key="collapse"
           hotkey="c"
-          onPress={() => void update($, collapsed, list => [...(list ?? []).filter(isSection), ...rows.filter(r => r.isDir).map(r => r.key)])}
+          onPress={() => void update($, collapsed, list => [...(list ?? []).filter(isKept), ...rows.filter(r => r.isDir).map(r => r.key)])}
         >
           collapse
         </Button>
-        <Button key="expand" hotkey="e" onPress={() => void update($, collapsed, list => (list ?? []).filter(isSection))}>
+        <Button key="expand" hotkey="e" onPress={() => void update($, collapsed, list => (list ?? []).filter(isKept))}>
           expand
         </Button>
         <Button key="clear" hotkey="x" onPress={() => void update($, files, () => ({}))}>
@@ -1225,13 +1301,16 @@ export const register: Register = (on, options) => {
       '#git': gitSection,
     }
 
+    /** The inline diff sits under the last tree section on screen, whichever tree opened it. */
+    const diffSlot = slots.filter(key => key === '#git' || key === '#changes').at(-1)
+
     // The API has no color for the frame the terminal draws around a pane; this paints the body under the tree instead.
     const paint = isTerminal && paneBackground !== '' ? { backgroundColor: paneBackground, minHeight: e.props.scroll.bodyRows } : {}
 
     return (
       <Box flexDirection="column" {...paint}>
         {figures.length > 0 && tiles(figures, cols)}
-        {slots.map(key => (key === '#changes' ? [changesSection, diffView] : nodes[key]))}
+        {slots.map(key => [key === '#changes' ? changesSection : nodes[key], key === diffSlot && diffView])}
       </Box>
     )
   })

@@ -1,7 +1,7 @@
 {
   "name": "session-info",
-  "version": "0.17.0",
-  "description": "Session pane: context, cost and turns, the last turn's tokens, cache and tools, a task list Claude keeps, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules, and a treeview of the files this session created, modified or deleted.",
+  "version": "0.18.0",
+  "description": "Session pane: context, cost and turns, the last turn's tokens, cache and tools, a task list Claude keeps, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents, the last build and test run, the Git state of the repository and its submodules with a treeview of its changed files, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -97,7 +97,7 @@
     "showGit": {
       "type": "boolean",
       "title": "Show the Git section",
-      "description": "Branch and upstream state, working-tree counts, the last commit, an operation in progress and the submodules that changed.",
+      "description": "Branch and upstream state, working-tree counts, the last commit, an operation in progress, the submodules that changed and a treeview of the changed files.",
       "default": true
     },
     "gitClient": {
