@@ -73,7 +73,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 
 | Action | How |
 | --- | --- |
-| Open the pane | `/session-info` (or `/changes`) |
+| Open the pane | `/session-info` (or `/changes`). To open it when the session starts, set `session-info.openOnStart` to `true` |
 | Fold or unfold a section | Press its `▾ Session`, `▾ Usage`, `▾ Agents`, `▾ Checks` or `▾ Changes` header |
 | Show the context breakdown by category | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff |
@@ -173,6 +173,7 @@ Change these in `/config`:
 
 | Setting | Values | Default |
 | --- | --- | --- |
+| `session-info.openOnStart` | `true`, `false` | `false` |
 | `session-info.showSession` | `true`, `false` | `true` |
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
@@ -184,6 +185,8 @@ Change these in `/config`:
 | `session-info.icons` | `unicode`, `nerd` (needs a [Nerd Font](https://www.nerdfonts.com/)), `emoji` | `unicode` |
 | `session-info.buildPattern` | A case-insensitive regular expression matched against each command segment, for example `^make( \|$)` | empty |
 | `session-info.testPattern` | The same, for test runs, for example `^make test\|^just test` | empty |
+
+With `openOnStart`, Claude Code draws the pane at session start only on a terminal of 144 columns or more, or 110 once you have opened the pane and not closed it by hand. On a narrower terminal the pane waits until you widen the terminal or run `/session-info`. A `-p` run does not open it. A reload of the mod opens it again.
 
 ## How changes are detected
 

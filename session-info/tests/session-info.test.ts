@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
 import { agentRows, agentSummary } from '../hooks/agents'
 import { crossings } from '../hooks/alerts'
@@ -318,3 +318,20 @@ test('the context alert fires at 85% and re-arms after it drops', async () => {
   expect(dropped.standing).toEqual([])
   expect(crossings([], high, dropped.standing, 0).alerts.length).toBe(1)
 })
+
+for (const openOnStart of [true, false]) {
+  test(`opens the pane at session start only with openOnStart (${openOnStart})`, { options: { openOnStart } }, async ($, on) => {
+    const opened: string[] = []
+    mock.clock(on)
+    on('session.start', async (_, e) => ({ cwd: e.cwd }))
+    on('command.register', async (_, e) => ({ value: { command: e.name } }))
+    on('ui.open', async (_, e) => (opened.push(e.id), { value: { isPlaced: true } }))
+    on('process.run', async () => ({ value: ran('', 128) }))
+
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+    expect(opened).toEqual(openOnStart ? ['session-info'] : [])
+
+    await $.session.start({ cwd: '/repo', surface: null, isInteractive: false })
+    expect(opened).toEqual(openOnStart ? ['session-info'] : [])
+  })
+}

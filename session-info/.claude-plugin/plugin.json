@@ -1,6 +1,6 @@
 {
   "name": "session-info",
-  "version": "0.8.3",
+  "version": "0.9.0",
   "description": "Session pane: context, cost and turns, live plan usage bars, running agents, the last build and test run, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
@@ -10,6 +10,12 @@
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
+    "openOnStart": {
+      "type": "boolean",
+      "title": "Open the pane when the session starts",
+      "description": "Open the pane without /session-info. On a terminal narrower than 144 columns (110 after you opened the pane once), the pane waits until you widen the terminal or run /session-info.",
+      "default": false
+    },
     "showSession": {
       "type": "boolean",
       "title": "Show the Session section",

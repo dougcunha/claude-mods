@@ -134,6 +134,7 @@ export const register: Register = (on, options) => {
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
   const isLive = shows.session || shows.usage || shows.agents || shows.checks
+  const isOpenOnStart = options.openOnStart === true
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -142,6 +143,8 @@ export const register: Register = (on, options) => {
     })
     await $.command.register({ name: 'changes', description: 'Same as /session-info' })
     if (isLive) $.clock.every(MINUTE, () => void update($, now, () => Date.now()))
+    // The engine draws a pane that the person did not ask for only on a wide terminal; a narrow one keeps it until /session-info.
+    if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: TITLE })
 
     return next(e)
   })
