@@ -100,6 +100,9 @@ export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 /** One task of the list the model writes with the mod's todo_write tool; `activeForm` is the task as it runs. */
 export type Todo = { content: string; status: TodoStatus; activeForm?: string }
 
+/** What a subagent runs on: the model of its last request and that request's effort, absent for a model without effort. */
+export type AgentModel = { model: string; effort?: string }
+
 /** One skill the session loaded, by the Skill tool or a slash command; `agentId` is absent for the main conversation. */
 export type SkillUse = { name: string; agentId?: string; at: number; isActive: boolean }
 
@@ -191,6 +194,8 @@ declare module 'claude-code' {
       jiraServer: string | null
       /** The Jira issues the conversation mentioned, the last one first. */
       jiraIssues: JiraIssue[]
+      /** The model and effort of each subagent, by its id, from its spawn and its last request. */
+      agentModels: Record<string, AgentModel>
       /** The active tab of each tab group, as `{ '#repo': '#changes' }`; a group not in it opens on its default tab. */
       tabs: Record<string, string>
     }

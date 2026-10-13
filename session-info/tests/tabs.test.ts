@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { parseTabGroups } from '../hooks/tabs'
+import { ORDER, parseSectionOrder, parseTabGroups } from '../hooks/tabs'
 
 const PANE = {
   plugin: 'session-info',
@@ -28,6 +28,27 @@ test('tab groups parse names in any case and drop unknown names, repeats and gro
     { key: '#turn+todos', members: ['#turn', '#todos'] },
   ])
   expect(parseTabGroups('git+nope, git+changes, usage, agents+agents')).toEqual([{ key: '#git+changes', members: ['#git', '#changes'] }])
+})
+
+test('the section order puts the named sections first and the others after them in the default order', async () => {
+  expect(parseSectionOrder(undefined)).toEqual(ORDER)
+  expect(parseSectionOrder('')).toEqual(ORDER)
+  // The value /config starts with names every section in the default order.
+  expect(parseSectionOrder('session, lastTurn, todos, skills, ci, jira, usage, agents, checks, git, changes')).toEqual(ORDER)
+  expect(parseSectionOrder(' Agents ; nope, git+changes, agents, LastTurn')).toEqual([
+    '#agents', '#git', '#changes', '#turn', '#session', '#todos', '#skills', '#ci', '#jira', '#usage', '#checks',
+  ])
+})
+
+test('a tab group card sits where its first shown section sits in the section order', { options: { sectionOrder: 'agents, git, session' } }, async ($, on) => {
+  pane(on)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const keys = (await ui.findAll({ type: 'Button' })).flatMap(button => (button.key?.startsWith('section:') ? [button.key.slice(8)] : []))
+  expect(keys.slice(0, 3)).toEqual(['#agents', '#changes+git', '#session'])
+  // The card opens on the first tab Tab groups lists, not on the section the order named first.
+  expect(await ui.find({ type: 'Text', text: 'No files changed in this session yet.' })).toBeDefined()
+  await ui.unmount()
 })
 
 for (const surface of ['terminal', 'desktop'] as const) {

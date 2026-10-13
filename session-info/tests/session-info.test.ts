@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { agentRows, agentSummary } from '../hooks/agents'
+import { agentModelText, agentRows, agentSummary, withAgentModel } from '../hooks/agents'
 import { crossings } from '../hooks/alerts'
 import { tileLayout } from '../hooks/cards'
 import { duration, tokens, turnLine } from '../hooks/session'
@@ -318,6 +318,53 @@ test('the agents section lists agents by status, children under their parent', a
   await ui.press({ key: 'section:#agents' })
   expect(await ui.find({ type: 'Text', text: 'reviewer' })).toBeUndefined()
   await ui.unmount()
+})
+
+test('the agents section shows the model and effort of each subagent, from its spawn and its last request', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('session.usage', async () => usage([]))
+  on('agent.list', async () =>
+    ({
+      value: [
+        { id: 'a1', type: 'Explore', description: 'find auth code', status: 'running' },
+        { id: 'a2', type: 'Plan', description: 'plan it', status: 'running' },
+      ],
+    }) as never)
+  on('agent.spawn', async () => ({ model: 'claude-haiku-5-5', agentId: 'a1' }) as never)
+  on('classic.SessionStart', async () => ({}))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn', usage: null } as never
+  })
+  const step = async (input: { agentId?: string; model: string; effort?: 'low' | 'high' }): Promise<void> => {
+    for await (const _ of $.turn.step({ turnId: 't1', index: 0, messageCount: 1, ...input })) void _
+  }
+
+  await $.agent.spawn({ prompt: 'find it', description: 'find auth code', subagentType: 'Explore' } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: ' · claude-haiku-5-5 · find auth code' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: ' · plan it' })).toBeDefined()
+
+  await step({ agentId: 'a1', model: 'claude-haiku-5-5', effort: 'low' })
+  await step({ agentId: 'a2', model: 'claude-opus-5-5', effort: 'high' })
+  await step({ model: 'claude-sonnet-5-5', effort: 'high' })
+  expect(await ui.find({ type: 'Text', text: ' · claude-haiku-5-5 · low · find auth code' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: ' · claude-opus-5-5 · high · plan it' })).toBeDefined()
+
+  await $.classic.SessionStart({ source: 'clear' })
+  expect(await ui.find({ type: 'Text', text: ' · plan it' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('agent models keep the effort a request reported when the spawn names the same model', () => {
+  const spawned = withAgentModel({}, 'a1', 'claude-haiku-5-5')
+  const stepped = withAgentModel(spawned, 'a1', 'claude-haiku-5-5', 'low')
+  expect(stepped).toEqual({ a1: { model: 'claude-haiku-5-5', effort: 'low' } })
+  expect(withAgentModel(stepped, 'a1', 'claude-haiku-5-5', 'low')).toBe(stepped)
+  expect(withAgentModel(stepped, 'a1', 'claude-haiku-5-5')).toBe(stepped)
+  expect(withAgentModel(stepped, 'a1', 'claude-sonnet-5-5')).toEqual({ a1: { model: 'claude-sonnet-5-5' } })
+  expect(withAgentModel(stepped, 'a1', 'claude-haiku-5-5', 2_048)).toEqual({ a1: { model: 'claude-haiku-5-5', effort: '2048' } })
+  expect(agentModelText(undefined)).toBe('')
+  expect(agentModelText({ model: 'claude-opus-5-5', effort: 'high' })).toBe(' · claude-opus-5-5 · high')
 })
 
 test('agent rows order active agents first and nest children', async () => {

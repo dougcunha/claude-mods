@@ -9,7 +9,7 @@ A Claude Code mod with one pane and eleven sections:
 - **CI**: the GitHub Actions runs that a push, a pull request, a workflow dispatch or a rerun of the session started, with their jobs, a link and a notification when each run ends.
 - **Jira**: the Jira issues the chat mentions, with summary, status, priority and assignee, read through the Atlassian MCP server you connected.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
-- **Agents**: the session's subagents and teammates with their status, children under the agent that spawned them.
+- **Agents**: the session's subagents and teammates with their status, model and effort, children under the agent that spawned them.
 - **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests. .NET, Node, Bun, Rust, Go and Python tools are recognized.
 - **Git**: the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, the submodules that changed, and every file `git status` lists, in a treeview like the Changes one. Pressing a file opens its diff against HEAD; pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
 - **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
@@ -19,6 +19,8 @@ It also raises a native notification when a usage window reaches 80% or 90%, or 
 Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost and the elapsed time at a glance. Bars fill to the eighth of a cell. In a terminal pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions. The desktop app always draws the frames and tiles, sizing them and the bars by percentage instead of terminal cells.
 
 Sections can share one card as tabs, to make the pane shorter. By default Changes and Git do: the card opens on Changes, and pressing a tab shows that section in the same place. A tab that is not active shows a count, such as `Changes 12`, so a hidden section still says it has something. The `tabGroups` option sets the groups, for example `changes+git, ci+jira+skills`.
+
+The `sectionOrder` option sets the order of the sections, top to bottom, for example `changes, git, session`. The sections it does not name follow in the default order: Session, Last turn, Todos, Skills, CI, Jira, Usage, Agents, Checks, Git, Changes. A tab group card sits where its first shown section sits in this order, and it stays there when you press another tab. The order of the tabs in the card, and the tab it opens on, come from `tabGroups`. For example, with `sectionOrder` set to `git, session` and the default group `changes+git`, the Changes and Git card is at the top and opens on Changes. A group typed whole, such as `changes+git`, also counts as its sections in order.
 
 ```text
 ╭──────────────────────────────────╮╭──────────────────────────────────╮
@@ -68,9 +70,9 @@ Sections can share one card as tabs, to make the pane shorter. By default Change
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
 │ ▾ Agents                                          2 running · 1 done │
-│ ⟳ reviewer · review diff                                             │
-│   ⟳ Explore · nested search                                          │
-│ ✓ Explore · find auth code                                           │
+│ ⟳ reviewer · claude-opus-5-5 · high · review diff                    │
+│   ⟳ Explore · claude-haiku-5-5 · low · nested search                 │
+│ ✓ Explore · claude-haiku-5-5 · low · find auth code                  │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────╮
 │ ▾ Checks                                            ✖ build  ✓ tests │
@@ -153,7 +155,7 @@ The token counts of the main turn do not include its subagents; the Tools row sh
 
 ## What the Agents section shows
 
-Every agent loop of the session, as Claude Code lists it: subagents the model or a plugin spawned and teammates. Each row shows a status glyph, the agent's name (or its type) and its task description:
+Every agent loop of the session, as Claude Code lists it: subagents the model or a plugin spawned and teammates. Each row shows a status glyph, the agent's name (or its type), its model and effort, and its task description:
 
 | Glyph | Status |
 | --- | --- |
@@ -166,6 +168,8 @@ Every agent loop of the session, as Claude Code lists it: subagents the model or
 | `⊘` | killed |
 
 Active agents come first; an agent spawned by another is indented under it. Claude Code drops a finished agent from its list some time after it ends, and the row leaves with it. The section redraws when an agent starts or finishes a turn, and once a minute. Up to 8 rows are shown.
+
+The model comes from the agent's spawn and then from each of its model requests; the effort comes from its requests only, so it shows after the agent's first request. The last request wins, so a fallback model shows too. An agent that started before the mod loaded shows its model and effort after its next request; one that ended before that shows neither. `/clear` forgets them.
 
 ## What the Checks section shows
 
@@ -363,6 +367,7 @@ Change these in `/config`:
 | `session-info.gitClient` | A command, for example `lazygit`, `gitui` or `tig`. Put a path with spaces in double quotes. Empty turns it off | `lazygit` |
 | `session-info.showChanges` | `true`, `false` | `true` |
 | `session-info.tabGroups` | Sections that share one card as tabs: groups split by commas, sections by `+`, for example `changes+git, ci+jira+skills`. Names: `session`, `lastTurn`, `todos`, `skills`, `ci`, `jira`, `usage`, `agents`, `checks`, `git`, `changes`. The first section of a group is the tab it opens on. Empty gives each section its own card | `changes+git` |
+| `session-info.sectionOrder` | The sections in order, top to bottom, split by commas, for example `changes, git, session`. Same names as `tabGroups`. The sections not named follow in the default order; a tab group card sits where its first shown section sits. Empty keeps the default order | `session, lastTurn, todos, skills, ci, jira, usage, agents, checks, git, changes` |
 | `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |

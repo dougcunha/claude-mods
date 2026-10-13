@@ -59,3 +59,14 @@ export function parseTabGroups(value: unknown): TabGroup[] {
 
   return groups
 }
+
+/**
+ * `changes, git, session`: the sections named first, in that order, then the others in the default order. Names split
+ * by commas, semicolons or `+`, so a tab group pasted whole counts too; an unknown name and a repeat drop out.
+ */
+export function parseSectionOrder(value: unknown): SectionKey[] {
+  const text = typeof value === 'string' ? value : ''
+  const named = text.split(/[,;+]/).flatMap(name => SECTION_NAMES[name.trim().toLowerCase()] ?? [])
+
+  return [...new Set([...named, ...ORDER])]
+}

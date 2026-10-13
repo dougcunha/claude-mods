@@ -1,9 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderSurface } from 'claude-code'
 
-import type { ChangeStatus, Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
+import type { AgentModel, ChangeStatus, Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
 
-import { AGENT_STATUS, agentLabel, agentRows, agentSummary } from './agents'
+import { AGENT_STATUS, agentLabel, agentModelText, agentRows, agentSummary, withAgentModel } from './agents'
 import { crossings } from './alerts'
 import type { AgentRow } from './agents'
 import { FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
@@ -20,7 +20,7 @@ import type { IconSet } from './icons'
 import { allowRequest, browseUrl, errorText, isAllowed, isIssueKey, isRefusal, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
 import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
-import { ORDER, parseTabGroups, TITLES } from './tabs'
+import { parseSectionOrder, parseTabGroups, TITLES } from './tabs'
 import type { SectionKey, TabGroup } from './tabs'
 import { SHELLS, track } from './track'
 import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
@@ -51,6 +51,7 @@ const skills = atom({ plugin: 'session-info', key: 'skills' } as const, [] as Sk
 const ciState = atom({ plugin: 'session-info', key: 'ci' } as const, null as CiWatch | null)
 const jiraServer = atom({ plugin: 'session-info', key: 'jiraServer' } as const, null as string | null)
 const jiraIssues = atom({ plugin: 'session-info', key: 'jiraIssues' } as const, [] as JiraIssue[])
+const agentModels = atom({ plugin: 'session-info', key: 'agentModels' } as const, {} as Record<string, AgentModel>)
 const tabs = atom({ plugin: 'session-info', key: 'tabs' } as const, {} as Record<string, string>)
 
 const PANE = 'session-info'
@@ -181,6 +182,13 @@ function refreshRepo($: EngineInterface): Promise<void> {
   })
 
   return reading
+}
+
+/** Keeps what a subagent runs on; a step that repeats the model and effort writes nothing, so the pane does not redraw. */
+async function noteAgentModel($: EngineInterface, agentId: string, model: string, effort?: string | number): Promise<void> {
+  const known = await read($, agentModels)
+  const next = withAgentModel(known, agentId, model, effort)
+  if (next !== known) await update($, agentModels, () => next)
 }
 
 /** Reads /context's breakdown, estimated locally (no token-count calls), for the stacked bar. */
@@ -370,6 +378,7 @@ export const register: Register = (on, options) => {
   const paneBackground = typeof options.paneBackground === 'string' ? options.paneBackground.trim() : ''
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
+  const order = parseSectionOrder(options.sectionOrder)
   const groups = parseTabGroups(options.tabGroups)
   const groupOf = new Map(groups.flatMap(group => group.members.map(key => [key, group] as const)))
   /** A grouped section folds with its group, whichever members show now. */
@@ -415,6 +424,7 @@ export const register: Register = (on, options) => {
       if (shows.turn) await update($, lastTurn, () => null)
       if (shows.skills) await update($, skills, () => [])
       if (shows.jira) await update($, jiraIssues, () => [])
+      if (shows.agents) await update($, agentModels, () => ({}))
     }
 
     return started
@@ -493,10 +503,13 @@ export const register: Register = (on, options) => {
 
       return next(e)
     })
+  }
 
+  if (shows.turn || shows.agents) {
     // The step only notes the request; it leaves the stream to the hooks beneath it.
     on('turn.step', async function* ($, e, next) {
-      if (e.agentId === undefined && draft !== undefined) draft = withStep(draft, e)
+      if (shows.turn && e.agentId === undefined && draft !== undefined) draft = withStep(draft, e)
+      if (shows.agents && e.agentId !== undefined) await noteAgentModel($, e.agentId, e.model, e.effort)
 
       return yield* next(e)
     })
@@ -535,6 +548,7 @@ export const register: Register = (on, options) => {
   on('agent.spawn', async ($, e, next) => {
     const spawned = await next(e)
     if (shows.turn && draft !== undefined) draft = withSpawn(draft)
+    if (shows.agents && spawned.agentId !== undefined) await noteAgentModel($, spawned.agentId, spawned.model)
     if (shows.agents) await update($, now, () => Date.now())
 
     return spawned
@@ -618,12 +632,12 @@ export const register: Register = (on, options) => {
       return present[key] && (group === undefined || activeOf(group) === key)
     }
     /** The sections to draw, in order; a group sits where its first shown member sits, so a tab switch does not move the card. */
-    const slots = ORDER.flatMap((key): SectionKey[] => {
+    const slots = order.flatMap((key): SectionKey[] => {
       const group = groupOf.get(key)
       if (group === undefined) return present[key] ? [key] : []
       const active = activeOf(group)
 
-      return active !== undefined && ORDER.find(one => groupOf.get(one) === group && present[one]) === key ? [active] : []
+      return active !== undefined && order.find(one => groupOf.get(one) === group && present[one]) === key ? [active] : []
     })
     await read($, now)
     const isDetailed = shows.session && isOpen('#session') && (await read($, breakdown))
@@ -674,6 +688,7 @@ export const register: Register = (on, options) => {
     const legend = isDetailed && reading ? legendLines(reading, inner) : []
     const sessionRows = counts('#session') ? chrome + (isOpen('#session') ? 3 + legend.length : 0) : 0
     const agentLines = agentRows(agents)
+    const models = shows.agents ? await read($, agentModels) : {}
     const agentRoom = Math.min(agentLines.length, 8)
     const agentsRows = counts('#agents') ? chrome + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
     const lastChecks = shows.checks ? await read($, checks) : NO_CHECKS
@@ -1109,7 +1124,7 @@ export const register: Register = (on, options) => {
         <Box flexDirection="row">
           <Text color={status.color}>{`${'  '.repeat(depth)}${status.glyph} `}</Text>
           <Text bold={agent.status === 'running'}>{agentLabel(agent)}</Text>
-          <Text dimColor wrap="truncate-end">{agent.description ? ` · ${agent.description}` : ''}</Text>
+          <Text dimColor wrap="truncate-end">{`${agentModelText(models[agent.id])}${agent.description ? ` · ${agent.description}` : ''}`}</Text>
         </Box>
       )
     }

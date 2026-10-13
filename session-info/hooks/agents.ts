@@ -1,3 +1,5 @@
+import type { AgentModel } from '../types'
+
 /** One agent loop as `$.agent.list()` reports it. */
 export type Agent = {
   id: string
@@ -45,6 +47,25 @@ export function agentRows(agents: readonly Agent[]): AgentRow[] {
 }
 
 export const agentLabel = (agent: Agent): string => agent.name ?? agent.type
+
+/** The models with this agent's entry set; the same object when nothing changed, so a step that repeats them redraws nothing. */
+export function withAgentModel(
+  models: Readonly<Record<string, AgentModel>>,
+  agentId: string,
+  model: string,
+  effort?: string | number,
+): Record<string, AgentModel> {
+  const known = models[agentId]
+  // The spawn names no effort: the effort a request already reported stays.
+  const next = effort === undefined ? (known?.model === model ? known : { model }) : { model, effort: String(effort) }
+  if (known !== undefined && known.model === next.model && known.effort === next.effort) return models
+
+  return { ...models, [agentId]: next }
+}
+
+/** ` · claude-haiku-5-5 · low`, or '' when the agent's model is unknown. */
+export const agentModelText = (run: AgentModel | undefined): string =>
+  run === undefined ? '' : [run.model, run.effort].filter(part => part !== undefined).map(part => ` · ${part}`).join('')
 
 /** `2 running · 1 idle · 3 done`, or `none`. */
 export function agentSummary(agents: readonly Agent[]): string {
