@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
 import type { CiRun } from '../types'
@@ -99,6 +99,29 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.unmount()
   })
 }
+
+test('a /clear or a resume drops the watch of the conversation that pushed', async ($, on) => {
+  let id = 's1'
+  const clock = mock.clock(on)
+  pane(on)
+  on('session.id', async () => ({ value: id }))
+  on('session.end', async (_, e) => ({ sessionId: e.sessionId }))
+  on('process.run', async (_, e) => ({ value: answer(e.argv) }) as never)
+  on('ui.notify', async () => ({ value: { isSent: true } }) as never)
+  on('tool.call', { tool: 'Bash' }, async () => ({ result: { stdout: '', stderr: '', interrupted: false }, text: 'pushed' }) as never)
+
+  await $.tool.call({ tool: 'Bash', command: 'rtk git push origin main' })
+  const watched = await mountPolled($, 'terminal', '✓ success')
+  expect(await watched.find({ type: 'Text', text: '✓ success' })).toBeDefined()
+  await watched.unmount()
+
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+  id = 's2'
+  await clock.advance(200)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: 'No GitHub Actions run started from this session yet.' })).toBeDefined()
+  await ui.unmount()
+})
 
 test('showCi false leaves the section out', { options: { showCi: false } }, async ($, on) => {
   pane(on)

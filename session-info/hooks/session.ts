@@ -31,5 +31,6 @@ export function turnLine(turns: TurnStats): string {
   return `${turns.count} turn${turns.count === 1 ? '' : 's'} · ~${perTurn} output tok/turn · last ${duration(turns.lastMs)}`
 }
 
-export const compactionText = (count: number): string =>
-  count === 0 ? '' : ` · ${count} compaction${count === 1 ? '' : 's'}`
+/** ` · 2 compactions`; nothing for none. */
+export const countText = (count: number, noun: string): string =>
+  count === 0 ? '' : ` · ${count} ${noun}${count === 1 ? '' : 's'}`

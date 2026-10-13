@@ -2,7 +2,7 @@
 
 A Claude Code mod with one pane and twelve sections:
 
-- **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
+- **Session**: the context window's fill, compactions and /clear commands, the session's cost and duration, and turn stats.
 - **Last turn**: how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, and the tools it called.
 - **Todos**: the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it.
 - **Autopick**: a switch that answers a question Claude asked and you left unanswered with the option Claude marked as recommended, after a wait you set. A countdown shows the time left, with Pick now and Cancel. The switch starts off.
@@ -142,9 +142,12 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 | Cost and elapsed (tiles) | The session's cost as `/cost` totals it and the time since the session started. In a narrow pane, they move to the section header |
 | Context bar | The live context window: tokens used, the window size, where auto-compaction runs (`compacts at 967k`) and the percentage. The bar is stacked, one color per category (system prompt, tools, memory files, skills, messages), then the free space as a thin line and the compaction buffer shaded. Pressing `▸ Context` unfolds a legend with each category's tokens and share. The categories are estimated locally after each turn and compaction; before the first reading the bar has one color |
 | Compactions | Compactions that went through in the main conversation |
+| Clears | `/clear` commands run since the mod loaded, by hand or by another mod (`· 3 clears`); it shows after the first reply that follows a `/clear` |
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
 
-The turn and compaction counts start when the mod loads, so a reload or a newly installed mod starts them at zero.
+The turn, compaction and clear counts start when the mod loads, so a reload or a newly installed mod starts them at zero.
+
+After a `/clear` or a `/resume` in the same process, Claude Code starts the next conversation with empty pane state and raises no start event for it. The mod waits until the session id changes, then reads the context, the repository, the Autopick switch and the Jira server again and, on a resume, the task list from the transcript.
 
 ## What the Last turn section shows
 
@@ -350,6 +353,8 @@ The section follows the GitHub Actions runs that the session started through a s
 Each run shows its workflow, branch, commit and time, a row of its jobs and an `↗ Open on GitHub` button that opens the run in your browser. While a run is open the section asks GitHub every 15 seconds with `gh run view`; when a run ends it raises a native notification with the result. The header shows `⟳ running` while a run is open, else the worst result. A new push replaces the runs of the previous one.
 
 The section needs the [GitHub CLI](https://cli.github.com/) on the `PATH`, logged in with `gh auth login`; the mod never reads a token. When `gh` is missing or fails, the section shows its message and stops asking.
+
+A `/clear` or a `/resume` ends the watch: the runs belong to the conversation that started them.
 
 ## What the Jira section shows
 

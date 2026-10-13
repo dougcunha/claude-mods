@@ -25,7 +25,7 @@ import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSk
 import { moveCard, orderText, parseSectionOrder, parseTabGroups, showOption, TITLES } from './tabs'
 import type { SectionKey, TabGroup } from './tabs'
 import { SHELLS, track } from './track'
-import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
+import { cost, countText, duration, NO_TURNS, tokens, turnLine } from './session'
 import { latestTodos, minSteps, parseTodos, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoPrompt, todoReply, todoSummary, todoText } from './todos'
 import { buildTree, flatten } from './tree'
 import { modelText, RESULT, resultText, startDraft, toolsText, tokensText, toRecord, turnLines, withSpawn, withStep, withSubagentUsage, withTool } from './turn'
@@ -80,6 +80,11 @@ let polling: Promise<void> | undefined
 let jiraSite: { cloudId: string; url?: string } | undefined
 /** The name `$.mcp.call` took for the Jira server, found by the first call that went through. */
 let jiraName: string | undefined
+/** /clear commands run since this load; $.state starts over with each /clear, so the count lives here. */
+let clearCount = 0
+/** After a session.end the state switches at once, but the session id and its usage only some time later. */
+const SWITCH_POLL_MS = 200
+const SWITCH_LIMIT_MS = 10_000
 const reads = new Set<string>()
 
 /**
@@ -208,7 +213,30 @@ async function noteAgentModel($: EngineInterface, agentId: string, model: string
 async function refreshContext($: EngineInterface): Promise<void> {
   const usage = await $.session.usage({ breakdown: 'summary' })
   const reading = usage.context.breakdown ? toReading(usage.context.breakdown) : null
-  if (reading !== null) await update($, contextState, () => reading)
+  if (reading === null) return
+  await update($, contextState, () => reading)
+  // After a /clear or a resume the pane's reads no longer redraw it on a write: it is drawn again here.
+  $.ui.invalidate('ui.render')
+}
+
+/**
+ * Runs `reload` once the session id is the next conversation's. A /clear or a resume raises session.end and no start
+ * event; the state switches at once, but the session id and its usage only some time later, and a read made before
+ * would put the ended conversation's figures in the next one's state.
+ */
+function afterSwitch($: EngineInterface, endedId: string, reload: () => Promise<void>): void {
+  let waited = 0
+  const poll = async (): Promise<void> => {
+    if ((await $.session.id().catch(() => endedId)) !== endedId) return reload()
+    waited += SWITCH_POLL_MS
+    if (waited < SWITCH_LIMIT_MS) $.clock.after(SWITCH_POLL_MS, () => void poll())
+  }
+  $.clock.after(SWITCH_POLL_MS, () => void poll())
+}
+
+/** Reads the context when the session has no reading yet: after a /clear or a resume, before any turn ends. */
+async function readMissingContext($: EngineInterface): Promise<void> {
+  if ((await read($, contextState)) === null) await refreshContext($).catch(() => undefined)
 }
 
 /** A resumed session starts with no list in its state: the last todo_write call of the transcript gives it back. */
@@ -523,6 +551,7 @@ export const register: Register = (on, options) => {
   const isOpenOnStart = options.openOnStart === true
 
   on('session.start', async ($, e, next) => {
+    clearCount = 0
     await $.command.register({
       name: 'session-info',
       description: 'Show the session, plan usage and the files this session created, modified or deleted',
@@ -535,6 +564,9 @@ export const register: Register = (on, options) => {
     if (isLive || shows.git)
       $.clock.every(MINUTE, () => {
         if (isLive) void update($, now, () => Date.now())
+        // The write alone redraws nothing after a /clear or a resume.
+        if (isLive) $.ui.invalidate('ui.render')
+        if (shows.session) void readMissingContext($)
         if (shows.git) void refreshRepo($)
       })
     if (shows.git) void refreshRepo($)
@@ -576,6 +608,34 @@ export const register: Register = (on, options) => {
     }
 
     return started
+  })
+
+  // A /clear ends the session as session.end with reason clear; the module and its count go on.
+  on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') {
+      clearCount += 1
+      // The count is no state value: nothing else draws it.
+      if (shows.session) $.ui.invalidate('ui.render')
+    }
+    // The next conversation's state starts empty and a draw may not write: what session.start loads is loaded here.
+    if (e.reason === 'clear' || e.reason === 'resume') {
+      const isResume = e.reason === 'resume'
+      afterSwitch($, e.sessionId, async () => {
+        if (shows.todos && isResume) await restoreTodos($).catch(() => undefined)
+        if (shows.git) void refreshRepo($)
+        if (shows.jira) await findJiraServer($).catch(() => undefined)
+        if (shows.autopick) {
+          await loadAutopick($).catch(() => undefined)
+          await checkRival($).catch(() => undefined)
+        }
+        // A CI watch belongs to the conversation that pushed.
+        if (shows.ci) await update($, ciState, () => null)
+        if (shows.session) await refreshContext($).catch(() => undefined)
+        $.ui.invalidate('ui.render')
+      })
+    }
+
+    return next(e)
   })
 
   on('command.run', { command: 'session-info' }, async $ => openPane($, shows.git, shows.session))
@@ -1146,7 +1206,7 @@ export const register: Register = (on, options) => {
               <Text dimColor wrap="truncate-end">
                 {context?.tokens === undefined
                   ? 'after the first reply'
-                  : contextText(context.tokens, context.window, reading?.compactsAt, compactionText(compacted))}
+                  : contextText(context.tokens, context.window, reading?.compactsAt, `${countText(compacted, 'compaction')}${countText(clearCount, 'clear')}`)}
               </Text>
             </Box>
             {reading ? stackedBar(reading, context?.percent ?? 0) : meter(context?.percent ?? 0)}

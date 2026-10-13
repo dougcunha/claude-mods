@@ -230,6 +230,53 @@ test('before the first reply the session section takes the context figures from 
   await ui.unmount()
 })
 
+test('the session section counts each /clear since the load', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.end', async (_, e) => ({ sessionId: e.sessionId }))
+  on('session.usage', async (_, e) =>
+    ({
+      value: { startedAt: Date.now(), rateLimits: [], context: { breakdown: e.breakdown ? BREAKDOWN : undefined } },
+    }) as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'context' })
+  expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k' })).toBeDefined()
+
+  const end = (reason: 'clear' | 'resume') => $.session.end({ reason, sessionId: 's1', resume: { id: 's1' } })
+  await end('clear')
+  expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k · 1 clear' })).toBeDefined()
+  await end('resume')
+  await end('clear')
+  expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k · 2 clears' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a /clear or a resume reads the context once the session id is the next one', async ($, on) => {
+  let isCleared = false
+  const clock = mock.clock(on)
+  on('session.id', async () => ({ value: isCleared ? 's2' : 's1' }))
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.end', async (_, e) => ({ sessionId: e.sessionId }))
+  on('session.usage', async (_, e) =>
+    ({
+      value: { startedAt: Date.now(), rateLimits: [], context: { breakdown: e.breakdown && isCleared ? BREAKDOWN : undefined } },
+    }) as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: 'after the first reply' })).toBeDefined()
+
+  await $.session.end({ reason: 'resume', sessionId: 's1', resume: { id: 's1' } })
+  await clock.advance(1_000)
+  expect(await ui.find({ type: 'Text', text: 'after the first reply' })).toBeDefined()
+
+  isCleared = true
+  await clock.advance(200)
+  expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('the context reading orders, colors and sizes the slices', async () => {
   const reading = toReading(BREAKDOWN)!
   expect(reading.slices.map(slice => `${slice.kind}:${slice.name}`)).toEqual([

@@ -114,6 +114,29 @@ test('session start registers the tool and a resumed session gets its list back'
   await ui.unmount()
 })
 
+test('a resume in the same process gets the list back once the session id is the next one', async ($, on) => {
+  let id = 's1'
+  const clock = mock.clock(on)
+  pane(on)
+  on('session.id', async () => ({ value: id }))
+  on('session.end', async (_, e) => ({ sessionId: e.sessionId }))
+  on('process.run', async () => ({ value: { exitCode: 128, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('session.messages', async () =>
+    ({ value: [{ role: 'assistant', text: '', toolUses: [{ tool_use_id: 'u1', tool: TODO_TOOL, input: { todos: TODOS } }] }] }) as never)
+
+  await $.session.end({ reason: 'resume', sessionId: 's1', resume: { id: 's1' } })
+  await clock.advance(1_000)
+  const before = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await before.find({ type: 'Text', text: /^No task list yet/ })).toBeDefined()
+  await before.unmount()
+
+  id = 's2'
+  await clock.advance(200)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: '1/3 done' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('showTodos false leaves out the tool, the prompt section and the section', { options: { showTodos: false } }, async ($, on) => {
   pane(on)
   on('prompt.compose', async () => ({ sections: [{ id: 'intro', text: 'Hi', scope: 'shared' }] }) as never)

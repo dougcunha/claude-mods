@@ -95,5 +95,5 @@ export function legendLines(reading: ContextReading, width: number): ContextSlic
 }
 
 /** `273k / 1.0M · compacts at 967k`: the live count, and where auto-compaction runs when it is on. */
-export const contextText = (used: number, window: number, compactsAt: number | undefined, compactions: string): string =>
-  `${tokens(used)} / ${tokens(window)}${compactsAt ? ` · compacts at ${tokens(compactsAt)}` : ''}${compactions}`
+export const contextText = (used: number, window: number, compactsAt: number | undefined, counts: string): string =>
+  `${tokens(used)} / ${tokens(window)}${compactsAt ? ` · compacts at ${tokens(compactsAt)}` : ''}${counts}`
