@@ -214,6 +214,22 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
+test('before the first reply the session section takes the context figures from the reading', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.usage', async (_, e) =>
+    ({
+      value: { startedAt: Date.now(), rateLimits: [], context: { breakdown: e.breakdown ? BREAKDOWN : undefined } },
+    }) as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'context' })
+  expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: / 62%$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'after the first reply' })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('the context reading orders, colors and sizes the slices', async () => {
   const reading = toReading(BREAKDOWN)!
   expect(reading.slices.map(slice => `${slice.kind}:${slice.name}`)).toEqual([

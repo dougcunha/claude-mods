@@ -836,7 +836,11 @@ export const register: Register = (on, options) => {
     const repoFiles = isRepo ? (repo.files ?? []) : []
     const gitShut = new Set([...shut].filter(isGitFold).map(key => key.slice(GIT_FOLD.length)))
     const gitTree = isRepo ? flatten(buildTree(repo.root, repoFiles), gitShut) : []
-    const context = usage?.context
+    // Before the first reply the usage has no context figures; the /context reading has them already.
+    const context =
+      usage?.context.tokens === undefined && reading
+        ? { tokens: reading.total, window: reading.window, percent: (reading.total / reading.window) * 100 }
+        : usage?.context
     const figures: Tile[] =
       isCards && shows.session && usage !== undefined
         ? [
