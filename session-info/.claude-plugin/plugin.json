@@ -1,6 +1,6 @@
 {
   "name": "session-info",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Session pane: context, cost and turns, the last turn's tokens, cache and tools, a task list Claude keeps, an autopick switch that answers a question left unanswered with its recommended option, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents with their model and effort, the last build and test run, the Git state of the repository and its submodules with a treeview of its changed files, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",

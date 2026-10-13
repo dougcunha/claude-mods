@@ -142,6 +142,26 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
+test('the layout does not change while a countdown runs', SLOW, async ($, on) => {
+  const clock = world(on, { [STORE_ON]: true, [STORE_MINUTES]: 1 }, 5 * MINUTE)
+  const sets: unknown[] = []
+  on('config.set', async (_, e) => (sets.push(e.key), { value: e.value }))
+  const call = $.tool.call(ASK)
+  await clock.settle()
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'layout' })
+  await ui.press({ key: 'hide:#skills' })
+  expect(sets).toEqual([])
+  await ui.unmount()
+
+  await clock.advance(MINUTE)
+  expect(answersOf(await call)).toEqual({ 'Color?': 'Blue (Recommended)' })
+  const after = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await after.press({ key: 'hide:#skills' })
+  expect(sets).toEqual(['session-info.showSkills'])
+  await after.unmount()
+})
+
 test('a question with no recommended option shows that it waits', async ($, on) => {
   const clock = world(on, { [STORE_ON]: true, [STORE_MINUTES]: 1 }, 5 * MINUTE)
   const plain = [{ ...QUESTIONS[0], options: [{ label: 'Blue', description: '' }, { label: 'Red', description: '' }] }]

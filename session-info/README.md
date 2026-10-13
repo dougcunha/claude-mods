@@ -129,6 +129,8 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Turn autopick on or off | Press `[ ] Answer unanswered questions` in the Autopick section, or run `/autopick on` or `/autopick off` |
 | Set the autopick wait | Press `−` or `+` in the Autopick section, or run `/autopick <minutes>`, 1 to 120 |
 | Answer a waiting question now, or stop its countdown | Press `Pick now` or `Cancel` on its row in the Autopick section |
+| Move or hide a card | Press `≡ Layout` at the bottom of the pane, or press `l` while the pane has the focus. Each card header then shows `↑`, `↓` and `✕`. Press `≡ Done` or `l` again to leave layout mode. See [Arrange the cards](#arrange-the-cards) |
+| Show a hidden card again | Press its name after `Hidden:` at the bottom of the pane |
 | Return to the prompt | `Esc` |
 
 Status colors follow your theme: green for created (`A`), yellow for modified (`M`), red and struck through for deleted (`D`). Chains of single-child folders collapse into one row, for example `src/app/ui`.
@@ -376,9 +378,19 @@ With `jiraSite` set, the mod never calls `getAccessibleAtlassianResources`. The 
 
 Each issue shows its key, summary, status, priority, assignee and when it was last updated. Pressing the key opens the issue in your browser. A key read in the last 5 minutes is not read again. The section draws the last 3 issues. `jiraSite` names your site (`https://company.atlassian.net`); left empty, the mod asks the server for the first Jira site your account reaches. `/clear` empties the section.
 
+## Arrange the cards
+
+Layout mode changes the same settings that `/config` changes, so the order and the hidden cards stay for the next sessions.
+
+- **`↑` and `↓`** move the card one place up or down. The mod writes the new order to `sectionOrder`. A tab group moves as one card, and a hidden section keeps its place in the order.
+- **`✕`** sets the `show*` setting of the section to `false`, for example `showGit`. In a tab group, `✕` hides the tab that is open. The effect is the same as in `/config`: `showTodos` off also removes the `todo_write` tool and its prompt section, and `showAutopick` off also removes the `/autopick` command.
+- **`Hidden:`** at the bottom of the pane lists the sections whose `show*` setting is `false`. Press a name to set it back to `true`.
+
+After each change, Claude Code loads the mod again with the new settings, so the pane draws once more. The settings stay. A load stops the timers of the mod, so the layout does not change while an autopick countdown runs: the mod shows a toast instead. Cancel the countdown or let it end first. When a managed policy owns a setting, Claude Code refuses the change and the mod shows the reason in a toast.
+
 ## Settings
 
-Change these in `/config`:
+Change these in `/config`, or move and hide the cards in [layout mode](#arrange-the-cards):
 
 | Setting | Values | Default |
 | --- | --- | --- |

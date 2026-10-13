@@ -60,7 +60,7 @@ test('showLastTurn false leaves the section out', { options: { showLastTurn: fal
   on('session.usage', async () => ({ value: { startedAt: 0, rateLimits: [], context: { window: 200_000 } } }) as never)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /Last turn/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /^▾ Last turn/ })).toBeUndefined()
   await ui.unmount()
 })
 

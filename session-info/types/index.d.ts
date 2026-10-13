@@ -218,6 +218,8 @@ declare module 'claude-code' {
       autopickLast: AutopickPick | null
       /** Whether the ask-autopick mod is loaded: it answers the same questions, so this switch stays off. */
       autopickConflict: boolean
+      /** Whether the pane is in layout mode: each card header shows its move and hide buttons. */
+      layout: boolean
     }
   }
 }

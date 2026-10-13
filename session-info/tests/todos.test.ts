@@ -121,7 +121,7 @@ test('showTodos false leaves out the tool, the prompt section and the section', 
   expect(composed.sections.map(s => s.id)).toEqual(['intro'])
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /Todos/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /^▾ Todos/ })).toBeUndefined()
   await ui.unmount()
 })
 

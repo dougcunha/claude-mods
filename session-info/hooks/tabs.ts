@@ -22,6 +22,25 @@ export const TITLES: Record<SectionKey, string> = {
   '#changes': 'Changes',
 }
 
+/** The name of each section in `tabGroups` and `sectionOrder`, as the settings spell it. */
+export const NAMES: Record<SectionKey, string> = {
+  '#session': 'session',
+  '#turn': 'lastTurn',
+  '#todos': 'todos',
+  '#autopick': 'autopick',
+  '#skills': 'skills',
+  '#ci': 'ci',
+  '#jira': 'jira',
+  '#usage': 'usage',
+  '#agents': 'agents',
+  '#checks': 'checks',
+  '#git': 'git',
+  '#changes': 'changes',
+}
+
+/** The `userConfig` field that shows or hides each section: `show` and the name with its first letter upper case. */
+export const showOption = (key: SectionKey): string => `show${NAMES[key].charAt(0).toUpperCase()}${NAMES[key].slice(1)}`
+
 /** The names `tabGroups` takes, in lower case: the suffixes of the `show*` options. */
 const SECTION_NAMES: Record<string, SectionKey> = {
   session: '#session',
@@ -71,4 +90,35 @@ export function parseSectionOrder(value: unknown): SectionKey[] {
   const named = text.split(/[,;+]/).flatMap(name => SECTION_NAMES[name.trim().toLowerCase()] ?? [])
 
   return [...new Set([...named, ...ORDER])]
+}
+
+/** The order as `sectionOrder` takes it: `session, lastTurn, todos`. */
+export const orderText = (order: readonly SectionKey[]): string => order.map(key => NAMES[key]).join(', ')
+
+/**
+ * The order with the card of `key` moved one card up or down. A card is a section, or a tab group as a whole, and sits
+ * where its first shown section sits, as the pane draws it; it swaps with the nearest shown card in that direction, and
+ * hidden sections keep their places. The order is unchanged when no shown card is there.
+ */
+export function moveCard(order: readonly SectionKey[], groups: readonly TabGroup[], isShown: (key: SectionKey) => boolean, key: SectionKey, direction: 1 | -1): SectionKey[] {
+  const groupOf = (one: SectionKey) => groups.find(group => group.members.includes(one))
+  // Each card once, at its first shown section, or at its first section when none shows.
+  const anchorOf = (one: SectionKey): SectionKey => {
+    const members = groupOf(one)?.members ?? [one]
+
+    return order.find(other => members.includes(other) && isShown(other)) ?? order.find(other => members.includes(other)) ?? one
+  }
+  const cards = order.filter(one => anchorOf(one) === one).map(anchor => groupOf(anchor)?.members ?? [anchor])
+  const at = cards.findIndex(card => card.includes(key))
+  let to = at + direction
+  while (to >= 0 && to < cards.length && !cards[to]?.some(isShown)) to += direction
+  const moving = cards[at]
+  const other = cards[to]
+  if (at < 0 || moving === undefined || other === undefined) return [...order]
+  cards[at] = other
+  cards[to] = moving
+  // A card's sections keep their own relative order.
+  const rank = (one: SectionKey) => order.indexOf(one)
+
+  return cards.flatMap(card => [...card].sort((a, b) => rank(a) - rank(b)))
 }

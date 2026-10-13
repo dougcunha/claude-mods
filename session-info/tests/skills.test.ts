@@ -64,7 +64,7 @@ test('showSkills false leaves the section out', { options: { showSkills: false }
   await $.skill.prompt({ skill: 'commit', text: 'body' })
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /Skills/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /^▾ Skills/ })).toBeUndefined()
   await ui.unmount()
 })
 

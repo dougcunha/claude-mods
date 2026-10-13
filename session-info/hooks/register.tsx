@@ -22,7 +22,7 @@ import type { IconSet } from './icons'
 import { allowRequest, browseUrl, errorText, isAllowed, isIssueKey, isRefusal, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
 import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
-import { parseSectionOrder, parseTabGroups, TITLES } from './tabs'
+import { moveCard, orderText, parseSectionOrder, parseTabGroups, showOption, TITLES } from './tabs'
 import type { SectionKey, TabGroup } from './tabs'
 import { SHELLS, track } from './track'
 import { compactionText, cost, duration, NO_TURNS, tokens, turnLine } from './session'
@@ -59,6 +59,7 @@ const autopick = atom({ plugin: 'session-info', key: 'autopick' } as const, DEFA
 const autopickWaits = atom({ plugin: 'session-info', key: 'autopickWaits' } as const, [] as AutopickWait[])
 const autopickLast = atom({ plugin: 'session-info', key: 'autopickLast' } as const, null as AutopickPick | null)
 const autopickConflict = atom({ plugin: 'session-info', key: 'autopickConflict' } as const, false)
+const layout = atom({ plugin: 'session-info', key: 'layout' } as const, false)
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
@@ -870,7 +871,11 @@ export const register: Register = (on, options) => {
     const gitExtra = isGitTree && isChangesTree ? 4 : 0
     const gitRows = counts('#git') ? chrome + (isOpen('#git') ? repoRowCount(repo) + gitExtra : 0) : 0
     const changesFrame = counts('#changes') && isCards ? FRAME_ROWS : 0
-    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + autopickRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame
+    const isEditing = await read($, layout)
+    /** The sections their show* option turned off: the footer offers them back. */
+    const hidden = order.filter(key => options[showOption(key)] === false)
+    const footerRows = 1
+    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + autopickRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame + footerRows
     const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
     // Two trees on screen split the room: the Git tree takes up to half, the Changes tree the rest.
     const gitRoom = isChangesTree ? Math.min(gitTree.length, Math.max(3, Math.floor(room / 2))) : room
@@ -909,6 +914,39 @@ export const register: Register = (on, options) => {
       await update($, collapsed, list => (list ?? []).filter(one => one !== group.key))
     }
 
+    const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
+
+    /**
+     * Changes one of the mod's settings as /config would; the engine then loads the module again with it. A load during
+     * an autopick countdown would drop its timer, so the layout waits until no countdown runs.
+     */
+    const setOption = async (field: string, value: boolean | string) => {
+      if (live.controls.size > 0) return void $.ui.toast('session-info: the layout changes after the autopick countdown ends or you cancel it.')
+      const done = await $.config.set({ key: `session-info.${field}`, value })
+      if (done.deny !== undefined) $.ui.toast(`session-info: ${done.deny}`)
+    }
+    const moveTo = (key: SectionKey, direction: 1 | -1) =>
+      void setOption('sectionOrder', orderText(moveCard(order, groups, one => present[one], key, direction))).catch(toast)
+
+    /** Up, down and hide, in place of the header's right side while the pane is in layout mode. */
+    const layoutButtons = (key: SectionKey) => {
+      const fold = foldOf(key)
+
+      return (
+        <Box flexDirection="row" gap={2} flexShrink={0} paddingLeft={1}>
+          <Button plain key={`move-up:${fold}`} onPress={() => moveTo(key, -1)}>
+            <Text color="suggestion">↑</Text>
+          </Button>
+          <Button plain key={`move-down:${fold}`} onPress={() => moveTo(key, 1)}>
+            <Text color="suggestion">↓</Text>
+          </Button>
+          <Button plain key={`hide:${key}`} onPress={() => void setOption(showOption(key), false).catch(toast)}>
+            <Text color="error">✕</Text>
+          </Button>
+        </Box>
+      )
+    }
+
     /** The section's title, or the tabs of its group when two or more of them show; the right side is the active one's. */
     const header = (key: SectionKey, title: string, right: string, aside?: RenderChildren) => {
       const fold = foldOf(key)
@@ -938,7 +976,7 @@ export const register: Register = (on, options) => {
               ])}
             </Box>
           )}
-          {aside ?? <Text dimColor>{right}</Text>}
+          {isEditing ? layoutButtons(key) : (aside ?? <Text dimColor>{right}</Text>)}
         </Box>
       )
     }
@@ -1157,8 +1195,6 @@ export const register: Register = (on, options) => {
       isOpen('#todos') && taskList.slice(0, todoRoom).map(todoLine),
       isOpen('#todos') && taskList.length > todoRoom && <Text dimColor>{`… ${taskList.length - todoRoom} more`}</Text>,
     ])
-
-    const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
 
     const autopickSwitch = (
       <Box flexDirection="row" justifyContent="space-between">
@@ -1566,6 +1602,26 @@ export const register: Register = (on, options) => {
     /** The inline diff sits under the last tree section on screen, whichever tree opened it. */
     const diffSlot = slots.filter(key => key === '#git' || key === '#changes').at(-1)
 
+    // A one-cell glyph: an emoji one such as a gear draws two cells in some terminals and eats the space after it.
+    const footer = (
+      <Box flexDirection="row" gap={2} paddingX={isCards ? 1 : 0}>
+        <Button plain key="layout" hotkey="l" onPress={() => void update($, layout, isOn => !isOn)}>
+          <Text {...(isEditing ? { bold: true, color: 'claude' } : { dimColor: true })}>{isEditing ? '≡ Done' : '≡ Layout'}</Text>
+        </Button>
+        {hidden.length > 0 && (
+          <Box flexDirection="row" gap={1} flexShrink={1}>
+            <Text dimColor>Hidden:</Text>
+            {hidden.map((key, index) => [
+              index > 0 && <Text dimColor>·</Text>,
+              <Button plain key={`show:${key}`} onPress={() => void setOption(showOption(key), true).catch(toast)}>
+                <Text color="suggestion">{TITLES[key]}</Text>
+              </Button>,
+            ])}
+          </Box>
+        )}
+      </Box>
+    )
+
     // The API has no color for the frame the terminal draws around a pane; this paints the body under the tree instead.
     const paint = isTerminal && paneBackground !== '' ? { backgroundColor: paneBackground, minHeight: e.props.scroll.bodyRows } : {}
 
@@ -1573,6 +1629,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column" {...paint}>
         {figures.length > 0 && tiles(figures, cols)}
         {slots.map(key => [key === '#changes' ? changesSection : nodes[key], key === diffSlot && diffView])}
+        {footer}
       </Box>
     )
   })

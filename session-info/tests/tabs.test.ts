@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { ORDER, parseSectionOrder, parseTabGroups } from '../hooks/tabs'
+import { moveCard, ORDER, orderText, parseSectionOrder, parseTabGroups, showOption } from '../hooks/tabs'
 
 const PANE = {
   plugin: 'session-info',
@@ -38,6 +38,43 @@ test('the section order puts the named sections first and the others after them 
   expect(parseSectionOrder(' Agents ; nope, git+changes, agents, LastTurn')).toEqual([
     '#agents', '#git', '#changes', '#turn', '#session', '#todos', '#autopick', '#skills', '#ci', '#jira', '#usage', '#checks',
   ])
+})
+
+test('a card moves past the nearest shown card, a tab group moves whole, and hidden sections keep their places', async () => {
+  const groups = parseTabGroups(undefined)
+  const shown = (key: string) => key !== '#jira'
+  const at = (order: readonly string[]) => orderText(order as typeof ORDER)
+  expect(at(moveCard(ORDER, groups, shown, '#todos', -1))).toBe('session, todos, lastTurn, autopick, skills, ci, jira, usage, agents, checks, git, changes')
+  expect(moveCard(ORDER, groups, shown, '#session', -1)).toEqual(ORDER)
+  expect(at(moveCard(ORDER, groups, shown, '#ci', 1))).toBe('session, lastTurn, todos, autopick, skills, usage, jira, ci, agents, checks, git, changes')
+  expect(at(moveCard(ORDER, groups, shown, '#git', -1))).toBe('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, git, changes, checks')
+  expect(at(moveCard(ORDER, groups, shown, '#changes', -1))).toBe('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, git, changes, checks')
+  expect(moveCard(ORDER, groups, shown, '#changes', 1)).toEqual(ORDER)
+  expect(showOption('#turn')).toBe('showLastTurn')
+  expect(showOption('#ci')).toBe('showCi')
+})
+
+test('layout mode moves and hides cards through /config, and the footer offers hidden sections back', { options: { showCi: false } }, async ($, on) => {
+  pane(on)
+  const sets: [string, unknown][] = []
+  on('config.set', async (_, e) => (sets.push([e.key, e.value]), { value: e.value }))
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 80, rows: 80 } })
+  expect(await ui.find({ type: 'Button', key: 'hide:#skills' })).toBeUndefined()
+
+  await ui.press({ key: 'layout' })
+  expect(await ui.find({ type: 'Text', text: '≡ Done' })).toBeDefined()
+  await ui.press({ key: 'move-up:#todos' })
+  await ui.press({ key: 'hide:#skills' })
+  await ui.press({ key: 'show:#ci' })
+  expect(sets).toEqual([
+    ['session-info.sectionOrder', 'session, todos, lastTurn, autopick, skills, ci, jira, usage, agents, checks, git, changes'],
+    ['session-info.showSkills', false],
+    ['session-info.showCi', true],
+  ])
+
+  await ui.press({ key: 'layout' })
+  expect(await ui.find({ type: 'Button', key: 'hide:#skills' })).toBeUndefined()
+  await ui.unmount()
 })
 
 test('a tab group card sits where its first shown section sits in the section order', { options: { sectionOrder: 'agents, git, session' } }, async ($, on) => {
