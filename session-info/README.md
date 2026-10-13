@@ -1,10 +1,11 @@
 # session-info
 
-A Claude Code mod with one pane and eleven sections:
+A Claude Code mod with one pane and twelve sections:
 
 - **Session**: the context window's fill, compactions, the session's cost and duration, and turn stats.
 - **Last turn**: how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, and the tools it called.
 - **Todos**: the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it.
+- **Autopick**: a switch that answers a question Claude asked and you left unanswered with the option Claude marked as recommended, after a wait you set. A countdown shows the time left, with Pick now and Cancel. The switch starts off.
 - **Skills**: the skills the conversation loaded, which agent loaded each one, and the ones still active.
 - **CI**: the GitHub Actions runs that a push, a pull request, a workflow dispatch or a rerun of the session started, with their jobs, a link and a notification when each run ends.
 - **Jira**: the Jira issues the chat mentions, with summary, status, priority and assignee, read through the Atlassian MCP server you connected.
@@ -125,6 +126,9 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`, or `??` in the Git tree) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff. In the Git tree, the diff is against HEAD |
 | Collapse or expand a folder | Press the folder |
 | Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom. The Git tree has collapse and expand only; `c` and `e` go to it while the Changes tree is not on screen |
+| Turn autopick on or off | Press `[ ] Answer unanswered questions` in the Autopick section, or run `/autopick on` or `/autopick off` |
+| Set the autopick wait | Press `−` or `+` in the Autopick section, or run `/autopick <minutes>`, 1 to 120 |
+| Answer a waiting question now, or stop its countdown | Press `Pick now` or `Cancel` on its row in the Autopick section |
 | Return to the prompt | `Esc` |
 
 Status colors follow your theme: green for created (`A`), yellow for modified (`M`), red and struck through for deleted (`D`). Chains of single-child folders collapse into one row, for example `src/app/ui`.
@@ -295,6 +299,35 @@ The tool and the prompt section use tokens on each request. Set `showTodos` to `
 
 The list belongs to the conversation: `/clear` empties it, a new session starts without one, and `/reload-plugins` keeps it.
 
+## What the Autopick section shows
+
+You start a long task and walk away, and the session stops on a question Claude asked in the first minute. With autopick on, a question that waits longer than the wait you set gets the option Claude recommended, and the work goes on.
+
+1. The question shows as usual and waits for you. The Autopick section shows a row with the countdown and the option it will pick: `◷ 7:32 Color? → Blue (Recommended)`.
+2. If you answer before the countdown ends, your answer goes through and autopick does nothing.
+3. If the countdown ends, autopick answers in your place with the recommended option of each question. Claude Code closes the question, and the transcript shows the answer as it would show yours, with a line that says autopick picked it.
+4. Claude also gets a note with the answer: you did not choose the option, so it is a default and not your decision, and its next reply must say what was picked.
+5. The section keeps the last pick: `✓ Picked 3m ago: Color? → Blue (Recommended)`.
+
+On the row of a waiting question:
+
+- **Pick now** answers with the recommended option at once. The note tells Claude that you accepted the default.
+- **Cancel** stops the countdown of that question. The row stays, dim, until you answer.
+
+Claude marks the option it recommends by putting it first and ending its label with `(Recommended)`, or with that word in the language of the question. Autopick takes the first option only when it carries that mark and no other option does. It knows the word in English, Portuguese, Spanish, Turkish, German, French, Italian, Dutch, Polish, Russian, Chinese, Japanese and Korean, and full-width parentheses count too. Three kinds of questions always wait for you, and their row says `No recommended option: the question waits for you.`:
+
+- A question whose first option has no mark.
+- A question where a second option has the mark too.
+- A question that takes several answers (`multiSelect`).
+
+When a call holds several questions, all of them need a recommended option, or the whole call waits.
+
+The switch and the wait are kept in the mod's store, so they stay across sessions and every open session uses the same values. The switch starts off, and the wait starts at 10 minutes. The `−` and `+` buttons step through 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90 and 120 minutes. Turning the switch off stops every countdown that runs. A change of the wait applies to the next question.
+
+**ask-autopick.** The [ask-autopick](https://github.com/KilimcininKorOglu/claude-code-mods/tree/main/plugins/ask-autopick) mod does the same work. When both answer the same question, the result is not defined, so autopick here stands aside while that mod is loaded: it looks for the `/ask-autopick` command in the session's command list. The section then shows `⚠ The ask-autopick mod is loaded and answers questions too`, and the switch does not turn on until you disable ask-autopick.
+
+Autopick answers questions for you: whatever the recommended option does, it is picked. Leave the switch off when a question can lead to a change you must approve. Set `showAutopick` to `false` to remove the section and the `/autopick` command.
+
 ## What the Skills section shows
 
 Each skill the conversation loaded, newest first: by the Skill tool (Claude's own choice, or a subagent's) or by a slash command you typed. The row shows the agent that loaded it, `main` for the main conversation, and how long ago.
@@ -355,6 +388,7 @@ Change these in `/config`:
 | `session-info.showTodos` | `true`, `false` | `true` |
 | `session-info.todoMinSteps` | A whole number from 1: the steps that call for a task list | `3` |
 | `session-info.todoInstruction` | Your own text for the prompt section that asks for the task list. Empty uses the built-in text | empty |
+| `session-info.showAutopick` | `true`, `false`. The switch and the wait are set in the section, not here | `true` |
 | `session-info.showSkills` | `true`, `false` | `true` |
 | `session-info.showCi` | `true`, `false` | `true` |
 | `session-info.showJira` | `true`, `false` | `true` |
@@ -366,8 +400,8 @@ Change these in `/config`:
 | `session-info.showGit` | `true`, `false` | `true` |
 | `session-info.gitClient` | A command, for example `lazygit`, `gitui` or `tig`. Put a path with spaces in double quotes. Empty turns it off | `lazygit` |
 | `session-info.showChanges` | `true`, `false` | `true` |
-| `session-info.tabGroups` | Sections that share one card as tabs: groups split by commas, sections by `+`, for example `changes+git, ci+jira+skills`. Names: `session`, `lastTurn`, `todos`, `skills`, `ci`, `jira`, `usage`, `agents`, `checks`, `git`, `changes`. The first section of a group is the tab it opens on. Empty gives each section its own card | `changes+git` |
-| `session-info.sectionOrder` | The sections in order, top to bottom, split by commas, for example `changes, git, session`. Same names as `tabGroups`. The sections not named follow in the default order; a tab group card sits where its first shown section sits. Empty keeps the default order | `session, lastTurn, todos, skills, ci, jira, usage, agents, checks, git, changes` |
+| `session-info.tabGroups` | Sections that share one card as tabs: groups split by commas, sections by `+`, for example `changes+git, ci+jira+skills`. Names: `session`, `lastTurn`, `todos`, `autopick`, `skills`, `ci`, `jira`, `usage`, `agents`, `checks`, `git`, `changes`. The first section of a group is the tab it opens on. Empty gives each section its own card | `changes+git` |
+| `session-info.sectionOrder` | The sections in order, top to bottom, split by commas, for example `changes, git, session`. Same names as `tabGroups`. The sections not named follow in the default order; a tab group card sits where its first shown section sits. Empty keeps the default order | `session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, checks, git, changes` |
 | `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
@@ -396,6 +430,7 @@ After every shell command, the mod also checks that each listed file still exist
 - **Binary files** are not handled. The snapshot stores text only.
 - **Checks of background commands** stay `running in background`: mods get no event when a background command ends, so the row updates on the next run of that kind.
 - **Check details** depend on the tool's output format. When a format is not recognized, the row shows the status and, for a failure, the last lines of the output. `rtk dotnet test` on a Microsoft.Testing.Platform project prints no counts when it passes, so the row says `passed`.
+- **Autopick** depends on Claude Code closing the question when the mod answers the call first. This was measured on Claude Code 2.1.296, for a pick after the wait and for Pick now pressed in the pane while the question was open; the mod API does not document it. Waits longer than 1 minute were not measured live. A question in a language whose word for "recommended" is not on the list waits for you. A copy of ask-autopick loaded under another name is not detected.
 - **Usage** shows only the windows Claude Code exposes to mods. The per-model weekly windows and the `~N tok/turn` total that `/usage` prints come from an endpoint mods cannot reach without your OAuth token, so they are left out.
 
 ## Development
@@ -413,6 +448,7 @@ claude --plugin-dir .
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
 | `hooks/context.ts` | The stacked context bar: slices, cell widths, legend lines |
+| `hooks/autopick.ts` | Which option autopick picks, its settings, the minute steps, the countdown and its texts |
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
 | `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, and its rows |
@@ -431,6 +467,8 @@ claude --plugin-dir .
 ## Credits
 
 The stacked context bar follows the design of [context-bar](https://github.com/hamzafer/claude-code-mods/tree/main/mods/context-bar) by Hamza Zafar (MIT).
+
+The Autopick section follows [ask-autopick](https://github.com/KilimcininKorOglu/claude-code-mods/tree/main/plugins/ask-autopick) by Kerem Gok (MIT): the rules that find the recommended option, its list of words for "recommended", and the note that tells Claude the pick was not your choice.
 
 ## License
 

@@ -106,6 +106,18 @@ export type AgentModel = { model: string; effort?: string }
 /** One skill the session loaded, by the Skill tool or a slash command; `agentId` is absent for the main conversation. */
 export type SkillUse = { name: string; agentId?: string; at: number; isActive: boolean }
 
+/** Whether autopick answers questions left unanswered, and the wait in minutes; kept in `$.store` across sessions. */
+export type AutopickSettings = { isOn: boolean; minutes: number }
+
+/**
+ * A question the Autopick section shows while its dialog is open. `picks` holds the recommended label per question,
+ * null when one question has none; `deadline` is when the pick happens, absent once the person cancelled the countdown.
+ */
+export type AutopickWait = { id: string; picks: Record<string, string> | null; at: number; deadline?: number }
+
+/** The last question autopick answered: what it picked, when, and whether the person pressed Pick now. */
+export type AutopickPick = { picks: Record<string, string>; at: number; minutes: number; isByHand: boolean }
+
 /** A GitHub Actions job as `gh run view --json jobs` reports it; `conclusion` is '' until the job completes. */
 export type CiJob = { name: string; status: string; conclusion: string }
 
@@ -198,6 +210,14 @@ declare module 'claude-code' {
       agentModels: Record<string, AgentModel>
       /** The active tab of each tab group, as `{ '#repo': '#changes' }`; a group not in it opens on its default tab. */
       tabs: Record<string, string>
+      /** A mirror of the autopick settings in `$.store`, so a change redraws the pane. */
+      autopick: AutopickSettings
+      /** The questions whose dialog is open, oldest first. */
+      autopickWaits: AutopickWait[]
+      /** The last pick of this conversation; null before the first one. */
+      autopickLast: AutopickPick | null
+      /** Whether the ask-autopick mod is loaded: it answers the same questions, so this switch stays off. */
+      autopickConflict: boolean
     }
   }
 }

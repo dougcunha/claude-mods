@@ -1,16 +1,17 @@
-export type SectionKey = '#session' | '#turn' | '#todos' | '#skills' | '#ci' | '#jira' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
+export type SectionKey = '#session' | '#turn' | '#todos' | '#autopick' | '#skills' | '#ci' | '#jira' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
 
 /** Sections that share one card as tabs; `key` folds the group and holds its active tab, the first member opens. */
 export type TabGroup = { key: string; members: SectionKey[] }
 
 /** Sections in the order the pane draws them. */
-export const ORDER: readonly SectionKey[] = ['#session', '#turn', '#todos', '#skills', '#ci', '#jira', '#usage', '#agents', '#checks', '#git', '#changes']
+export const ORDER: readonly SectionKey[] = ['#session', '#turn', '#todos', '#autopick', '#skills', '#ci', '#jira', '#usage', '#agents', '#checks', '#git', '#changes']
 
 /** The title a tab shows while another tab of its group is active. */
 export const TITLES: Record<SectionKey, string> = {
   '#session': 'Session',
   '#turn': 'Last turn',
   '#todos': 'Todos',
+  '#autopick': 'Autopick',
   '#skills': 'Skills',
   '#ci': 'CI',
   '#jira': 'Jira',
@@ -26,6 +27,7 @@ const SECTION_NAMES: Record<string, SectionKey> = {
   session: '#session',
   lastturn: '#turn',
   todos: '#todos',
+  autopick: '#autopick',
   skills: '#skills',
   ci: '#ci',
   jira: '#jira',

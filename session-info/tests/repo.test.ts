@@ -241,7 +241,7 @@ test('the Git section draws the changed files as a tree that folds and opens a d
   await $.session.start({ cwd: 'D:/repo/sub', surface: 'terminal', isInteractive: true })
   await clock.settle()
 
-  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 60 } })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 64 } })
   // The inactive Git tab counts the files git lists.
   expect(await ui.find({ type: 'Text', text: 'Git 6' })).toBeDefined()
   await ui.press({ key: 'tab:#git' })

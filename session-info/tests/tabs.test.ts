@@ -34,9 +34,9 @@ test('the section order puts the named sections first and the others after them 
   expect(parseSectionOrder(undefined)).toEqual(ORDER)
   expect(parseSectionOrder('')).toEqual(ORDER)
   // The value /config starts with names every section in the default order.
-  expect(parseSectionOrder('session, lastTurn, todos, skills, ci, jira, usage, agents, checks, git, changes')).toEqual(ORDER)
+  expect(parseSectionOrder('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, checks, git, changes')).toEqual(ORDER)
   expect(parseSectionOrder(' Agents ; nope, git+changes, agents, LastTurn')).toEqual([
-    '#agents', '#git', '#changes', '#turn', '#session', '#todos', '#skills', '#ci', '#jira', '#usage', '#checks',
+    '#agents', '#git', '#changes', '#turn', '#session', '#todos', '#autopick', '#skills', '#ci', '#jira', '#usage', '#checks',
   ])
 })
 

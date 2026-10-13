@@ -1,10 +1,12 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderChildren, RenderSurface } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
 
-import type { AgentModel, ChangeStatus, Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
+import type { AgentModel, AutopickPick, AutopickSettings, AutopickWait, ChangeStatus, Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentModelText, agentRows, agentSummary, withAgentModel } from './agents'
 import { crossings } from './alerts'
+import { AUTOPICK_USAGE, autopickSummary, countdown, DEFAULT_SETTINGS, hasRival, minutesOf, pickedLog, pickedNote, picksOf, picksText, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from './autopick'
+import type { Question } from './autopick'
 import type { AgentRow } from './agents'
 import { FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
@@ -53,6 +55,10 @@ const jiraServer = atom({ plugin: 'session-info', key: 'jiraServer' } as const, 
 const jiraIssues = atom({ plugin: 'session-info', key: 'jiraIssues' } as const, [] as JiraIssue[])
 const agentModels = atom({ plugin: 'session-info', key: 'agentModels' } as const, {} as Record<string, AgentModel>)
 const tabs = atom({ plugin: 'session-info', key: 'tabs' } as const, {} as Record<string, string>)
+const autopick = atom({ plugin: 'session-info', key: 'autopick' } as const, DEFAULT_SETTINGS as AutopickSettings)
+const autopickWaits = atom({ plugin: 'session-info', key: 'autopickWaits' } as const, [] as AutopickWait[])
+const autopickLast = atom({ plugin: 'session-info', key: 'autopickLast' } as const, null as AutopickPick | null)
+const autopickConflict = atom({ plugin: 'session-info', key: 'autopickConflict' } as const, false)
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
@@ -74,6 +80,12 @@ let jiraSite: { cloudId: string; url?: string } | undefined
 /** The name `$.mcp.call` took for the Jira server, found by the first call that went through. */
 let jiraName: string | undefined
 const reads = new Set<string>()
+
+/**
+ * The countdowns of one load of the module: the Pick now and Cancel actions of each question whose countdown runs, by
+ * tool_use_id, and the one-second tick that redraws them, stopped while none runs.
+ */
+type Countdowns = { controls: Map<string, { pick: () => void; cancel: () => void }>; ticker?: { cancel: () => void } }
 
 const toggle = (list: readonly string[], key: string): string[] =>
   list.includes(key) ? list.filter(one => one !== key) : [...list, key]
@@ -346,6 +358,127 @@ function noteText($: EngineInterface, text: string, pattern: RegExp | undefined,
   void noteIssues($, issueKeys(text, pattern), setting).catch(() => undefined)
 }
 
+/** Reads the autopick settings from the store, which every window shares, into the pane's mirror. */
+async function loadAutopick($: EngineInterface): Promise<AutopickSettings> {
+  const settings = settingsOf(await $.store.get(STORE_ON), await $.store.get(STORE_MINUTES))
+  const shown = await read($, autopick)
+  if (shown.isOn !== settings.isOn || shown.minutes !== settings.minutes) await update($, autopick, () => settings)
+
+  return settings
+}
+
+/** Whether ask-autopick is loaded; it answers the same questions, so autopick here stands aside while it is. */
+async function checkRival($: EngineInterface): Promise<boolean> {
+  const isLoaded = hasRival(await $.command.list())
+  if ((await read($, autopickConflict)) !== isLoaded) await update($, autopickConflict, () => isLoaded)
+
+  return isLoaded
+}
+
+/** Turning autopick off stops every countdown that runs: those questions wait for the person. */
+async function saveAutopick($: EngineInterface, live: Countdowns, change: Partial<AutopickSettings>): Promise<AutopickSettings> {
+  const settings = { ...(await loadAutopick($)), ...change }
+  await $.store.set(STORE_ON, settings.isOn)
+  await $.store.set(STORE_MINUTES, settings.minutes)
+  await update($, autopick, () => settings)
+  if (!settings.isOn) for (const control of [...live.controls.values()]) control.cancel()
+
+  return settings
+}
+
+async function switchAutopick($: EngineInterface, live: Countdowns): Promise<void> {
+  const isOn = !(await loadAutopick($)).isOn
+  if (isOn && (await checkRival($))) return void $.ui.toast('session-info: ask-autopick is loaded and answers questions too; disable it first.')
+  await saveAutopick($, live, { isOn })
+}
+
+/** `/autopick`, `/autopick on | off` and `/autopick <minutes>`. */
+async function runAutopick($: EngineInterface, live: Countdowns, args: string): Promise<{ text: string }> {
+  const arg = args.trim().toLowerCase()
+  const isBlocked = await checkRival($)
+  let settings = await loadAutopick($)
+  if (arg === 'on' || arg === 'off') {
+    if (arg === 'off' || !isBlocked) settings = await saveAutopick($, live, { isOn: arg === 'on' })
+  } else if (arg !== '') {
+    const minutes = minutesOf(arg)
+    if (minutes === undefined) return { text: AUTOPICK_USAGE }
+    settings = await saveAutopick($, live, { minutes })
+  }
+
+  return { text: statusText(settings, isBlocked) }
+}
+
+/** Redraws the pane each second while a countdown runs. */
+function syncTicker($: EngineInterface, live: Countdowns): void {
+  if (live.controls.size === 0) {
+    live.ticker?.cancel()
+    live.ticker = undefined
+  } else live.ticker ??= $.clock.every(1_000, () => $.ui.invalidate('ui.render'))
+}
+
+const dropWait = ($: EngineInterface, id: string) => update($, autopickWaits, list => (list ?? []).filter(wait => wait.id !== id))
+
+/**
+ * An AskUserQuestion call while autopick is on: the dialog opens as usual, and when the wait runs out (or the person
+ * presses Pick now) the hook answers the call with the recommended options in the person's place. The engine then
+ * closes the dialog and settles the abandoned `next(e)` as rejected, which the hook absorbs.
+ */
+async function answerOrPick($: EngineInterface, live: Countdowns, input: { tool_use_id?: string }, questions: readonly Question[], pending: Promise<ToolCallResult>): Promise<ToolCallResult> {
+  const settings = await read($, autopick)
+  const picks = picksOf(questions)
+  const at = await $.clock.now()
+  const id = input.tool_use_id ?? `ask-${at}`
+  const ms = settings.minutes * MINUTE
+  await update($, autopickWaits, list => [...(list ?? []), { id, picks: picks ?? null, at, ...(picks ? { deadline: at + ms } : {}) }])
+  if (picks === undefined) {
+    try {
+      return await pending
+    } finally {
+      await dropWait($, id)
+    }
+  }
+  let fire: (isByHand: boolean) => void = () => undefined
+  const fired = new Promise<boolean>(resolve => {
+    fire = resolve
+  })
+  const timer = $.clock.after(ms, () => fire(false))
+  live.controls.set(id, {
+    pick: () => {
+      timer.cancel()
+      fire(true)
+    },
+    cancel: () => {
+      timer.cancel()
+      live.controls.delete(id)
+      syncTicker($, live)
+      // The wait keeps its row without a deadline: the question is the person's again.
+      void update($, autopickWaits, list => (list ?? []).map(wait => (wait.id === id ? { id, picks: wait.picks, at: wait.at } : wait)))
+    },
+  })
+  syncTicker($, live)
+  try {
+    const first = await Promise.race([pending, fired])
+    if (typeof first !== 'boolean') return first
+    // Turned off in another window during the wait: the question stays for the person.
+    if (!first && !(await loadAutopick($)).isOn) {
+      live.controls.get(id)?.cancel()
+
+      return await pending
+    }
+    pending.catch(() => undefined)
+    const pick: AutopickPick = { picks, at: await $.clock.now(), minutes: settings.minutes, isByHand: first }
+    await update($, autopickLast, () => pick)
+    $.ui.log(pickedLog(pick))
+
+    return { result: { questions, answers: picks, annotations: {} }, context: [pickedNote(pick)] } as never
+  } finally {
+    timer.cancel()
+    live.controls.delete(id)
+    syncTicker($, live)
+    await dropWait($, id)
+  }
+}
+
 async function openPane($: EngineInterface, isGitShown: boolean, isSessionShown: boolean): Promise<{ text: string }> {
   if (isGitShown) void refreshRepo($)
   if (isSessionShown) void refreshContext($).catch(() => undefined)
@@ -372,7 +505,9 @@ export const register: Register = (on, options) => {
     git: options.showGit !== false,
     changes: options.showChanges !== false,
     jira: options.showJira !== false,
+    autopick: options.showAutopick !== false,
   }
+  const live: Countdowns = { controls: new Map() }
   const keyPattern = toKeyPattern(options.jiraKeyPattern)
   const gitClient = typeof options.gitClient === 'string' ? options.gitClient.trim() : 'lazygit'
   const paneBackground = typeof options.paneBackground === 'string' ? options.paneBackground.trim() : ''
@@ -409,6 +544,17 @@ export const register: Register = (on, options) => {
       void pollCi($).catch(() => undefined)
     }
     if (shows.jira) void findJiraServer($).catch(() => undefined)
+    if (shows.autopick) {
+      await $.command.register({
+        name: 'autopick',
+        description: 'Pick the recommended option of a question left unanswered: status, on, off, <minutes>',
+        argumentHint: '[on | off | <minutes>]',
+        immediate: true,
+      })
+      await loadAutopick($).catch(() => undefined)
+      // The other plugins register their commands in their own session.start: the check waits for them.
+      $.clock.after(5_000, () => void checkRival($).catch(() => undefined))
+    }
     // The engine draws a pane that the person did not ask for only on a wide terminal; a narrow one keeps it until /session-info.
     if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: TITLE })
 
@@ -425,6 +571,7 @@ export const register: Register = (on, options) => {
       if (shows.skills) await update($, skills, () => [])
       if (shows.jira) await update($, jiraIssues, () => [])
       if (shows.agents) await update($, agentModels, () => ({}))
+      if (shows.autopick) await update($, autopickLast, () => null)
     }
 
     return started
@@ -433,6 +580,8 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'session-info' }, async $ => openPane($, shows.git, shows.session))
 
   on('command.run', { command: 'changes' }, async $ => openPane($, shows.git, shows.session))
+
+  if (shows.autopick) on('command.run', { command: 'autopick' }, async ($, e) => runAutopick($, live, String(e.args ?? '')))
 
   // A commit made outside the session, in the Git client for example, shows by the next prompt.
   on('prompt.submit', async ($, e, next) => {
@@ -566,6 +715,7 @@ export const register: Register = (on, options) => {
 
   on('tool.call', async ($, e, next) => {
     if (shows.turn && e.agentId === undefined && draft !== undefined) draft = withTool(draft, e.tool)
+    if (e.tool === 'AskUserQuestion') return next(e)
     const isShell = (SHELLS as readonly string[]).includes(e.tool)
     const isChecked = shows.checks && isShell
     const isRepoTool = shows.git && FILE_TOOLS.includes(e.tool)
@@ -591,6 +741,17 @@ export const register: Register = (on, options) => {
     return ran
   }).catch(($, e, next) => next(e))
 
+  if (shows.autopick) {
+    // Registered after the general tool.call hook so it sits beneath it: the abandoned dialog's rejection stays here.
+    on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
+      const settings = await loadAutopick($)
+      if (!settings.isOn || (await checkRival($))) return next(e)
+      const questions = (e as { questions?: unknown }).questions
+
+      return answerOrPick($, live, e, Array.isArray(questions) ? (questions as Question[]) : [], next(e))
+    }).catch(($, e, next) => next(e))
+  }
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button, Code } = $.ui.resolve(e)
     const isTerminal = e.surface === 'terminal'
@@ -608,6 +769,7 @@ export const register: Register = (on, options) => {
       '#session': shows.session,
       '#turn': shows.turn,
       '#todos': shows.todos,
+      '#autopick': shows.autopick,
       '#skills': shows.skills,
       '#ci': shows.ci,
       '#jira': isJiraShown,
@@ -649,6 +811,12 @@ export const register: Register = (on, options) => {
     const turnRecord = shows.turn ? await read($, lastTurn) : null
     const taskList = shows.todos ? await read($, todos) : []
     const skillList = shows.skills ? await read($, skills) : []
+    const pickSettings = shows.autopick ? await read($, autopick) : DEFAULT_SETTINGS
+    const waits = shows.autopick ? await read($, autopickWaits) : []
+    const lastPick = shows.autopick ? await read($, autopickLast) : null
+    const isPickBlocked = shows.autopick && (await read($, autopickConflict))
+    // The countdowns and the last pick's age run on the engine's clock, the one their times were set by.
+    const clockNow = waits.length > 0 || lastPick ? await $.clock.now() : 0
     const ciWatch = shows.ci ? await read($, ciState) : null
     const ciRuns = ciWatch?.runs.slice(0, CI_ROOM) ?? []
     const issues = issueList.slice(0, JIRA_ROOM)
@@ -684,6 +852,8 @@ export const register: Register = (on, options) => {
     const jiraRows = counts('#jira') ? chrome + (isOpen('#jira') ? Math.max(1, issues.length * 2 + issues.filter(needsAllow).length) : 0) : 0
     const todoRoom = Math.min(taskList.length, TODO_ROOM)
     const todosRows = counts('#todos') ? chrome + (isOpen('#todos') ? Math.max(1, todoRoom + (taskList.length > todoRoom ? 1 : 0)) : 0) : 0
+    const autopickBody = 1 + (isPickBlocked ? 1 : 0) + waits.length + (lastPick ? 1 : 0)
+    const autopickRows = counts('#autopick') ? chrome + (isOpen('#autopick') ? autopickBody : 0) : 0
     const usageRows = counts('#usage') ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
     const legend = isDetailed && reading ? legendLines(reading, inner) : []
     const sessionRows = counts('#session') ? chrome + (isOpen('#session') ? 3 + legend.length : 0) : 0
@@ -700,7 +870,7 @@ export const register: Register = (on, options) => {
     const gitExtra = isGitTree && isChangesTree ? 4 : 0
     const gitRows = counts('#git') ? chrome + (isOpen('#git') ? repoRowCount(repo) + gitExtra : 0) : 0
     const changesFrame = counts('#changes') && isCards ? FRAME_ROWS : 0
-    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame
+    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + autopickRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame
     const room = isTerminal ? Math.max(3, (e.viewport?.rows ?? 30) - above - (diff ? 16 : 7)) : Number.MAX_SAFE_INTEGER
     // Two trees on screen split the room: the Git tree takes up to half, the Changes tree the rest.
     const gitRoom = isChangesTree ? Math.min(gitTree.length, Math.max(3, Math.floor(room / 2))) : room
@@ -726,6 +896,7 @@ export const register: Register = (on, options) => {
         '#skills': skillList.length,
         '#jira': issueList.length,
         '#todos': taskList.length,
+        '#autopick': waits.length,
         '#agents': agents.length,
       }
 
@@ -985,6 +1156,81 @@ export const register: Register = (on, options) => {
       isOpen('#todos') && taskList.length === 0 && <Text dimColor>No task list yet. Claude writes one for work with several steps.</Text>,
       isOpen('#todos') && taskList.slice(0, todoRoom).map(todoLine),
       isOpen('#todos') && taskList.length > todoRoom && <Text dimColor>{`… ${taskList.length - todoRoom} more`}</Text>,
+    ])
+
+    const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
+
+    const autopickSwitch = (
+      <Box flexDirection="row" justifyContent="space-between">
+        <Button plain key="autopick-switch" onPress={() => void switchAutopick($, live).catch(toast)}>
+          <Text color={pickSettings.isOn ? 'success' : undefined} dimColor={!pickSettings.isOn}>
+            {pickSettings.isOn ? '[x]' : '[ ]'}
+          </Text>
+          {' Answer unanswered questions'}
+        </Button>
+        <Box flexDirection="row" gap={1} flexShrink={0} paddingLeft={1}>
+          <Text dimColor>after</Text>
+          <Button plain key="autopick-less" onPress={() => void saveAutopick($, live, { minutes: stepMinutes(pickSettings.minutes, -1) }).catch(toast)}>
+            <Text color="suggestion">−</Text>
+          </Button>
+          <Text>{`${pickSettings.minutes} min`}</Text>
+          <Button plain key="autopick-more" onPress={() => void saveAutopick($, live, { minutes: stepMinutes(pickSettings.minutes, 1) }).catch(toast)}>
+            <Text color="suggestion">+</Text>
+          </Button>
+        </Box>
+      </Box>
+    )
+
+    const waitLine = (wait: AutopickWait) => {
+      const control = live.controls.get(wait.id)
+      const isCounting = wait.deadline !== undefined && control !== undefined
+
+      return (
+        <Box flexDirection="row" justifyContent="space-between">
+          {/* One-cell glyphs and a gap, not trailing spaces: an emoji glyph draws two cells and eats the space after it. */}
+          <Box flexDirection="row" flexShrink={1} gap={1}>
+            <Box flexShrink={0}>
+              <Text color={isCounting ? 'warning' : undefined} dimColor={!isCounting}>
+                {isCounting ? `◷ ${countdown((wait.deadline ?? 0) - clockNow)}` : '◌'}
+              </Text>
+            </Box>
+            <Text dimColor={!isCounting} wrap="truncate-end">
+              {wait.picks === null ? 'No recommended option: the question waits for you.' : picksText(wait.picks)}
+            </Text>
+          </Box>
+          {isCounting && (
+            <Box flexDirection="row" gap={2} flexShrink={0} paddingLeft={1}>
+              <Button plain key={`autopick-pick:${wait.id}`} onPress={() => control.pick()}>
+                <Text color="suggestion">Pick now</Text>
+              </Button>
+              <Button plain key={`autopick-cancel:${wait.id}`} onPress={() => control.cancel()}>
+                <Text color="suggestion">Cancel</Text>
+              </Button>
+            </Box>
+          )}
+        </Box>
+      )
+    }
+
+    const autopickSection = section('#autopick', [
+      header(
+        '#autopick',
+        'Autopick',
+        '',
+        <Text color={pickSettings.isOn ? 'success' : undefined} dimColor={!pickSettings.isOn}>
+          {autopickSummary(pickSettings)}
+        </Text>,
+      ),
+      isOpen('#autopick') && autopickSwitch,
+      isOpen('#autopick') && isPickBlocked && (
+        <Text color="warning" wrap="truncate-end">
+          ⚠ The ask-autopick mod is loaded and answers questions too: this switch stays off until you disable it.
+        </Text>
+      ),
+      isOpen('#autopick') && waits.map(waitLine),
+      isOpen('#autopick') && lastPick && (
+        <Text dimColor wrap="truncate-end">{`✓ Picked ${age(clockNow - lastPick.at)} ago: ${picksText(lastPick.picks)}`}</Text>
+      ),
     ])
 
     const skillLine = (use: SkillUse) => {
@@ -1307,6 +1553,7 @@ export const register: Register = (on, options) => {
       '#session': sessionSection,
       '#turn': turnSection,
       '#todos': todosSection,
+      '#autopick': autopickSection,
       '#skills': skillsSection,
       '#ci': ciSection,
       '#jira': jiraSection,
