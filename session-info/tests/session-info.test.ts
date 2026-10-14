@@ -559,7 +559,12 @@ test('the trees fit the window the pane body gets, and a body taller than its wi
   on('fs.write', async () => ({ value: undefined }))
   on('fs.exists', async () => ({ value: true }))
   on('process.run', async () => ({ value: ran('', 128) }))
-  on('ui.scroll', async () => ({}))
+  let handedToPane = 0
+  on('ui.scroll', async () => {
+    handedToPane++
+
+    return {}
+  })
   on('tool.call', { tool: 'Write' }, async (_, e) =>
     ({ result: { type: 'create', filePath: e.file_path, content: '', structuredPatch: [], originalFile: null } }) as never)
   for (let index = 0; index < 30; index++) await $.tool.call({ tool: 'Write', file_path: `/repo/src/file-${String(index).padStart(2, '0')}.ts`, content: 'x' })
@@ -571,11 +576,25 @@ test('the trees fit the window the pane body gets, and a body taller than its wi
   expect(shown).toBeLessThanOrEqual(6)
 
   const wheel = { component: 'Pane', requestId: 'session-info', offset: 0, by: 4, bodyRows: 16, contentRows: 40, origin: { kind: 'person' } } as const
+  const overList = { column: 0, row: 44 }
   await $.ui.scroll(wheel as never)
+  await $.ui.scroll({ ...wheel, pointer: { column: 0, row: 999 } } as never)
+  expect(handedToPane).toBe(2)
   expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
-  await $.ui.scroll({ ...wheel, contentRows: 40, pointer: { column: 0, row: 999 } } as never)
-  expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
-  await $.ui.scroll({ ...wheel, contentRows: 16 } as never)
+  await $.ui.scroll({ ...wheel, pointer: overList } as never)
+  expect(handedToPane).toBe(2)
   expect(await ui.find({ type: 'Text', text: /↑ 4 above/ })).toBeDefined()
+  await $.ui.scroll({ ...wheel, by: -4, pointer: overList } as never)
+  expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
+  await $.ui.scroll({ ...wheel, by: -4, pointer: overList } as never)
+  expect(handedToPane).toBe(3)
+  for (let press = 0; press < 7; press++) await $.ui.scroll({ ...wheel, pointer: overList } as never)
+  expect(await ui.find({ type: 'Text', text: /↓ 0 below/ })).toBeDefined()
+  expect(handedToPane).toBe(3)
+  await $.ui.scroll({ ...wheel, pointer: overList } as never)
+  expect(handedToPane).toBe(4)
+  await $.ui.scroll({ ...wheel, contentRows: 16 } as never)
+  expect(handedToPane).toBe(4)
+  expect(await ui.find({ type: 'Text', text: /↓ 0 below/ })).toBeDefined()
   await ui.unmount()
 })

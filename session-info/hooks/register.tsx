@@ -24,7 +24,7 @@ import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_C
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
 import { moveCard, orderText, parseSectionOrder, parseTabGroups, showOption, TITLES } from './tabs'
 import type { SectionKey, TabGroup } from './tabs'
-import { clampOffset, MIN_LIST_ROWS, movedTo, offsetAt, scrollbar, targetAt, targetNear } from './scrollbar'
+import { clampOffset, MIN_LIST_ROWS, movedTo, offsetAt, POINTER_SLACK, scrollbar, targetAt, targetNear } from './scrollbar'
 import type { ScrollTarget, ScrollView } from './scrollbar'
 import { SHELLS, track } from './track'
 import { cost, countText, duration, NO_TURNS, tokens, turnLine } from './session'
@@ -63,8 +63,6 @@ const autopickLast = atom({ plugin: 'session-info', key: 'autopickLast' } as con
 const autopickConflict = atom({ plugin: 'session-info', key: 'autopickConflict' } as const, false)
 const layout = atom({ plugin: 'session-info', key: 'layout' } as const, false)
 const changesTop = atom({ plugin: 'session-info', key: 'changesTop' } as const, 0)
-/** Rows the wheel may be off the list the mod placed, which is an estimate of the rows above it. */
-const POINTER_SLACK = 2
 const gitTop = atom({ plugin: 'session-info', key: 'gitTop' } as const, 0)
 
 const PANE = 'session-info'
@@ -822,17 +820,19 @@ export const register: Register = (on, options) => {
   /** The trees that leave rows out, as the last draw placed them in the body; none while every tree shows whole. */
   let scrollTargets: ScrollTarget[] = []
 
-  /** Where the engine scrolled the pane body to when it last drew: a row of the body is that many rows further down the tree. */
-  let bodyOffset = 0
-
   on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
-    const treeRow = e.pointer === undefined ? undefined : e.pointer.row + bodyOffset
+    // The event carries the offset the engine scrolled the body to: a row of the body is that many rows further down the tree.
+    const treeRow = e.pointer === undefined ? undefined : e.pointer.row + e.offset
     // A body taller than its window scrolls as a whole under the engine; the wheel goes to a list only over it, and the keys then stay with the engine.
     const isClipped = e.contentRows > e.bodyRows
     const target = isClipped ? (treeRow === undefined ? undefined : targetNear(scrollTargets, treeRow, POINTER_SLACK)) : targetAt(scrollTargets, treeRow)
     if (target === undefined) return next(e)
-    if (target.key === 'git') await update($, gitTop, from => movedTo(from, e.by, target))
-    else await update($, changesTop, from => movedTo(from, e.by, target))
+    const from = target.key === 'git' ? await read($, gitTop) : await read($, changesTop)
+    const to = movedTo(from, e.by, target)
+    // A list at its end hands the wheel to the pane, so the sections past it stay reachable.
+    if (isClipped && to === from) return next(e)
+    if (target.key === 'git') await update($, gitTop, () => to)
+    else await update($, changesTop, () => to)
 
     return {}
   }).catch(($, e, next) => next(e))
@@ -966,7 +966,6 @@ export const register: Register = (on, options) => {
     const above = tileRows + usageRows + sessionRows + turnRows + todosRows + autopickRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame + footerRows
     // The terminal's height is a guess at what the pane may take; the window Claude Code gives the body is the limit, and a tree taller than it is clipped.
     const bodyRows = e.props.scroll?.bodyRows ?? Number.MAX_SAFE_INTEGER
-    bodyOffset = e.props.scroll?.offset ?? 0
     const room = isTerminal ? Math.max(MIN_LIST_ROWS, Math.min((e.viewport?.rows ?? 30) - above - (diff ? 16 : 7), bodyRows - above - (diff ? 16 : 7))) : Number.MAX_SAFE_INTEGER
     // Two trees on screen split the room: the Git tree takes up to half, the Changes tree the rest.
     const gitRoom = isChangesTree ? Math.min(gitTree.length, Math.max(MIN_LIST_ROWS, Math.floor(room / 2))) : room
