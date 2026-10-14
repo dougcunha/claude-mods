@@ -538,14 +538,44 @@ test('the Changes tree scrolls in a window with a scrollbar when it leaves rows 
   expect(await ui.find({ type: 'Text', text: /^file-00\.ts$/ })).toBeUndefined()
 
   await ui.press({ key: 'changes-up' })
-  expect(await ui.find({ type: 'Text', text: /↑ 2 above/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
   await ui.press({ key: 'changes-down' })
-  expect(await ui.find({ type: 'Text', text: /↑ 4 above/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /↑ 5 above/ })).toBeDefined()
   await ui.press({ key: 'changes-bar:0' })
   expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
   const last = (await ui.findAll({ type: 'Button' })).filter(button => button.key?.startsWith('changes-bar:')).length - 1
   await ui.press({ key: `changes-bar:${last}` })
   expect(await ui.find({ type: 'Text', text: /↓ 0 below/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^file-29\.ts$/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the trees fit the window the pane body gets, and a body taller than its window scrolls as a whole', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.id', async () => ({ value: 'sid' }))
+  on('session.usage', async () => usage([]))
+  on('env.get', async () => ({ value: undefined }))
+  on('fs.write', async () => ({ value: undefined }))
+  on('fs.exists', async () => ({ value: true }))
+  on('process.run', async () => ({ value: ran('', 128) }))
+  on('ui.scroll', async () => ({}))
+  on('tool.call', { tool: 'Write' }, async (_, e) =>
+    ({ result: { type: 'create', filePath: e.file_path, content: '', structuredPatch: [], originalFile: null } }) as never)
+  for (let index = 0; index < 30; index++) await $.tool.call({ tool: 'Write', file_path: `/repo/src/file-${String(index).padStart(2, '0')}.ts`, content: 'x' })
+
+  const props = { ...PANE.props, scroll: { offset: 0, bodyRows: 16 } }
+  const ui = await $.ui.mount({ ...PANE, props, surface: 'terminal', viewport: { columns: 80, rows: 80 } } as never)
+  const shown = (await ui.findAll({ type: 'Text', text: /^file-\d+\.ts$/ })).length
+  expect(shown).toBeGreaterThan(0)
+  expect(shown).toBeLessThanOrEqual(6)
+
+  const wheel = { component: 'Pane', requestId: 'session-info', offset: 0, by: 4, bodyRows: 16, contentRows: 40, origin: { kind: 'person' } } as const
+  await $.ui.scroll(wheel as never)
+  expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
+  await $.ui.scroll({ ...wheel, contentRows: 40, pointer: { column: 0, row: 999 } } as never)
+  expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
+  await $.ui.scroll({ ...wheel, contentRows: 16 } as never)
+  expect(await ui.find({ type: 'Text', text: /↑ 4 above/ })).toBeDefined()
   await ui.unmount()
 })

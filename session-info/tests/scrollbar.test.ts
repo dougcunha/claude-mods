@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { clampOffset, movedTo, offsetAt, scrollbar, targetAt } from '../hooks/scrollbar'
+import { clampOffset, movedTo, offsetAt, scrollbar, targetAt, targetNear } from '../hooks/scrollbar'
 import type { ScrollTarget } from '../hooks/scrollbar'
 
 const git: ScrollTarget = { key: 'git', start: 4, rows: 6, overflow: 10 }
@@ -52,4 +52,13 @@ test('pressing the track jumps from the top of the list to the last window', asy
   expect(offsetAt(9, 20, 10)).toBe(10)
   expect(offsetAt(4, 20, 10)).toBe(4)
   expect(offsetAt(3, 8, 10)).toBe(0)
+})
+
+test('a crowded wheel moves at most one window, and the list is found only near the pointer', async () => {
+  expect(movedTo(0, 27, git)).toBe(6)
+  expect(movedTo(9, -27, git)).toBe(3)
+  expect(targetNear([git, changes], 11, 2)).toBe(git)
+  expect(targetNear([git, changes], 12, 2)).toBe(changes)
+  expect(targetNear([git, changes], 40, 2)).toBeUndefined()
+  expect(targetNear([], 5, 2)).toBeUndefined()
 })

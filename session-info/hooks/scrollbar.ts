@@ -28,8 +28,19 @@ export function targetAt(targets: readonly ScrollTarget[], row: number | undefin
   return targets.reduce<ScrollTarget | undefined>((nearest, target) => (nearest === undefined || gapTo(target, row) < gapTo(nearest, row) ? target : nearest), undefined)
 }
 
-/** The offset after a move of `by` rows, held between the first row and the last window. */
-export const movedTo = (from: number, by: number, target: ScrollTarget): number => Math.min(Math.max(0, from + by), target.overflow)
+/** Rows a list always gets, even when the cards above leave less room: the pane then scrolls as a whole, and the wheel over the list still moves the list. */
+export const MIN_LIST_ROWS = 6
+
+/** The tree whose list the pointer is over, give or take `slack` rows; none when the pointer is elsewhere. */
+export function targetNear(targets: readonly ScrollTarget[], row: number, slack: number): ScrollTarget | undefined {
+  const near = targets.filter(target => gapTo(target, row) <= slack)
+
+  return near.reduce<ScrollTarget | undefined>((nearest, target) => (nearest === undefined || gapTo(target, row) < gapTo(nearest, row) ? target : nearest), undefined)
+}
+
+/** The offset after a move of `by` rows, at most one window at a time, held between the first row and the last window. */
+export const movedTo = (from: number, by: number, target: ScrollTarget): number =>
+  Math.min(Math.max(0, from + Math.sign(by) * Math.min(Math.abs(by), target.rows)), target.overflow)
 
 /** One tree's window as the pane draws it: its rows, the first one shown, the rows that fit, and how a press moves it. */
 export type ScrollView = { id: string; total: number; from: number; room: number; jump: (to: number) => void; isKeyed: boolean }
