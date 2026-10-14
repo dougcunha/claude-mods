@@ -1,3 +1,5 @@
 # Laid by Claude Code when it loads a mod; regenerated on every load
 .claude-plugin/types/
 node_modules/
+.agents/
+.claude/
