@@ -534,5 +534,16 @@ test('the Changes tree scrolls in a window with a scrollbar when it leaves rows 
   await $.ui.scroll(wheel as never)
   expect(await ui.find({ type: 'Text', text: /↑ 4 above/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^file-00\.ts$/ })).toBeUndefined()
+
+  await ui.press({ key: 'changes-up' })
+  expect(await ui.find({ type: 'Text', text: /↑ 2 above/ })).toBeDefined()
+  await ui.press({ key: 'changes-down' })
+  expect(await ui.find({ type: 'Text', text: /↑ 4 above/ })).toBeDefined()
+  await ui.press({ key: 'changes-bar:0' })
+  expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
+  const last = (await ui.findAll({ type: 'Button' })).filter(button => button.key?.startsWith('changes-bar:')).length - 1
+  await ui.press({ key: `changes-bar:${last}` })
+  expect(await ui.find({ type: 'Text', text: /↓ 0 below/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^file-29\.ts$/ })).toBeDefined()
   await ui.unmount()
 })

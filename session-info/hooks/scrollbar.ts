@@ -25,3 +25,10 @@ export function targetAt(targets: readonly ScrollTarget[], row: number | undefin
 
 /** The offset after a move of `by` rows, held between the first row and the last window. */
 export const movedTo = (from: number, by: number, target: ScrollTarget): number => Math.min(Math.max(0, from + by), target.overflow)
+
+/** One tree's window as the pane draws it: its rows, the first one shown, the rows that fit, and how a press moves it. */
+export type ScrollView = { id: string; total: number; from: number; room: number; jump: (to: number) => void; isKeyed: boolean }
+
+/** The first row the window takes when the track is pressed at `index`: the top of the track is the top of the list, its bottom the last window. */
+export const offsetAt = (index: number, total: number, room: number): number =>
+  clampOffset(Math.round((index / Math.max(1, room - 1)) * (total - room)), total, room)

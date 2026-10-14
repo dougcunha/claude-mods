@@ -24,8 +24,8 @@ import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_C
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
 import { moveCard, orderText, parseSectionOrder, parseTabGroups, showOption, TITLES } from './tabs'
 import type { SectionKey, TabGroup } from './tabs'
-import { clampOffset, movedTo, scrollbar, targetAt } from './scrollbar'
-import type { ScrollTarget } from './scrollbar'
+import { clampOffset, movedTo, offsetAt, scrollbar, targetAt } from './scrollbar'
+import type { ScrollTarget, ScrollView } from './scrollbar'
 import { SHELLS, track } from './track'
 import { cost, countText, duration, NO_TURNS, tokens, turnLine } from './session'
 import { latestTodos, minSteps, parseTodos, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoPrompt, todoReply, todoSummary, todoText } from './todos'
@@ -962,6 +962,9 @@ export const register: Register = (on, options) => {
     const changesRoom = isGitTree ? Math.max(3, room - gitRoom) : room
     const changesFrom = clampOffset(await read($, changesTop), rows.length, changesRoom)
     const gitFrom = clampOffset(await read($, gitTop), gitTree.length, gitRoom)
+    // Without the Changes tree on screen, its hotkeys are free for the Git tree.
+    const gitView: ScrollView = { id: 'git', total: gitTree.length, from: gitFrom, room: gitRoom, jump: to => void update($, gitTop, () => to), isKeyed: !counts('#changes') }
+    const changesView: ScrollView = { id: 'changes', total: rows.length, from: changesFrom, room: changesRoom, jump: to => void update($, changesTop, () => to), isKeyed: true }
     // Where each list starts in the body, from the rows the sections above are known to take: the frame's top border, the header and the rows before the list.
     const listTop = (isCards ? 1 : 0) + 1
     const fixedRows: Partial<Record<SectionKey, number>> = {
@@ -1208,23 +1211,42 @@ export const register: Register = (on, options) => {
     )
 
     /** The rows of a tree from `from` on, each with its slice of the scrollbar once the tree leaves rows out. */
-    const scrolled = <T,>(list: Row<T>[], from: number, room: number, draw: (row: Row<T>) => RenderChildren) => {
-      const bar = scrollbar(list.length, room, from)
+    const scrolled = <T,>(list: Row<T>[], view: ScrollView, draw: (row: Row<T>) => RenderChildren) => {
+      const bar = scrollbar(view.total, view.room, view.from)
 
-      return list.slice(from, from + room).map((row, index) =>
+      return list.slice(view.from, view.from + view.room).map((row, index) =>
         bar.length === 0 ? (
           draw(row)
         ) : (
           <Box flexDirection="row" justifyContent="space-between">
             {draw(row)}
-            <Text dimColor>{bar[index]}</Text>
+            <Button plain key={`${view.id}-bar:${index}`} onPress={() => view.jump(offsetAt(index, view.total, view.room))}>
+              <Text dimColor>{bar[index]}</Text>
+            </Button>
           </Box>
         ),
       )
     }
 
-    const scrollHint = (total: number, from: number, room: number) =>
-      total > room && <Text dimColor>{`↑ ${from} above · ↓ ${total - from - room} below · wheel or arrows scroll`}</Text>
+    /** The row under the list: a page up and a page down, which work where the wheel and the arrows do not reach, and where the window stands. */
+    const scrollControls = (view: ScrollView) => {
+      const page = Math.max(1, view.room - 1)
+      const key = (letter: string) => (view.isKeyed ? { hotkey: letter } : {})
+
+      return (
+        view.total > view.room && (
+          <Box flexDirection="row" gap={2}>
+            <Button key={`${view.id}-up`} {...key('u')} onPress={() => view.jump(clampOffset(view.from - page, view.total, view.room))}>
+              ▲
+            </Button>
+            <Button key={`${view.id}-down`} {...key('d')} onPress={() => view.jump(clampOffset(view.from + page, view.total, view.room))}>
+              ▼
+            </Button>
+            <Text dimColor>{`↑ ${view.from} above · ↓ ${view.total - view.from - view.room} below`}</Text>
+          </Box>
+        )
+      )
+    }
 
     const line = (row: Row) => {
       const status = row.change?.status
@@ -1635,8 +1657,8 @@ export const register: Register = (on, options) => {
       const hotkey = (key: string) => (counts('#changes') ? {} : { hotkey: key })
 
       return [
-        scrolled(gitTree, gitFrom, gitRoom, repoLine(repo)),
-        scrollHint(gitTree.length, gitFrom, gitRoom),
+        scrolled(gitTree, gitView, repoLine(repo)),
+        scrollControls(gitView),
         unlisted > 0 && <Text dimColor>{`… ${unlisted} more files not listed`}</Text>,
         <Box flexDirection="row" marginTop={1} gap={2}>
           <Button
@@ -1686,8 +1708,8 @@ export const register: Register = (on, options) => {
 
     const changesBody = isOpen('#changes') && [
       rows.length === 0 && <Text dimColor>No files changed in this session yet.</Text>,
-      scrolled(rows, changesFrom, changesRoom, line),
-      scrollHint(rows.length, changesFrom, changesRoom),
+      scrolled(rows, changesView, line),
+      scrollControls(changesView),
       <Box flexDirection="row" marginTop={1} gap={2}>
         <Button
           key="collapse"
