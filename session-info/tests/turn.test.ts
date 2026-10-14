@@ -1,6 +1,6 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
-import { cacheHit, modelText, resultText, startDraft, tokensText, toolsText, toRecord, turnLines, withSpawn, withStep, withSubagentUsage, withTool } from '../hooks/turn'
+import { cacheHit, modelText, refusedText, resultText, startDraft, tokensText, toolsText, toRecord, turnLines, withRefusal, withSpawn, withStep, withSubagentUsage, withTool } from '../hooks/turn'
 
 const PANE = {
   plugin: 'session-info',
@@ -101,4 +101,59 @@ test('tools fold past four names, MCP tools show their own name, and the cache s
   expect(toolsText(toRecord(startDraft('t'), { turnId: 't', durationMs: 0, reason: 'answer' }, undefined, 0))).toBe('No tool calls')
   expect(cacheHit({ input: 0, output: 10, cacheRead: 0, cacheWrite: 0 })).toBeUndefined()
   expect(cacheHit({ input: 10, output: 0, cacheRead: 30, cacheWrite: 0 })).toBe(75)
+})
+
+test('a call the permission check refused in the main turn shows under its tools', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.usage', async () => ({ value: { startedAt: 0, rateLimits: [], context: { window: 200_000 } } }) as never)
+  on('turn.start', async (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', async (_, e) => ({ text: e.answer }))
+  on('tool.check', async (_, e) =>
+    (e.tool === 'Bash' ? { decision: 'deny', reason: 'Denied by rule', rule: 'Bash(rm:*)' } : { decision: 'deny', reason: 'dontAsk' }) as never)
+
+  await $.turn.start({ text: 'clean up', turnId: 't1' })
+  await $.tool.check({ tool: 'Bash', input: { command: 'rm -rf dist' }, tool_use_id: 'toolu_1' } as never)
+  await $.tool.check({ tool: 'mcp__web__fetch', input: {}, tool_use_id: 'toolu_2' } as never)
+  await $.tool.check({ tool: 'Bash', input: { command: 'rm a' } } as never)
+  await $.tool.check({ tool: 'Bash', input: { command: 'rm b' }, tool_use_id: 'toolu_3', agentId: 'a1' } as never)
+  await $.turn.complete({ answer: 'done', durationMs: 1_000, isAborted: false, turnId: 't1', reason: 'answer' })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: '⊘ 2 refused: Bash (Bash(rm:*)) · fetch (mode)' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the refused row names what decided and folds past four calls', () => {
+  let draft = startDraft('t')
+  draft = withRefusal(draft, 'Bash', { decision: 'deny', rule: 'Bash(git push:*)' })
+  draft = withRefusal(draft, 'Edit', { decision: 'deny', hook: 'PreToolUse' })
+  draft = withRefusal(draft, 'Read', { decision: 'deny', setting: 'permissions.blockReadsOutsideWorkingDirectories' })
+  draft = withRefusal(withRefusal(draft, 'Write', { decision: 'deny' }), 'Bash', { decision: 'deny' })
+  const record = toRecord(draft, { turnId: 't', durationMs: 0, reason: 'answer' }, undefined, 0)
+  expect(refusedText(record)).toBe('⊘ 5 refused: Bash (Bash(git push:*)) · Edit (PreToolUse) · Read (permissions.blockReadsOutsideWorkingDirectories) · Write (mode) · +1 more')
+  expect(turnLines(record)).toContain(refusedText(record))
+  const quiet = toRecord(startDraft('t'), { turnId: 't', durationMs: 0, reason: 'answer' }, undefined, 0)
+  expect(quiet.refused).toBeUndefined()
+  expect(refusedText(quiet)).toBe('')
+})
+
+test('a conversation the mod joins late counts its turns from the transcript', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.usage', async () => ({ value: { startedAt: 0, rateLimits: [], context: { window: 200_000 } } }) as never)
+  mock.clock(on)
+  on('session.start', async (_, e) => ({ cwd: e.cwd }))
+  on('command.register', async (_, e) => ({ value: { command: e.name } }))
+  on('tool.register', async (_, e) => ({ value: { tool: `mcp__session-info__${e.name}` } }) as never)
+  on('process.run', async () => ({ value: { exitCode: 128, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('session.messages', async () => ({ value: [] }))
+  on('session.turns', async () => ({ value: 7 }))
+  on('turn.complete', async (_, e) => ({ text: e.answer }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.turn.complete({ answer: 'done', durationMs: 1_000, isAborted: false, turnId: 't8', reason: 'answer' })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: '▾ Last turn #8' })).toBeDefined()
+  await ui.unmount()
 })

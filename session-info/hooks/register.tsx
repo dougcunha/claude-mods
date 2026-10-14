@@ -12,7 +12,7 @@ import { FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './card
 import type { Tile } from './cards'
 import { openClient } from './client'
 import { cellWidths, contextText, GLYPH, LEGEND_GAP, legendLines, legendText, SWATCH, toReading } from './context'
-import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, NO_CHECKS, toPattern } from './checks'
+import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, fixSuggestion, NO_CHECKS, toPattern } from './checks'
 import { CI_POLL_MS, CI_ROOM, CI_STATUS, ciTrigger, isWatching, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from './ci'
 import type { CheckView, Patterns } from './checks'
 import { gitStatus } from './git'
@@ -26,11 +26,12 @@ import { moveCard, orderText, parseSectionOrder, parseTabGroups, showOption, TIT
 import type { SectionKey, TabGroup } from './tabs'
 import { clampOffset, MIN_LIST_ROWS, movedTo, offsetAt, POINTER_SLACK, scrollbar, targetAt, targetNear } from './scrollbar'
 import type { ScrollTarget, ScrollView } from './scrollbar'
+import { finishedRuns, taskEnds, withFinished } from './tasks'
 import { SHELLS, track } from './track'
 import { cost, countText, duration, NO_TURNS, tokens, turnLine } from './session'
 import { latestTodos, minSteps, parseTodos, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoPrompt, todoReply, todoSummary, todoText } from './todos'
 import { buildTree, flatten } from './tree'
-import { modelText, RESULT, resultText, startDraft, toolsText, tokensText, toRecord, turnLines, withSpawn, withStep, withSubagentUsage, withTool } from './turn'
+import { modelText, refusedText, RESULT, resultText, startDraft, toolsText, tokensText, toRecord, turnLines, withRefusal, withSpawn, withStep, withSubagentUsage, withTool } from './turn'
 import type { TurnDraft } from './turn'
 import type { Row } from './tree'
 import { bar, colorOf, labelOf, ordered, percentText, resetIn } from './usage'
@@ -86,6 +87,10 @@ let jiraSite: { cloudId: string; url?: string } | undefined
 let jiraName: string | undefined
 /** /clear commands run since this load; $.state starts over with each /clear, so the count lives here. */
 let clearCount = 0
+/** How long a fix suggestion the busy prompt box refused waits for its second try. */
+const FIX_RETRY_MS = 1_500
+/** The fix the prompt box proposes after a turn left a failed check, until the next prompt; the key names the run it is for. */
+let fix: { key: string; text: string; isOpen: boolean } | undefined
 /** After a session.end the state switches at once, but the session id and its usage only some time later. */
 const SWITCH_POLL_MS = 200
 const SWITCH_LIMIT_MS = 10_000
@@ -178,11 +183,38 @@ async function inspect($: EngineInterface, input: Record<string, unknown>, ran: 
     command,
     text: typeof ran.text === 'string' ? ran.text : fallback,
     isError,
-    isBackground: typeof result.backgroundTaskId === 'string',
+    taskId: typeof result.backgroundTaskId === 'string' ? result.backgroundTaskId : undefined,
     isAgent: input.agentId !== undefined,
     persistedPath: typeof result.persistedOutputPath === 'string' ? result.persistedOutputPath : undefined,
   }, Date.now())
   await update($, checks, current => runs.reduce((all, run) => ({ ...all, [run.kind]: run }), current ?? NO_CHECKS))
+}
+
+/** Proposes a fix of the failed check in the empty prompt box, once per failed run; a box still busy gets one more try. */
+async function suggestFix($: EngineInterface): Promise<void> {
+  const suggestion = fixSuggestion(await read($, checks))
+  if (suggestion === undefined || suggestion.key === fix?.key) return
+  const open = { ...suggestion, isOpen: true }
+  fix = open
+  const shown = await $.prompt.suggest({ text: open.text }).catch(() => ({ isShown: false }))
+  if (!shown.isShown)
+    $.clock.after(FIX_RETRY_MS, () => {
+      if (fix === open && open.isOpen) void $.prompt.suggest({ text: open.text }).catch(() => undefined)
+    })
+}
+
+/** A conversation the mod joins with turns behind it, by a resume or an install, counts them from the prompts in its transcript. */
+async function seedTurns($: EngineInterface): Promise<void> {
+  const sent = await $.session.turns()
+  await update($, turns, stats => ((stats ?? NO_TURNS).count > 0 ? (stats ?? NO_TURNS) : { ...(stats ?? NO_TURNS), count: sent }))
+}
+
+/** Reads the checks of each background command whose task the notification says ended. */
+async function finishTasks($: EngineInterface, text: string): Promise<void> {
+  for (const end of taskEnds(text)) {
+    const runs = await finishedRuns(hostOf($), await read($, checks), end, Date.now())
+    if (runs.length > 0) await update($, checks, current => withFinished(current ?? NO_CHECKS, end, runs))
+  }
 }
 
 /** Reads the repository into the Git section; a call made while a read runs makes that read go once more. */
@@ -546,6 +578,7 @@ export const register: Register = (on, options) => {
   const paneBackground = typeof options.paneBackground === 'string' ? options.paneBackground.trim() : ''
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
+  const isSuggestingFix = shows.checks && options.suggestFix !== false
   const order = parseSectionOrder(options.sectionOrder)
   const groups = parseTabGroups(options.tabGroups)
   const groupOf = new Map(groups.flatMap(group => group.members.map(key => [key, group] as const)))
@@ -575,6 +608,7 @@ export const register: Register = (on, options) => {
       })
     if (shows.git) void refreshRepo($)
     if (shows.session) void refreshContext($).catch(() => undefined)
+    void seedTurns($).catch(() => undefined)
     if (shows.ci) {
       $.clock.every(CI_POLL_MS, () => void pollCi($).catch(() => undefined))
       // A reload during a run picks the watch up again from the state.
@@ -626,6 +660,7 @@ export const register: Register = (on, options) => {
       const isResume = e.reason === 'resume'
       afterSwitch($, e.sessionId, async () => {
         if (shows.todos && isResume) await restoreTodos($).catch(() => undefined)
+        if (isResume) await seedTurns($).catch(() => undefined)
         if (shows.git) void refreshRepo($)
         if (shows.jira) await findJiraServer($).catch(() => undefined)
         if (shows.autopick) {
@@ -651,6 +686,10 @@ export const register: Register = (on, options) => {
   // A commit made outside the session, in the Git client for example, shows by the next prompt.
   on('prompt.submit', async ($, e, next) => {
     if (shows.git) void refreshRepo($)
+    if (fix) fix.isOpen = false
+    // A background command's end reaches the session as a notification prompt, the one place its exit status shows.
+    if (shows.checks && e.origin?.kind === 'task-notification')
+      void finishTasks($, e.text).catch(error => $.ui.toast(`session-info: ${String(error)}`))
     if (shows.jira) {
       // MCP servers connect after the session starts: each prompt looks again until one serves Jira.
       void findJiraServer($).catch(() => undefined)
@@ -717,6 +756,15 @@ export const register: Register = (on, options) => {
 
       return next(e)
     })
+
+    // Only reads the verdict: a query (no tool_use_id) and a subagent's call leave the main turn's record alone.
+    on('tool.check', async ($, e, next) => {
+      const verdict = await next(e)
+      if (verdict.decision === 'deny' && e.agentId === undefined && e.tool_use_id !== undefined && draft !== undefined)
+        draft = withRefusal(draft, e.tool, verdict)
+
+      return verdict
+    }).catch(($, e, next) => next(e))
   }
 
   if (shows.turn || shows.agents) {
@@ -755,9 +803,14 @@ export const register: Register = (on, options) => {
       const usage = await $.session.usage().catch(() => undefined)
       await update($, lastTurn, () => toRecord(own, e, usage?.cost?.usd, Date.now()))
     }
+    if (isSuggestingFix && e.agentId === undefined) await suggestFix($).catch(() => undefined)
 
     return answered
   })
+
+  if (isSuggestingFix)
+    // The engine's own guess can come after the fix: the fix stays the suggestion until the next prompt.
+    on('prompt.suggest', async ($, e, next) => (fix?.isOpen && e.origin.kind === 'suggestion' ? next({ ...e, text: fix.text }) : next(e)))
 
   on('agent.spawn', async ($, e, next) => {
     const spawned = await next(e)
@@ -1312,6 +1365,7 @@ export const register: Register = (on, options) => {
 
     const turnModel = turnRecord ? modelText(turnRecord) : ''
     const turnTools = turnRecord ? toolsText(turnRecord) : ''
+    const turnRefused = turnRecord ? refusedText(turnRecord) : ''
     // The turn counter and the record update in the same turn.complete, so the count numbers the turn shown.
     const turnCount = (stats ?? NO_TURNS).count
     const turnSection = section('#turn', [
@@ -1325,6 +1379,7 @@ export const register: Register = (on, options) => {
       isOpen('#turn') && turnRecord && turnModel !== '' && <Text wrap="truncate-end">{turnModel}</Text>,
       isOpen('#turn') && turnRecord && <Text dimColor wrap="truncate-end">{tokensText(turnRecord)}</Text>,
       isOpen('#turn') && turnRecord && turnTools !== '' && <Text dimColor wrap="truncate-end">{turnTools}</Text>,
+      isOpen('#turn') && turnRecord && turnRefused !== '' && <Text color="warning" wrap="truncate-end">{turnRefused}</Text>,
     ])
 
     const todoLine = (todo: Todo) => {

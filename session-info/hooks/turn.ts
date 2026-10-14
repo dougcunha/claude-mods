@@ -1,4 +1,4 @@
-import type { TurnReason, TurnRecord, TurnTokens } from '../types'
+import type { TurnReason, TurnRecord, TurnRefusal, TurnTokens } from '../types'
 
 import { cost, duration, tokens } from './session'
 
@@ -10,8 +10,12 @@ export type TurnDraft = {
   effort?: string
   requests: number
   tools: Record<string, number>
+  refused: TurnRefusal[]
   subagents: { count: number; tokens: number }
 }
+
+/** What `tool.check` resolved to, as far as the refused row reads it. */
+export type CheckVerdict = { decision: string; rule?: string; hook?: string; setting?: string }
 
 /** A turn's or a response's token counts, as `turn.complete` reports them. */
 export type TurnUsage = {
@@ -41,6 +45,7 @@ export const startDraft = (turnId: string, costBefore?: number): TurnDraft => ({
   ...(costBefore === undefined ? {} : { costBefore }),
   requests: 0,
   tools: {},
+  refused: [],
   subagents: { count: 0, tokens: 0 },
 })
 
@@ -59,6 +64,12 @@ export function withStep(draft: TurnDraft, step: TurnStep): TurnDraft {
 export const withTool = (draft: TurnDraft, tool: string): TurnDraft => ({
   ...draft,
   tools: { ...draft.tools, [tool]: (draft.tools[tool] ?? 0) + 1 },
+})
+
+/** A call the permission check refused, with what decided: the rule as written, the hook, the setting, else the mode. */
+export const withRefusal = (draft: TurnDraft, tool: string, verdict: CheckVerdict): TurnDraft => ({
+  ...draft,
+  refused: [...draft.refused, { tool, cause: verdict.rule ?? verdict.hook ?? verdict.setting ?? 'mode' }],
 })
 
 export const withSpawn = (draft: TurnDraft): TurnDraft => ({
@@ -99,6 +110,7 @@ export function toRecord(draft: TurnDraft | undefined, end: TurnEnd, costAfter: 
     ...(own === undefined || own.requests === 0 ? {} : { requests: own.requests }),
     tokens,
     ...(own === undefined ? {} : { tools: own.tools }),
+    ...(own === undefined || own.refused.length === 0 ? {} : { refused: own.refused }),
     subagents: own?.subagents ?? { count: 0, tokens: 0 },
     ...(costBefore === undefined || costAfter === undefined ? {} : { costUsd: Math.max(0, costAfter - costBefore) }),
   }
@@ -153,6 +165,16 @@ export function toolsText(record: TurnRecord): string {
   return record.tools === undefined ? '' : 'No tool calls'
 }
 
+/** `⊘ 2 refused: Bash (Bash(rm:*)) · WebFetch (mode)`, the first refusals in order; '' when none. */
+export function refusedText(record: TurnRecord): string {
+  const refused = record.refused ?? []
+  if (refused.length === 0) return ''
+  const shown = refused.slice(0, TOOL_ROOM).map(({ tool, cause }) => `${toolName(tool)} (${cause})`)
+  const more = refused.length > TOOL_ROOM ? [`+${refused.length - TOOL_ROOM} more`] : []
+
+  return `⊘ ${refused.length} refused: ${[...shown, ...more].join(' · ')}`
+}
+
 /** The rows of the section body, empty ones left out. */
 export const turnLines = (record: TurnRecord): string[] =>
-  [modelText(record), tokensText(record), toolsText(record)].filter(line => line !== '')
+  [modelText(record), tokensText(record), toolsText(record), refusedText(record)].filter(line => line !== '')

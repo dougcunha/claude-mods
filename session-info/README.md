@@ -3,7 +3,7 @@
 A Claude Code mod with one pane and twelve sections:
 
 - **Session**: the context window's fill, compactions and /clear commands, the session's cost and duration, and turn stats.
-- **Last turn**: how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, and the tools it called.
+- **Last turn**: how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, the tools it called, and the calls the permission check refused.
 - **Todos**: the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it.
 - **Autopick**: a switch that answers a question Claude asked and you left unanswered with the option Claude marked as recommended, after a wait you set. A countdown shows the time left, with Pick now and Cancel. The switch starts off.
 - **Skills**: the skills the conversation loaded, which agent loaded each one, and the ones still active.
@@ -11,7 +11,7 @@ A Claude Code mod with one pane and twelve sections:
 - **Jira**: the Jira issues the chat mentions, with summary, status, priority and assignee, read through the Atlassian MCP server you connected.
 - **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
 - **Agents**: the session's subagents and teammates with their status, model and effort, children under the agent that spawned them.
-- **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests. .NET, Node, Bun, Rust, Go and Python tools are recognized.
+- **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests, and a prompt that asks Claude to fix a failure. .NET, Node, Bun, Rust, Go and Python tools are recognized.
 - **Git**: the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, the submodules that changed, and every file `git status` lists, in a treeview like the Changes one. Pressing a file opens its diff against HEAD; pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
 - **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
@@ -78,7 +78,7 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 | Clears | `/clear` commands run since the mod loaded, by hand or by another mod (`· 3 clears`); it shows after the first reply that follows a `/clear` |
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
 
-The turn, compaction and clear counts start when the mod loads, so a reload or a newly installed mod starts them at zero.
+The compaction and clear counts start when the mod loads, so a newly installed mod starts them at zero. When the mod joins a conversation that already has turns, after a resume or an install, the turn count starts from the prompts in its transcript.
 
 After a `/clear` or a `/resume` in the same process, Claude Code starts the next conversation with empty pane state and raises no start event for it. The mod waits until the session id changes, then reads the context, the repository, the Autopick switch and the Jira server again and, on a resume, the task list from the transcript.
 
@@ -94,8 +94,9 @@ The section shows the last turn of the main conversation. It updates when the tu
 | Model | The model of the last request of the turn, the effort it sent, and how many model requests the turn made |
 | Tokens | Input, output, cache read and cache write tokens, summed over the turn's requests, and the share of the input that the prompt cache served (`cache read / (input + cache read + cache write)`) |
 | Tools | The tools the main conversation called in the turn, most-called first, four names and then `+N more`. An MCP tool shows by its own name. Then the subagents the turn spawned and the tokens of the subagent runs that ended during the turn |
+| Refused | The calls of the main conversation that the permission check refused in the turn (`⊘ 2 refused: Bash (Bash(rm:*)) · WebFetch (mode)`), in order, four and then `+N more`. Each names what decided: the settings rule as written, the hook (`PreToolUse`), the setting, or `mode` for the permission mode. The row shows only when a call was refused |
 
-The token counts of the main turn do not include its subagents; the Tools row shows them apart. A subagent that runs in the background and ends after the turn is not counted. When the mod loads while a turn runs, for example after a reload, that turn's record has no effort, request count, tools or cost. `/clear` empties the section.
+The token counts of the main turn do not include its subagents; the Tools row shows them apart. The Refused row reads the verdict that Claude Code's rules, permission mode and hooks give before a call runs. A call that you refuse in the permission dialog, or that the auto-mode classifier refuses, is not in it: the mod gets no verdict for those. A subagent that runs in the background and ends after the turn is not counted. When the mod loads while a turn runs, for example after a reload, that turn's record has no effort, request count, tools or cost. `/clear` empties the section.
 
 ## What the Agents section shows
 
@@ -136,11 +137,24 @@ The status comes from the command's exit code; an interrupted or timed-out comma
 | --- | --- |
 | A failed build | The error count and the first error lines (`file(line,col): code: message`). With no recognizable error line, the last lines of the output |
 | A test run | `12 passed`, or `2 failed / 120` with the first failed test names. A test run that did not compile shows the compile errors |
-| A command run in the background | `running in background`, until the next run of that kind |
+| A command run in the background | `running in background` until its task ends. Claude Code then sends the session a notification with the task's status and output file; the mod reads that file and shows the result as for a command in the foreground |
 
 The output is read as the model got it: raw, filtered by RTK, or localized. Localized .NET output (`Com falha! – Com falha: 2, Aprovado: 1, …`) is read by its structure, not its words. When RTK cut the output and points to the whole log (`[full output: …]`), or wrote a vitest JSON report in its place, the mod reads that file for the counts and names.
 
 The readers were checked against real output of `dotnet build` and `dotnet test` (VSTest and Microsoft.Testing.Platform, English and Portuguese), tsc, jest, vitest, `node --test`, Bun and `cargo test`, each with and without RTK. Go and pytest are read by their documented formats. For the other tools, the status comes from the exit code, and the counts and failed names show when the output has a format the mod already reads, such as `claude plugin test`, which prints Bun's.
+
+### Fix suggestion
+
+When a turn of the main conversation ends and the last build or test run failed, the mod proposes a prompt in the empty prompt box, dim, for Tab to take:
+
+| Failure | Prompt |
+| --- | --- |
+| Build with an error count | `Fix the 2 build errors` |
+| Build without an error count | `Fix the failed build` |
+| Test run with failed test names | `Fix the 2 failed tests: Subtract_Fails, Divide_Throws`, three names and then `and N more` |
+| Test run without names | `Fix the 3 failed tests`, or `Fix the failed test run` |
+
+A failed build comes first, because a build that fails often explains the failed tests. Each failed run gets one proposal: the next turn proposes again only for a new failed run. Until you send the next prompt, the proposal replaces the suggestion that Claude Code makes after a turn. Claude Code shows no proposal while the prompt box holds text. Set `suggestFix` to `false` to turn it off.
 
 ## What the Git section shows
 
@@ -365,6 +379,7 @@ Change these in `/config`, or move and hide the cards in [layout mode](#arrange-
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
 | `session-info.showChecks` | `true`, `false` | `true` |
+| `session-info.suggestFix` | `true`, `false`: propose a prompt that fixes a failed build or test run after the turn | `true` |
 | `session-info.showGit` | `true`, `false` | `true` |
 | `session-info.gitClient` | A command, for example `lazygit`, `gitui` or `tig`. Put a path with spaces in double quotes. Empty turns it off | `lazygit` |
 | `session-info.showChanges` | `true`, `false` | `true` |
@@ -399,7 +414,7 @@ After every shell command, the mod also checks that each listed file still exist
 - **Tree scrolling** places each list in the pane from the rows the sections above it are expected to take, and the wheel finds a list within 2 rows of where the mod placed it. When the pane is taller than its window, a wheel just outside that margin scrolls the pane instead of the list.
 - **The diff viewer** runs as a child of the mod, so it closes when the mod reloads. On Linux the terminal window of the Git client does too.
 - **Binary files** are not handled. The snapshot stores text only.
-- **Checks of background commands** stay `running in background`: mods get no event when a background command ends, so the row updates on the next run of that kind.
+- **Checks of background commands** end when the task's notification reaches the session, not when the command ends. A newer run of the same kind replaces the row first, and the notification of the older run changes nothing. When the task's output file is gone, the row shows the status alone.
 - **Check details** depend on the tool's output format. When a format is not recognized, the row shows the status and, for a failure, the last lines of the output. `rtk dotnet test` on a Microsoft.Testing.Platform project prints no counts when it passes, so the row says `passed`.
 - **Autopick** depends on Claude Code closing the question when the mod answers the call first. This was measured on Claude Code 2.1.296, for a pick after the wait and for Pick now pressed in the pane while the question was open; the mod API does not document it. Waits longer than 1 minute were not measured live. A question in a language whose word for "recommended" is not on the list waits for you. A copy of ask-autopick loaded under another name is not detected.
 - **Usage** shows only the windows Claude Code exposes to mods. The per-model weekly windows and the `~N tok/turn` total that `/usage` prints come from an endpoint mods cannot reach without your OAuth token, so they are left out.
@@ -414,7 +429,7 @@ claude --plugin-dir .
 
 | File | Role |
 | --- | --- |
-| `hooks/register.tsx` | The commands, the `tool.call`, `prompt.submit`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh timer and the pane |
+| `hooks/register.tsx` | The commands, the `tool.call`, `tool.check`, `prompt.submit`, `prompt.suggest`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh timer and the pane |
 | `hooks/cards.tsx` | Framed cards, the tiles row and how the tiles wrap |
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
@@ -422,7 +437,8 @@ claude --plugin-dir .
 | `hooks/autopick.ts` | Which option autopick picks, its settings, the minute steps, the countdown and its texts |
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
-| `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, and its rows |
+| `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, its rows and the fix prompt |
+| `hooks/tasks.ts` | Reads a background task's end from its notification and finishes the check that waits on it |
 | `hooks/parse.ts` | Reads error lines, error counts, test counts and failed test names from build and test output |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |
 | `hooks/git.ts` | `git status`, `HEAD` content and snapshots |

@@ -13,11 +13,13 @@ export type CheckStatus = 'passed' | 'failed' | 'running'
 /**
  * A build or test command the session ran: its status, and what its output said.
  * `errors` holds the first error lines of a failed run; `failures` the names of the failed tests.
+ * `taskId` names the background task of a run that is still running, whose notification ends it.
  */
 export type CheckRun = {
   kind: CheckKind
   status: CheckStatus
   command: string
+  taskId?: string
   at: number
   isAgent: boolean
   errors: string[]
@@ -74,13 +76,16 @@ export type ContextReading = { slices: ContextSlice[]; total: number; window: nu
 
 export type TurnReason = 'answer' | 'aborted' | 'refusal' | 'error'
 
+/** A tool call the permission check refused: the tool and what decided, a settings rule, a hook, a setting or the mode. */
+export type TurnRefusal = { tool: string; cause: string }
+
 /** Token counts the API reported, summed over the requests of a turn. */
 export type TurnTokens = { input: number; output: number; cacheRead: number; cacheWrite: number }
 
 /**
  * The last main-thread turn, as the Last turn section draws it.
  * `requests`, `effort` and `tools` are absent when the mod loaded while the turn ran;
- * `costUsd` is absent when the session reports no cost.
+ * `costUsd` is absent when the session reports no cost; `refused` is absent when no call was refused.
  */
 export type TurnRecord = {
   at: number
@@ -91,6 +96,7 @@ export type TurnRecord = {
   requests?: number
   tokens: TurnTokens | null
   tools?: Record<string, number>
+  refused?: TurnRefusal[]
   subagents: { count: number; tokens: number }
   costUsd?: number
 }

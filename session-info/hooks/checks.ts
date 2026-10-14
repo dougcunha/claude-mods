@@ -9,19 +9,19 @@ export const NO_CHECKS: Checks = { build: null, test: null }
 
 export type Patterns = { build?: RegExp; test?: RegExp }
 
-/** A finished shell call, as `tool.call` resolved it. */
+/** A finished shell call, as `tool.call` resolved it; `taskId` names the background task of a command still running. */
 export type ShellRun = {
   command: string
   text: string
   isError: boolean
-  isBackground: boolean
   isAgent: boolean
+  taskId?: string
   persistedPath?: string
 }
 
 const MAX_ERRORS = 3
 const MAX_FAILURES = 5
-const MAX_READ = 1_000_000
+export const MAX_READ = 1_000_000
 
 // Each segment of a shell command is matched against these, so the lists stay anchored and free of nested repeats.
 const TEST = [
@@ -147,7 +147,7 @@ function testRun(base: Base, text: string, whole: string | undefined, report: Re
 /** One record per check the command ran, read from its output and any whole copy of it on disk. */
 export async function checkRuns(host: Host, kinds: readonly CheckKind[], shell: ShellRun, at: number): Promise<CheckRun[]> {
   const base: Base = { command: (shell.command.split('\n')[0] ?? '').trim(), at, isAgent: shell.isAgent }
-  if (shell.isBackground) return kinds.map(kind => ({ ...base, kind, status: 'running', errors: [], failures: [] }))
+  if (shell.taskId !== undefined) return kinds.map(kind => ({ ...base, kind, status: 'running', taskId: shell.taskId, errors: [], failures: [] }))
 
   const text = clean(shell.text)
   const whole = await readClean(host, shell.persistedPath ?? fullOutputPath(text, (await host.env()).home))
@@ -199,6 +199,27 @@ export const checkWhen = (run: CheckRun, now: number): string =>
 /** The section header's right side: `✓ build  ✖ tests`. */
 export function checkSummary(checks: Checks): string {
   return checkViews(checks).map(({ run }) => `${CHECK_STATUS[run.status].glyph} ${run.kind === 'build' ? 'build' : 'tests'}`).join('  ')
+}
+
+/** Failed test names the fix prompt lists before the rest fold into `and N more`. */
+const FIX_ROOM = 3
+
+function testFix(run: CheckRun): string {
+  const count = run.failed ?? run.failures.length
+  if (count === 0) return 'Fix the failed test run'
+  const names = run.failures.slice(0, FIX_ROOM).join(', ')
+  const more = run.failures.length > FIX_ROOM ? ` and ${run.failures.length - FIX_ROOM} more` : ''
+
+  return `Fix the ${plural(count, 'failed test')}${names === '' ? '' : `: ${names}${more}`}`
+}
+
+/** The prompt that asks for a fix of the failed build, else of the failed tests, which a failed build often explains; the key names the run. */
+export function fixSuggestion(checks: Checks): { key: string; text: string } | undefined {
+  const run = [checks.build, checks.test].find(one => one?.status === 'failed')
+  if (!run) return undefined
+  const text = run.kind === 'test' ? testFix(run) : run.errorCount ? `Fix the ${plural(run.errorCount, 'build error')}` : 'Fix the failed build'
+
+  return { key: `${run.kind}@${run.at}`, text }
 }
 
 export const checkRowCount = (views: readonly CheckView[]): number =>

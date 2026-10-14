@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { checkRuns, checkViews, classify, toPattern } from '../hooks/checks'
+import { checkRuns, checkViews, classify, fixSuggestion, toPattern } from '../hooks/checks'
 import type { ShellRun } from '../hooks/checks'
 import type { Host } from '../hooks/host'
 import { buildErrorCount, buildErrors, clean, failedTests, fullOutputPath, testCounts, vitestReport } from '../hooks/parse'
@@ -201,7 +201,7 @@ const one = async (...args: Parameters<typeof checkRuns>): Promise<CheckRun> => 
 }
 
 const shell = (text: string, more: Partial<ShellRun> = {}): ShellRun =>
-  ({ command: 'dotnet test', text, isError: text.startsWith('Exit code'), isBackground: false, isAgent: false, ...more })
+  ({ command: 'dotnet test', text, isError: text.startsWith('Exit code'), isAgent: false, ...more })
 
 test('classifies build and test commands through wrappers and compound commands', async () => {
   expect(classify('dotnet build dn-build --no-restore')).toEqual(['build'])
@@ -348,7 +348,7 @@ test('the RTK vitest report and tee log fill in what the text lacks', async () =
 })
 
 test('a background run shows as running; views summarize each check', async () => {
-  const running = await one(host(), ['test'], shell('', { isBackground: true }), 0)
+  const running = await one(host(), ['test'], shell('', { taskId: 'b1' }), 0)
   expect(running.status).toBe('running')
 
   const build = await one(host(), ['build'], shell(BUILD_RTK_FAILED, { command: 'dotnet build' }), 0)
@@ -388,4 +388,62 @@ test('the checks section shows the last build and test run of any agent', async 
   await ui.press({ key: 'section:#checks' })
   expect(await ui.find({ type: 'Text', text: '  12 passed' })).toBeUndefined()
   await ui.unmount()
+})
+
+test('the fix prompt asks for the failed build first, then names the failed tests', () => {
+  const base = { command: 'dotnet test', at: 4, isAgent: false, errors: [], failures: [] }
+  const build: CheckRun = { ...base, kind: 'build', status: 'failed', errorCount: 2 }
+  const tests: CheckRun = { ...base, kind: 'test', status: 'failed', failed: 5, failures: ['A', 'B', 'C', 'D'] }
+  expect(fixSuggestion({ build, test: tests })).toEqual({ key: 'build@4', text: 'Fix the 2 build errors' })
+  expect(fixSuggestion({ build: { ...build, errorCount: undefined }, test: null })?.text).toBe('Fix the failed build')
+  expect(fixSuggestion({ build: { ...build, status: 'passed' }, test: tests })?.text).toBe('Fix the 5 failed tests: A, B, C and 1 more')
+  expect(fixSuggestion({ build: null, test: { ...tests, failed: undefined, failures: ['A'] } })?.text).toBe('Fix the 1 failed test: A')
+  expect(fixSuggestion({ build: null, test: { ...tests, failed: undefined, failures: [] } })?.text).toBe('Fix the failed test run')
+  expect(fixSuggestion({ build: null, test: { ...tests, status: 'running' } })).toBeUndefined()
+})
+
+/** A session whose shell runs a failing test run, with the prompt box's suggestions kept in `shown`. */
+function failingSession(on: Parameters<Parameters<typeof test>[1] & ((...args: never[]) => unknown)>[1], shown: string[]) {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.usage', async () => usage)
+  on('env.get', async () => ({ value: undefined }))
+  on('process.run', async () => ({ value: { exitCode: 128, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('turn.complete', async (_, e) => ({ text: e.answer }))
+  on('prompt.submit', async (_, e) => ({ text: e.text }) as never)
+  on('prompt.suggest', async (_, e) => {
+    shown.push(e.text)
+
+    return { isShown: true }
+  })
+  on('tool.call', { tool: 'Bash' }, async () => ({ isError: true, result: MTP_RAW_PT, text: MTP_RAW_PT }) as never)
+}
+
+const FIX = 'Fix the 2 failed tests: Subtract_Fails, Divide_Throws'
+
+test('a turn that leaves a failed test run proposes its fix once, over the suggestion of Claude Code', async ($, on) => {
+  const shown: string[] = []
+  failingSession(on, shown)
+
+  await $.tool.call({ tool: 'Bash', command: 'dotnet test' })
+  await $.turn.complete({ answer: 'done', durationMs: 1_000, isAborted: false, turnId: 't1', reason: 'answer' })
+  expect(shown).toEqual([FIX])
+
+  await $.prompt.suggest({ text: 'commit this', origin: { kind: 'suggestion' } } as never)
+  expect(shown).toEqual([FIX, FIX])
+
+  await $.prompt.submit({ text: 'later', origin: { kind: 'composer' }, wait: false } as never)
+  await $.prompt.suggest({ text: 'commit this', origin: { kind: 'suggestion' } } as never)
+  await $.turn.complete({ answer: 'done', durationMs: 1_000, isAborted: false, turnId: 't2', reason: 'answer' })
+  expect(shown).toEqual([FIX, FIX, 'commit this'])
+})
+
+test('suggestFix false proposes nothing', { options: { suggestFix: false } }, async ($, on) => {
+  const shown: string[] = []
+  failingSession(on, shown)
+
+  await $.tool.call({ tool: 'Bash', command: 'dotnet test' })
+  await $.turn.complete({ answer: 'done', durationMs: 1_000, isAborted: false, turnId: 't1', reason: 'answer' })
+  await $.prompt.suggest({ text: 'commit this', origin: { kind: 'suggestion' } } as never)
+  expect(shown).toEqual(['commit this'])
 })
