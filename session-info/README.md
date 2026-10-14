@@ -97,9 +97,11 @@ The `sectionOrder` option sets the order of the sections, top to bottom, for exa
 
 ## Screenshot
 
-The pane in a fullscreen terminal, with two subagents, a passed build and test run, and the context legend unfolded:
+The pane in a fullscreen terminal at the start of a task: an autopick countdown on a question, a task list with its first task in progress, and an active skill:
 
-![The session-info pane: tiles, Session with the stacked context bar, Usage, Agents, Checks, Git and Changes](images/pane.png)
+![The session-info pane: tiles, Session with the stacked context bar, Usage, Autopick with a countdown, Todos, Last turn, Skills, Agents, Checks and Changes](images/overview.png)
+
+Each section that follows has its own screenshot from the same session.
 
 ## Install
 
@@ -137,6 +139,8 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 
 ## What the Session section shows
 
+![The Session section with the context legend unfolded: each category's tokens and share, the free space, the compact buffer and the turn stats](images/session.png)
+
 | Row | Source |
 | --- | --- |
 | Cost and elapsed (tiles) | The session's cost as `/cost` totals it and the time since the session started. In a narrow pane, they move to the section header |
@@ -153,6 +157,8 @@ After a `/clear` or a `/resume` in the same process, Claude Code starts the next
 
 The section shows the last turn of the main conversation. It updates when the turn ends.
 
+![The Last turn section: the turn number, result, duration and cost, then the model, effort and request count, the token and cache counts, and the tools called](images/last-turn.png)
+
 | Row | Source |
 | --- | --- |
 | Header | The turn's number (`#14`), how the turn ended (`✓ answer`, `⊘ aborted`, `✖ refusal`, `✖ error`), its duration, and its cost: the session's cost when the turn ended minus the cost when it started, so it includes the subagents that ran during the turn |
@@ -163,6 +169,8 @@ The section shows the last turn of the main conversation. It updates when the tu
 The token counts of the main turn do not include its subagents; the Tools row shows them apart. A subagent that runs in the background and ends after the turn is not counted. When the mod loads while a turn runs, for example after a reload, that turn's record has no effort, request count, tools or cost. `/clear` empties the section.
 
 ## What the Agents section shows
+
+![The Agents section with two completed Explore subagents, each with its model, effort and task](images/agents.png)
 
 Every agent loop of the session, as Claude Code lists it: subagents the model or a plugin spawned and teammates. Each row shows a status glyph, the agent's name (or its type), its model and effort, and its task description:
 
@@ -181,6 +189,8 @@ Active agents come first; an agent spawned by another is indented under it. Clau
 The model comes from the agent's spawn and then from each of its model requests; the effort comes from its requests only, so it shows after the agent's first request. The last request wins, so a fallback model shows too. An agent that started before the mod loaded shows its model and effort after its next request; one that ended before that shows neither. `/clear` forgets them.
 
 ## What the Checks section shows
+
+![The Checks section with a passed build and a passed test run of 112 tests](images/checks.png)
 
 One row for the last build and one for the last test run, from any shell command the session ran, a subagent's included (marked `agent`). A command counts when one of its segments runs a known tool, so `cd app && npm test` and `rtk dotnet test …` count too. The runners in front of a tool and their options are skipped: `rtk`, `env`, `time`, `npx`/`bunx`/`uvx` (so `npx -y -p typescript tsc` is `tsc`), `pnpm`/`yarn exec` and `dlx`, `uv`/`poetry`/`pipenv`/`hatch run`, `bundle exec` and variable assignments such as `CI=1`.
 
@@ -206,6 +216,8 @@ The readers were checked against real output of `dotnet build` and `dotnet test`
 ## What the Git section shows
 
 The section shows the repository of the session's folder and only what differs from a clean state. A row with nothing to say is left out, so a clean repository takes one row under the header.
+
+![The Git tab of the Changes and Git card: the branch, the working-tree counts, the last commit and the treeview of changed files](images/git.png)
 
 ```text
 ▾ Git                                   g: ⎇ main ↑2 ↓1
@@ -261,6 +273,8 @@ A usage window alerts again after it resets; the context alert re-arms once the 
 
 ## How usage updates
 
+![The Usage section with the current session and current week bars and their reset countdowns](images/usage.png)
+
 The bars read the same figures as `/usage` and the status line. Claude Code learns them from each API response, so they move after a reply, not while the session is idle. The pane redraws when a window moves a whole point, and once a minute so the reset countdown stays current.
 
 The section shows each window Claude Code reports: the current session (`five_hour`), the current week (`seven_day`) and a gateway's spend limit. A bar and its percentage are green below 50%, yellow from 50%, orange from 70% and red from 90%. The single-color context bar uses the same scale. On API-key or other non-subscription accounts there are no windows to show.
@@ -283,6 +297,8 @@ With the `auto` viewer, the mod opens the first of these that is available:
 3. **Inline**: the unified diff drawn inside the pane.
 
 ## What the Todos section shows
+
+![The Todos section with five completed tasks and one in progress](images/todos.png)
 
 Claude Code gives the model no task tool in every setup, so the mod registers its own: `todo_write`, which the model sees as `mcp__session-info__todo_write`. A short section at the end of the system prompt tells the model to write a list for work with 3 or more steps and to update it as each task starts and ends. Each call sends the whole list and replaces the previous one.
 
@@ -314,6 +330,8 @@ You start a long task and walk away, and the session stops on a question Claude 
 4. Claude also gets a note with the answer: you did not choose the option, so it is a default and not your decision, and its next reply must say what was picked.
 5. The section keeps the last pick: `✓ Picked 3m ago: Color? → Blue (Recommended)`.
 
+![The Autopick section with the switch on, a 3-minute wait and the last pick](images/autopick.png)
+
 On the row of a waiting question:
 
 - **Pick now** answers with the recommended option at once. The note tells Claude that you accepted the default.
@@ -334,6 +352,8 @@ The switch and the wait are kept in the mod's store, so they stay across session
 Autopick answers questions for you: whatever the recommended option does, it is picked. Leave the switch off when a question can lead to a change you must approve. Set `showAutopick` to `false` to remove the section and the `/autopick` command.
 
 ## What the Skills section shows
+
+![The Skills tab with two skills the main conversation loaded, both done](images/skills.png)
 
 Each skill the conversation loaded, newest first: by the Skill tool (Claude's own choice, or a subagent's) or by a slash command you typed. The row shows the agent that loaded it, `main` for the main conversation, and how long ago.
 
@@ -357,6 +377,8 @@ The section needs the [GitHub CLI](https://cli.github.com/) on the `PATH`, logge
 A `/clear` or a `/resume` ends the watch: the runs belong to the conversation that started them.
 
 ## What the Jira section shows
+
+![The Jira tab with one issue: key, summary, status, priority, assignee and last update](images/jira.png)
 
 The issues the chat mentions, the last one first, read with `getJiraIssue` on the Atlassian MCP server you connected (for example the Atlassian plugin). The mod calls the server with Claude Code's own connection, so it never reads a credential. Without a connected server that serves `getJiraIssue`, the section stays hidden.
 
@@ -430,6 +452,8 @@ Change these in `/config`, or move and hide the cards in [layout mode](#arrange-
 With `openOnStart`, Claude Code draws the pane at session start only on a terminal of 144 columns or more, or 110 once you have opened the pane and not closed it by hand. On a narrower terminal the pane waits until you widen the terminal or run `/session-info`. A `-p` run does not open it. A reload of the mod opens it again.
 
 ## How changes are detected
+
+![The Changes tab with one created file and one modified file in a treeview](images/changes.png)
 
 | Tool | Source |
 | --- | --- |
