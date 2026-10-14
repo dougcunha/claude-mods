@@ -24,6 +24,8 @@ import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_C
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
 import { moveCard, orderText, parseSectionOrder, parseTabGroups, showOption, TITLES } from './tabs'
 import type { SectionKey, TabGroup } from './tabs'
+import { clampOffset, movedTo, scrollbar, targetAt } from './scrollbar'
+import type { ScrollTarget } from './scrollbar'
 import { SHELLS, track } from './track'
 import { cost, countText, duration, NO_TURNS, tokens, turnLine } from './session'
 import { latestTodos, minSteps, parseTodos, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoPrompt, todoReply, todoSummary, todoText } from './todos'
@@ -60,6 +62,8 @@ const autopickWaits = atom({ plugin: 'session-info', key: 'autopickWaits' } as c
 const autopickLast = atom({ plugin: 'session-info', key: 'autopickLast' } as const, null as AutopickPick | null)
 const autopickConflict = atom({ plugin: 'session-info', key: 'autopickConflict' } as const, false)
 const layout = atom({ plugin: 'session-info', key: 'layout' } as const, false)
+const changesTop = atom({ plugin: 'session-info', key: 'changesTop' } as const, 0)
+const gitTop = atom({ plugin: 'session-info', key: 'gitTop' } as const, 0)
 
 const PANE = 'session-info'
 const TITLE = 'Session info'
@@ -813,6 +817,18 @@ export const register: Register = (on, options) => {
     }).catch(($, e, next) => next(e))
   }
 
+  /** The trees that leave rows out, as the last draw placed them in the body; none while every tree shows whole. */
+  let scrollTargets: ScrollTarget[] = []
+
+  on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    const target = targetAt(scrollTargets, e.pointer?.row)
+    if (target === undefined) return next(e)
+    if (target.key === 'git') await update($, gitTop, from => movedTo(from, e.by, target))
+    else await update($, changesTop, from => movedTo(from, e.by, target))
+
+    return {}
+  }).catch(($, e, next) => next(e))
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button, Code } = $.ui.resolve(e)
     const isTerminal = e.surface === 'terminal'
@@ -944,6 +960,32 @@ export const register: Register = (on, options) => {
     // Two trees on screen split the room: the Git tree takes up to half, the Changes tree the rest.
     const gitRoom = isChangesTree ? Math.min(gitTree.length, Math.max(3, Math.floor(room / 2))) : room
     const changesRoom = isGitTree ? Math.max(3, room - gitRoom) : room
+    const changesFrom = clampOffset(await read($, changesTop), rows.length, changesRoom)
+    const gitFrom = clampOffset(await read($, gitTop), gitTree.length, gitRoom)
+    // Where each list starts in the body, from the rows the sections above are known to take: the frame's top border, the header and the rows before the list.
+    const listTop = (isCards ? 1 : 0) + 1
+    const fixedRows: Partial<Record<SectionKey, number>> = {
+      '#session': sessionRows,
+      '#turn': turnRows,
+      '#todos': todosRows,
+      '#autopick': autopickRows,
+      '#skills': skillsRows,
+      '#ci': ciRows,
+      '#jira': jiraRows,
+      '#usage': usageRows,
+      '#agents': agentsRows,
+      '#checks': checksRows,
+    }
+    const gitShown = Math.min(gitTree.length, gitRoom)
+    const changesShown = Math.min(rows.length, changesRoom)
+    const targets: ScrollTarget[] = []
+    let sectionTop = tileRows
+    for (const key of slots) {
+      if (key === '#git' && isGitTree) targets.push({ key: 'git', start: sectionTop + listTop + repoRowCount(repo), rows: gitShown, overflow: gitTree.length - gitShown })
+      if (key === '#changes' && isChangesTree) targets.push({ key: 'changes', start: sectionTop + listTop, rows: changesShown, overflow: rows.length - changesShown })
+      sectionTop += key === '#git' ? chrome + repoRowCount(repo) + gitShown + 4 : key === '#changes' ? chrome + changesShown + 4 : (fixedRows[key] ?? 0)
+    }
+    scrollTargets = targets.filter(target => target.overflow > 0)
 
     const section = (key: SectionKey, children: RenderChildren) =>
       isCards ? card(foldOf(key), isOpen(key), children) : (
@@ -1164,6 +1206,25 @@ export const register: Register = (on, options) => {
         </Button>
       </Box>
     )
+
+    /** The rows of a tree from `from` on, each with its slice of the scrollbar once the tree leaves rows out. */
+    const scrolled = <T,>(list: Row<T>[], from: number, room: number, draw: (row: Row<T>) => RenderChildren) => {
+      const bar = scrollbar(list.length, room, from)
+
+      return list.slice(from, from + room).map((row, index) =>
+        bar.length === 0 ? (
+          draw(row)
+        ) : (
+          <Box flexDirection="row" justifyContent="space-between">
+            {draw(row)}
+            <Text dimColor>{bar[index]}</Text>
+          </Box>
+        ),
+      )
+    }
+
+    const scrollHint = (total: number, from: number, room: number) =>
+      total > room && <Text dimColor>{`↑ ${from} above · ↓ ${total - from - room} below · wheel or arrows scroll`}</Text>
 
     const line = (row: Row) => {
       const status = row.change?.status
@@ -1574,8 +1635,8 @@ export const register: Register = (on, options) => {
       const hotkey = (key: string) => (counts('#changes') ? {} : { hotkey: key })
 
       return [
-        gitTree.slice(0, gitRoom).map(repoLine(repo)),
-        gitTree.length > gitRoom && <Text dimColor>{`… ${gitTree.length - gitRoom} more rows`}</Text>,
+        scrolled(gitTree, gitFrom, gitRoom, repoLine(repo)),
+        scrollHint(gitTree.length, gitFrom, gitRoom),
         unlisted > 0 && <Text dimColor>{`… ${unlisted} more files not listed`}</Text>,
         <Box flexDirection="row" marginTop={1} gap={2}>
           <Button
@@ -1625,8 +1686,8 @@ export const register: Register = (on, options) => {
 
     const changesBody = isOpen('#changes') && [
       rows.length === 0 && <Text dimColor>No files changed in this session yet.</Text>,
-      rows.slice(0, changesRoom).map(line),
-      rows.length > changesRoom && <Text dimColor>{`… ${rows.length - changesRoom} more rows`}</Text>,
+      scrolled(rows, changesFrom, changesRoom, line),
+      scrollHint(rows.length, changesFrom, changesRoom),
       <Box flexDirection="row" marginTop={1} gap={2}>
         <Button
           key="collapse"

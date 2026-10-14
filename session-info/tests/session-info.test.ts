@@ -507,3 +507,32 @@ for (const surface of ['terminal', 'desktop'] as const) {
 test('usage colors go from green to red as a window nears its limit', async () => {
   expect([0, 49, 50, 69, 70, 89, 90, 100].map(colorOf)).toEqual(['success', 'success', 'warning', 'warning', '#ff8700', '#ff8700', 'error', 'error'])
 })
+
+test('the Changes tree scrolls in a window with a scrollbar when it leaves rows out', async ($, on) => {
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.id', async () => ({ value: 'sid' }))
+  on('session.usage', async () => usage([]))
+  on('env.get', async () => ({ value: undefined }))
+  on('fs.write', async () => ({ value: undefined }))
+  on('fs.exists', async () => ({ value: true }))
+  on('process.run', async () => ({ value: ran('', 128) }))
+  on('ui.scroll', async () => ({}))
+  on('tool.call', { tool: 'Write' }, async (_, e) =>
+    ({ result: { type: 'create', filePath: e.file_path, content: '', structuredPatch: [], originalFile: null } }) as never)
+  for (let index = 0; index < 30; index++) await $.tool.call({ tool: 'Write', file_path: `/repo/src/file-${String(index).padStart(2, '0')}.ts`, content: 'x' })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 80, rows: 24 } })
+  expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^file-00\.ts$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^file-29\.ts$/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /^┃$/ })).toBeDefined()
+
+  const wheel = { component: 'Pane', requestId: 'session-info', offset: 0, by: 4, bodyRows: 40, contentRows: 40, origin: { kind: 'person' } } as const
+  await $.ui.scroll({ ...wheel, pointer: { column: 0, row: 999 } } as never)
+  expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
+  await $.ui.scroll(wheel as never)
+  expect(await ui.find({ type: 'Text', text: /↑ 4 above/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^file-00\.ts$/ })).toBeUndefined()
+  await ui.unmount()
+})

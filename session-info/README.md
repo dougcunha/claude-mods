@@ -55,6 +55,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Show the legend of the context bar | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`, or `??` in the Git tree) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff. In the Git tree, the diff is against HEAD |
 | Collapse or expand a folder | Press the folder |
+| Scroll a long tree | The wheel over the list, or the arrow keys while the pane has the focus. A tree taller than the room the terminal leaves draws a window of rows with a scrollbar (`┃` on the track `│`) at its right edge, and a line under it with the rows above and below. Arrow keys move the first tree on screen |
 | Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom. The Git tree has collapse and expand only; `c` and `e` go to it while the Changes tree is not on screen |
 | Turn autopick on or off | Press `[ ] Answer unanswered questions` in the Autopick section, or run `/autopick on` or `/autopick off` |
 | Set the autopick wait | Press `−` or `+` in the Autopick section, or run `/autopick <minutes>`, 1 to 120 |
@@ -395,6 +396,7 @@ After every shell command, the mod also checks that each listed file still exist
 
 - **PowerShell commands:** a file that was already modified before the command and is modified again is not detected. Outside a git repository, only deletions of files already in the list are detected.
 - **Mouse clicks** work in the fullscreen terminal. Elsewhere, use the keyboard.
+- **Tree scrolling** places each list in the pane from the rows the sections above it are expected to take. When a line wraps, the wheel can miss the first or last row of the list by a row or two.
 - **The diff viewer** runs as a child of the mod, so it closes when the mod reloads. On Linux the terminal window of the Git client does too.
 - **Binary files** are not handled. The snapshot stores text only.
 - **Checks of background commands** stay `running in background`: mods get no event when a background command ends, so the row updates on the next run of that kind.
