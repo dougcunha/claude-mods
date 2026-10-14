@@ -530,8 +530,10 @@ test('the Changes tree scrolls in a window with a scrollbar when it leaves rows 
 
   const wheel = { component: 'Pane', requestId: 'session-info', offset: 0, by: 4, bodyRows: 40, contentRows: 40, origin: { kind: 'person' } } as const
   await $.ui.scroll({ ...wheel, pointer: { column: 0, row: 999 } } as never)
+  expect(await ui.find({ type: 'Text', text: /↑ 4 above/ })).toBeDefined()
+  await $.ui.scroll({ ...wheel, by: -4 } as never)
   expect(await ui.find({ type: 'Text', text: /↑ 0 above/ })).toBeDefined()
-  await $.ui.scroll(wheel as never)
+  await $.ui.scroll({ ...wheel, pointer: { column: 0, row: 0 } } as never)
   expect(await ui.find({ type: 'Text', text: /↑ 4 above/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^file-00\.ts$/ })).toBeUndefined()
 

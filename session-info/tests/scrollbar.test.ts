@@ -25,14 +25,18 @@ test('the offset stays between the first row and the last window', async () => {
   expect(clampOffset(4, 8, 10)).toBe(0)
 })
 
-test('the wheel picks the tree whose list is under the pointer and a key press the first tree', async () => {
+test('the wheel picks the tree nearest the pointer and a key press the first tree', async () => {
   const targets = [git, changes]
   expect(targetAt(targets, 4)).toBe(git)
   expect(targetAt(targets, 9)).toBe(git)
-  expect(targetAt(targets, 10)).toBeUndefined()
+  expect(targetAt(targets, 11)).toBe(git)
+  expect(targetAt(targets, 12)).toBe(changes)
   expect(targetAt(targets, 14)).toBe(changes)
-  expect(targetAt(targets, 20)).toBeUndefined()
+  expect(targetAt(targets, 40)).toBe(changes)
+  expect(targetAt(targets, 0)).toBe(git)
+  expect(targetAt([changes], 0)).toBe(changes)
   expect(targetAt(targets, undefined)).toBe(git)
+  expect(targetAt([], 3)).toBeUndefined()
   expect(targetAt([], undefined)).toBeUndefined()
 })
 

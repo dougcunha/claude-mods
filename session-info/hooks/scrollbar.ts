@@ -16,11 +16,16 @@ export function scrollbar(total: number, room: number, offset: number): string[]
 /** A tree whose rows scroll: where its list starts in the pane body, how many rows show and how many it leaves out. */
 export type ScrollTarget = { key: 'changes' | 'git'; start: number; rows: number; overflow: number }
 
-/** The tree under the wheel; a key press, which has no pointer, takes the first one. */
+const gapTo = (target: ScrollTarget, row: number): number => Math.max(target.start - row, row - (target.start + target.rows - 1), 0)
+
+/**
+ * The tree nearest the wheel, so a list placed a row or two off its estimate still gets the wheel; a key press,
+ * which has no pointer, takes the first one. Ties go to the first.
+ */
 export function targetAt(targets: readonly ScrollTarget[], row: number | undefined): ScrollTarget | undefined {
   if (row === undefined) return targets[0]
 
-  return targets.find(target => row >= target.start && row < target.start + target.rows)
+  return targets.reduce<ScrollTarget | undefined>((nearest, target) => (nearest === undefined || gapTo(target, row) < gapTo(nearest, row) ? target : nearest), undefined)
 }
 
 /** The offset after a move of `by` rows, held between the first row and the last window. */

@@ -55,7 +55,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Show the legend of the context bar | Press `▸ Context` |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`, or `??` in the Git tree) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff. In the Git tree, the diff is against HEAD |
 | Collapse or expand a folder | Press the folder |
-| Scroll a long tree | A tree taller than the room the terminal leaves draws a window of rows with a scrollbar (`┃` on the track `│`) at its right edge, and under it `▲` and `▼` with the rows above and below. Press `▲` or `▼`, or `u` and `d`, to move a page; press the track to jump to that place. The wheel over the list and the arrow keys also move it where Claude Code passes them to the mod. In the Git tree `u` and `d` work while the Changes tree is not on screen |
+| Scroll a long tree | A tree taller than the room the terminal leaves draws a window of rows with a scrollbar (`┃` on the track `│`) at its right edge, and under it `▲` and `▼` with the rows above and below. Press `▲` or `▼`, or `u` and `d`, to move a page; press the track to jump to that place. The wheel over the pane moves the tree nearest the pointer, and the arrow keys move the first tree on screen. In the Git tree `u` and `d` work while the Changes tree is not on screen |
 | Collapse all, expand all, clear the list | `c`, `e`, `x`, or the buttons at the bottom. The Git tree has collapse and expand only; `c` and `e` go to it while the Changes tree is not on screen |
 | Turn autopick on or off | Press `[ ] Answer unanswered questions` in the Autopick section, or run `/autopick on` or `/autopick off` |
 | Set the autopick wait | Press `−` or `+` in the Autopick section, or run `/autopick <minutes>`, 1 to 120 |
@@ -396,7 +396,7 @@ After every shell command, the mod also checks that each listed file still exist
 
 - **PowerShell commands:** a file that was already modified before the command and is modified again is not detected. Outside a git repository, only deletions of files already in the list are detected.
 - **Mouse clicks** work in the fullscreen terminal. Elsewhere, use the keyboard.
-- **Tree scrolling** places each list in the pane from the rows the sections above it are expected to take. When a line wraps, the wheel can miss the first or last row of the list by a row or two.
+- **Tree scrolling** places each list in the pane from the rows the sections above it are expected to take, and the wheel moves the tree nearest the pointer, so a list placed a row or two off still gets it. With two trees on screen, a wheel over the seam between them can move the other one.
 - **The diff viewer** runs as a child of the mod, so it closes when the mod reloads. On Linux the terminal window of the Git client does too.
 - **Binary files** are not handled. The snapshot stores text only.
 - **Checks of background commands** stay `running in background`: mods get no event when a background command ends, so the row updates on the next run of that kind.
