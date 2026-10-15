@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
 import { moveCard, ORDER, orderText, parseSectionOrder, parseTabGroups, showOption } from '../hooks/tabs'
@@ -54,27 +54,45 @@ test('a card moves past the nearest shown card, a tab group moves whole, and hid
   expect(showOption('#ci')).toBe('showCi')
 })
 
-test('layout mode moves and hides cards through /config, and the footer offers hidden sections back', { options: { showCi: false } }, async ($, on) => {
+test('layout mode moves, hides and toggles cards through /config, and the footer offers hidden sections back', { options: { showCi: false } }, async ($, on) => {
   pane(on)
+  mock.clock(on)
   const sets: [string, unknown][] = []
   on('config.set', async (_, e) => (sets.push([e.key, e.value]), { value: e.value }))
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 80, rows: 80 } })
   expect(await ui.find({ type: 'Button', key: 'hide:#skills' })).toBeUndefined()
+  expect(await ui.find({ type: 'Button', key: 'toggle:#ci' })).toBeUndefined()
+  expect(await ui.find({ type: 'Button', key: 'show:#ci' })).toBeDefined()
 
   await ui.press({ key: 'layout' })
   expect(await ui.find({ type: 'Text', text: '≡ Done' })).toBeDefined()
+  // The Sections list takes the place of the Hidden list.
+  expect(await ui.find({ type: 'Button', key: 'show:#ci' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: '[ ] CI' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '[x] Git' })).toBeDefined()
   await ui.press({ key: 'move-up:#todos' })
   await ui.press({ key: 'hide:#skills' })
-  await ui.press({ key: 'show:#ci' })
+  await ui.press({ key: 'toggle:#ci' })
+  await ui.press({ key: 'toggle:#git' })
   expect(sets).toEqual([
     ['session-info.sectionOrder', 'session, todos, lastTurn, autopick, skills, ci, jira, usage, agents, checks, git, changes'],
     ['session-info.showSkills', false],
     ['session-info.showCi', true],
+    ['session-info.showGit', false],
   ])
 
   await ui.press({ key: 'layout' })
   expect(await ui.find({ type: 'Button', key: 'hide:#skills' })).toBeUndefined()
+  expect(await ui.find({ type: 'Button', key: 'toggle:#git' })).toBeUndefined()
   await ui.unmount()
+})
+
+test('/config leaves out the show* rows the Sections list sets, and keeps the other rows', async ($, on) => {
+  on('config.describe', async (_, e) => ({ label: e.label, isHidden: e.isHidden }))
+  const provider = { plugin: 'session-info', tier: 'user' } as const
+  const describe = (key: string) => $.config.describe({ key: `session-info.${key}`, label: key, isHidden: false, provider })
+  for (const key of ORDER) expect((await describe(showOption(key))).isHidden).toBe(true)
+  expect((await describe('sectionOrder')).isHidden).toBe(false)
 })
 
 test('a tab group card sits where its first shown section sits in the section order', { options: { sectionOrder: 'agents, git, session' } }, async ($, on) => {

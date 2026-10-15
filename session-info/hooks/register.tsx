@@ -22,7 +22,7 @@ import type { IconSet } from './icons'
 import { allowRequest, browseUrl, errorText, isAllowed, isIssueKey, isRefusal, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
 import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
-import { moveCard, orderText, parseSectionOrder, parseTabGroups, showOption, TITLES } from './tabs'
+import { moveCard, ORDER, orderText, parseSectionOrder, parseTabGroups, showOption, TITLES } from './tabs'
 import type { SectionKey, TabGroup } from './tabs'
 import { clampOffset, MIN_LIST_ROWS, movedTo, offsetAt, POINTER_SLACK, scrollbar, targetAt, targetNear } from './scrollbar'
 import type { ScrollTarget, ScrollView } from './scrollbar'
@@ -87,6 +87,9 @@ let jiraSite: { cloudId: string; url?: string } | undefined
 let jiraName: string | undefined
 /** /clear commands run since this load; $.state starts over with each /clear, so the count lives here. */
 let clearCount = 0
+/** How long layout mode waits for the draw that adds the Sections checklist before it scrolls the pane to its end. */
+const LAYOUT_SCROLL_MS = 50
+
 /** How long a fix suggestion the busy prompt box refused waits for its second try. */
 const FIX_RETRY_MS = 1_500
 /** The fix the prompt box proposes after a turn left a failed check, until the next prompt; the key names the run it is for. */
@@ -587,6 +590,9 @@ export const register: Register = (on, options) => {
   const isLive = shows.session || shows.usage || shows.agents || shows.checks
   const isOpenOnStart = options.openOnStart === true
 
+  /** The pane's layout mode toggles the sections, so /config leaves out their twelve show* rows. */
+  on('config.describe', { key: ORDER.map(key => `session-info.${showOption(key)}`) }, async ($, e, next) => ({ ...(await next(e)), isHidden: true }))
+
   on('session.start', async ($, e, next) => {
     clearCount = 0
     await $.command.register({
@@ -1015,7 +1021,8 @@ export const register: Register = (on, options) => {
     const isEditing = await read($, layout)
     /** The sections their show* option turned off: the footer offers them back. */
     const hidden = order.filter(key => options[showOption(key)] === false)
-    const footerRows = 1
+    // Layout mode adds the Sections checklist above the footer: its title and the toggles, wrapped on about two lines.
+    const footerRows = isEditing ? 4 : 1
     const above = tileRows + usageRows + sessionRows + turnRows + todosRows + autopickRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame + footerRows
     // The terminal's height is a guess at what the pane may take; the window Claude Code gives the body is the limit, and a tree taller than it is clipped.
     const bodyRows = e.props.scroll?.bodyRows ?? Number.MAX_SAFE_INTEGER
@@ -1814,13 +1821,37 @@ export const register: Register = (on, options) => {
     /** The inline diff sits under the last tree section on screen, whichever tree opened it. */
     const diffSlot = slots.filter(key => key === '#git' || key === '#changes').at(-1)
 
+    /** Turns layout mode on or off; on, the pane scrolls to its end so the Sections checklist shows. */
+    const toggleLayout = async () => {
+      await update($, layout, isOn => !isOn)
+      if (!isEditing) $.clock.after(LAYOUT_SCROLL_MS, () => void $.ui.scroll({ in: PANE, to: 'end' }).catch(() => undefined))
+    }
+
+    /** In layout mode, one toggle per section in pane order: the settings /config no longer lists. */
+    const checklist = isEditing && (
+      <Box flexDirection="column" paddingX={isCards ? 1 : 0}>
+        <Text bold>Sections</Text>
+        <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
+          {order.map(key => {
+            const isOn = options[showOption(key)] !== false
+
+            return (
+              <Button plain key={`toggle:${key}`} onPress={() => void setOption(showOption(key), !isOn).catch(toast)}>
+                <Text {...(isOn ? { color: 'success' } : { dimColor: true })}>{`${isOn ? '[x]' : '[ ]'} ${TITLES[key]}`}</Text>
+              </Button>
+            )
+          })}
+        </Box>
+      </Box>
+    )
+
     // A one-cell glyph: an emoji one such as a gear draws two cells in some terminals and eats the space after it.
     const footer = (
       <Box flexDirection="row" gap={2} paddingX={isCards ? 1 : 0}>
-        <Button plain key="layout" hotkey="l" onPress={() => void update($, layout, isOn => !isOn)}>
+        <Button plain key="layout" hotkey="l" onPress={() => void toggleLayout()}>
           <Text {...(isEditing ? { bold: true, color: 'claude' } : { dimColor: true })}>{isEditing ? '≡ Done' : '≡ Layout'}</Text>
         </Button>
-        {hidden.length > 0 && (
+        {!isEditing && hidden.length > 0 && (
           <Box flexDirection="row" gap={1} flexShrink={1}>
             <Text dimColor>Hidden:</Text>
             {hidden.map((key, index) => [
@@ -1841,6 +1872,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column" {...paint}>
         {figures.length > 0 && tiles(figures, cols)}
         {slots.map(key => [key === '#changes' ? changesSection : nodes[key], key === diffSlot && diffView])}
+        {checklist}
         {footer}
       </Box>
     )
