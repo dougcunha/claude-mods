@@ -48,6 +48,9 @@ export type BackgroundTask = {
   endedAt?: number
 }
 
+/** A text a row of the pane cut short, shown whole in place of the sections until the person goes back. */
+export type Detail = { title: string; text: string }
+
 export type SubmoduleIssue = 'conflict' | 'uninitialized' | 'commit' | 'modified'
 
 /** A submodule that needs a look: its path in the repository and what is wrong with it. */
@@ -219,6 +222,8 @@ declare module 'claude-code' {
       checks: Checks
       /** The background commands of this conversation, newest first; an empty list before the first one starts. */
       background: BackgroundTask[]
+      /** The text the detail view shows in place of the sections; null while the sections show. */
+      detail: Detail | null
       /** The repository the Git section shows; `outside` when the folder is in none, null before the first read. */
       repo: Repo | 'outside' | null
       /** The last main-thread turn; null before the first one ends. */

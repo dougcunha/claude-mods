@@ -100,6 +100,16 @@ export const picksText = (picks: Readonly<Record<string, string>>): string =>
     .map(([question, label]) => `${question} → ${label}`)
     .join('; ')
 
+/** The picks one per line, `question → label`, for the detail view. */
+export const picksDetail = (picks: Readonly<Record<string, string>>): string =>
+  Object.entries(picks)
+    .map(([question, label]) => `${question} → ${label}`)
+    .join('\n')
+
+/** What a pick was and why it happened, then its picks one per line: the detail view of the Picked line. */
+export const pickDetail = (pick: AutopickPick): string =>
+  `${pick.isByHand ? 'Pick now pressed' : `No answer in ${pick.minutes} min`}\n${picksDetail(pick.picks)}`
+
 /** The header's right side: `on · 10 min` or `off`. */
 export const autopickSummary = (settings: AutopickSettings): string => (settings.isOn ? `on · ${settings.minutes} min` : 'off')
 

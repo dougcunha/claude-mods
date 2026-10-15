@@ -44,6 +44,23 @@ Sections can share one card as tabs, to make the pane shorter. By default Change
 
 The `sectionOrder` option sets the order of the sections, top to bottom, for example `changes, git, session`. The sections it does not name follow in the default order: Session, Last turn, Todos, Skills, CI, Jira, Usage, Agents, Background, Checks, Git, Changes. A tab group card sits where its first shown section sits in this order, and it stays there when you press another tab. The order of the tabs in the card, and the tab it opens on, come from `tabGroups`. For example, with `sectionOrder` set to `git, session` and the default group `changes+git`, the Changes and Git card is at the top and opens on Changes. A group typed whole, such as `changes+git`, also counts as its sections in order.
 
+### 🔍 Reading a text that a row cuts
+
+A row that does not fit the pane ends in `…`. Pressing a cut text opens the whole of it in place of the sections, with a **← Back** button (`b`) that returns to them and a **Copy** button (`y`) that puts the text on the clipboard. The text is wrapped to the pane and scrolls with it. These texts open that way:
+
+| Section | Texts |
+| --- | --- |
+| Last turn | The tools called and the refused calls |
+| Autopick | The recommended options of a question that waits, the `Picked` line (why it happened, then each pick on its own line) and the warning about the ask-autopick mod |
+| CI | The error that stopped the polling |
+| Jira | An issue's summary and the error of a failed read |
+| Agents | An agent's model, effort and task description |
+| Background | A command's name and its whole command, every line of it |
+| Checks | The command, the result line and the error lines or failed test names, shown together |
+| Git | The commit subject and the operation in progress |
+
+The view keeps the first 4,000 characters of a text. It is not saved: `/clear` closes it, and so does a reload.
+
 ## 📸 Screenshot
 
 The pane in a fullscreen terminal at the start of a task: an autopick countdown on a question, a task list with its first task in progress, and an active skill:
@@ -150,7 +167,7 @@ The shell commands that Claude started with `run_in_background`, in a `Bash` or 
 | `✖` | `failed · 4s` | The task ended with any other status than `completed` or `killed` |
 | `⊘` | `stopped · 1m 1s` | The task was killed |
 
-The name is the description Claude wrote for the call, with the command on a dim line under it; with no description, the command's first line is the name. Running tasks come first, then the ended ones, newest first. The header counts them by state, and a tab that is not active shows how many run. Up to 8 rows are shown, then a count of the rest, and the section keeps the last 30 commands.
+The name is the description Claude wrote for the call, with the command on a dim line under it; with no description, the command's first line is the name (the detail view shows the whole command). Running tasks come first, then the ended ones, newest first. The header counts them by state, and a tab that is not active shows how many run. Up to 8 rows are shown, then a count of the rest, and the section keeps the last 30 commands.
 
 A command is `running` until its task notification reaches the session: Claude Code sends one when a background task ends, and the mod marks the task ended then, not at the moment the command exits. The time of an ended task is the time the notification took to arrive. A foreground command is not listed, and neither is a task that Claude Code started without a shell call, such as a background subagent (the Agents section has those). The section keeps only the command, the description and the state: it never keeps a command's output. `/clear` empties it. Commands that the Checks section recognizes as a build or test run show in both sections.
 
@@ -500,6 +517,7 @@ claude --plugin-dir .
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
 | `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, its rows and the fix prompt |
 | `hooks/background.ts` | The list of background commands: starting one from a shell call's result, ending it from its notification, ordering, texts and status glyphs |
+| `hooks/detail.ts` | The detail view's text: joins the parts and cuts a text past its limit |
 | `hooks/tasks.ts` | Reads a background task's end from its notification and finishes the check that waits on it |
 | `hooks/parse.ts` | Reads error lines, error counts, test counts and failed test names from build and test output |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |

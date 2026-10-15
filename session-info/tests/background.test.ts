@@ -4,6 +4,7 @@ import type { TestBody } from 'claude-code/testing'
 import {
   BACKGROUND_LIMIT,
   backgroundSummary,
+  firstLine,
   hasCommandLine,
   orderedTasks,
   startedTask,
@@ -49,10 +50,11 @@ test('a call with no task id, a refused one and a failed one start nothing', () 
   expect(startedTask({ command: 'ls' }, ran('b1', { isError: true }), NOW)).toBeUndefined()
 })
 
-test('the task keeps the first line of the command and the description, cut to the limit, and no output', () => {
+test('the task keeps the whole command and the first line of the description, cut to the limit, and no output', () => {
   const long = 'x'.repeat(TEXT_LIMIT + 50)
-  const started = startedTask({ command: `\n  ${long}\nsecond line` }, ran('b1', { text: 'secret output' }), NOW)
-  expect(started?.command).toBe('x'.repeat(TEXT_LIMIT))
+  const started = startedTask({ command: `\n  ${long}\nsecond line`, description: 'Named\nmore' }, ran('b1', { text: 'secret output' }), NOW)
+  expect(started?.command).toBe(`${long}\nsecond line`.slice(0, TEXT_LIMIT))
+  expect(started?.description).toBe('Named')
   expect(JSON.stringify(started)).not.toContain('secret')
   expect(startedTask({ command: 7, description: '  ' }, ran('b1'), NOW)).toEqual({ id: 'b1', command: '', status: 'running', at: NOW })
 })
@@ -91,6 +93,8 @@ test('a task is named by its description, else its command, else its id, and a d
   expect(taskLabel(task('b1', { description: 'Start the server' }))).toBe('Start the server')
   expect(taskLabel(task('b1'))).toBe('run b1')
   expect(taskLabel(task('b1', { command: '' }))).toBe('b1')
+  expect(taskLabel(task('b1', { command: 'make all\nmake test' }))).toBe('make all')
+  expect(firstLine('\n  one\ntwo')).toBe('one')
   expect(hasCommandLine(task('b1', { description: 'Start the server' }))).toBe(true)
   expect(hasCommandLine(task('b1'))).toBe(false)
   expect(taskRowCount([task('a'), task('b', { description: 'Named' })])).toBe(3)

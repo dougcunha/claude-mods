@@ -1,17 +1,18 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
 
-import type { AgentModel, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, ChangeStatus, Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
+import type { AgentModel, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, ChangeStatus, Checks, CiRun, CiWatch, ContextReading, Detail, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentModelText, agentRows, agentSummary, withAgentModel } from './agents'
 import { crossings } from './alerts'
-import { AUTOPICK_USAGE, autopickSummary, countdown, DEFAULT_SETTINGS, hasRival, minutesOf, pickedLog, pickedNote, picksOf, picksText, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from './autopick'
+import { AUTOPICK_USAGE, autopickSummary, countdown, DEFAULT_SETTINGS, hasRival, minutesOf, pickDetail, pickedLog, pickedNote, picksDetail, picksOf, picksText, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from './autopick'
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
-import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, hasCommandLine, orderedTasks, startedTask, taskLabel, taskRowCount, taskState, withEnd, withTask } from './background'
+import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCommandLine, orderedTasks, startedTask, taskLabel, taskRowCount, taskState, withEnd, withTask } from './background'
 import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
 import { openClient } from './client'
+import { detailLines, detailOf } from './detail'
 import { cellWidths, contextText, GLYPH, LEGEND_GAP, legendLines, legendText, SWATCH, toReading } from './context'
 import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, fixSuggestion, NO_CHECKS, toPattern } from './checks'
 import { CI_POLL_MS, CI_ROOM, CI_STATUS, ciTrigger, isWatching, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from './ci'
@@ -52,6 +53,7 @@ const contextState = atom({ plugin: 'session-info', key: 'context' } as const, n
 const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as string[])
 const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECKS as Checks)
 const background = atom({ plugin: 'session-info', key: 'background' } as const, [] as BackgroundTask[])
+const detail = atom({ plugin: 'session-info', key: 'detail' } as const, null as Detail | null)
 const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
 const lastTurn = atom({ plugin: 'session-info', key: 'lastTurn' } as const, null as TurnRecord | null)
 const todos = atom({ plugin: 'session-info', key: 'todos' } as const, [] as Todo[])
@@ -70,6 +72,8 @@ const changesTop = atom({ plugin: 'session-info', key: 'changesTop' } as const, 
 const gitTop = atom({ plugin: 'session-info', key: 'gitTop' } as const, 0)
 
 const PANE = 'session-info'
+/** Why the Autopick switch stays off while the ask-autopick mod answers the same questions. */
+const RIVAL_TEXT = 'The ask-autopick mod is loaded and answers questions too: this switch stays off until you disable it.'
 const MINUTE = 60_000
 
 /** Tools whose calls can change the working tree, so the Git section reads the repository again after them. */
@@ -663,6 +667,7 @@ export const register: Register = (on, options) => {
       if (shows.jira) await update($, jiraIssues, () => [])
       if (shows.agents) await update($, agentModels, () => ({}))
       if (shows.background) await update($, background, () => [])
+      await update($, detail, () => null)
       if (shows.autopick) await update($, autopickLast, () => null)
     }
 
@@ -922,6 +927,40 @@ export const register: Register = (on, options) => {
     const { card, tiles, banner } = widgets({ Box, Text }, isTerminal)
     const cols = Math.max(20, e.props.bodyColumns)
     const isCards = !isTerminal || isFramed(cols)
+    const shownDetail = await read($, detail)
+    if (shownDetail !== null) {
+      // No list is on screen: the wheel and the keys belong to the pane.
+      scrollTargets = []
+      const body = (
+        <Box flexDirection="column" gap={1}>
+          <Text bold wrap="wrap">{shownDetail.title}</Text>
+          <Text wrap="wrap">{shownDetail.text}</Text>
+        </Box>
+      )
+
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Box flexDirection="row" gap={2}>
+            <Button plain key="detail-back" hotkey="b" onPress={() => void update($, detail, () => null)}>
+              <Text bold color="claude">← Back</Text>
+            </Button>
+            <Button
+              plain
+              key="detail-copy"
+              hotkey="y"
+              onPress={() =>
+                void $.ui.copy({ text: shownDetail.text, surface: e.surface })
+                  .then(copied => $.ui.toast(copied.isCopied ? 'session-info: copied the text' : `session-info: could not copy the text (${copied.reason}).`))
+                  .catch(() => $.ui.toast('session-info: could not copy the text.'))
+              }
+            >
+              <Text color="suggestion">Copy</Text>
+            </Button>
+          </Box>
+          {isCards ? card('detail', true, body) : body}
+        </Box>
+      )
+    }
     const inner = isCards ? cols - FRAME_COLUMNS : cols
     const chrome = isCards ? 1 + FRAME_ROWS : 2
     const shut = new Set(await read($, collapsed))
@@ -1123,6 +1162,19 @@ export const register: Register = (on, options) => {
     }
 
     const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
+
+    /**
+     * A line the row cuts short, pressed to read the whole text in the detail view; the key names the line. A Button
+     * draws its text with the wrap of its own, not the inner Text's, so the box keeps the line to one row and clips the rest.
+     */
+    const expandable = (key: string, title: string, text: string, line: RenderChildren) =>
+      text.trim() === '' ? line : (
+        <Box key={`detail-row:${key}`} height={1} flexShrink={1} overflow="hidden">
+          <Button plain key={`detail:${key}`} onPress={() => void update($, detail, () => detailOf(title, text))}>
+            {line}
+          </Button>
+        </Box>
+      )
 
     /**
      * Changes one of the mod's settings as /config would; the engine then loads the module again with it. A load during
@@ -1414,8 +1466,8 @@ export const register: Register = (on, options) => {
       isOpen('#turn') && turnRecord === null && <Text dimColor>No turn finished yet.</Text>,
       isOpen('#turn') && turnRecord && turnModel !== '' && <Text wrap="truncate-end">{turnModel}</Text>,
       isOpen('#turn') && turnRecord && <Text dimColor wrap="truncate-end">{tokensText(turnRecord)}</Text>,
-      isOpen('#turn') && turnRecord && turnTools !== '' && <Text dimColor wrap="truncate-end">{turnTools}</Text>,
-      isOpen('#turn') && turnRecord && turnRefused !== '' && <Text color="warning" wrap="truncate-end">{turnRefused}</Text>,
+      isOpen('#turn') && turnRecord && turnTools !== '' && expandable('turn:tools', 'Tools of the last turn', turnTools, <Text dimColor wrap="truncate-end">{turnTools}</Text>),
+      isOpen('#turn') && turnRecord && turnRefused !== '' && expandable('turn:refused', 'Refused calls of the last turn', turnRefused, <Text color="warning" wrap="truncate-end">{turnRefused}</Text>),
     ])
 
     const todoLine = (todo: Todo) => {
@@ -1478,9 +1530,11 @@ export const register: Register = (on, options) => {
                 {isCounting ? `◷ ${countdown((wait.deadline ?? 0) - clockNow)}` : '◌'}
               </Text>
             </Box>
-            <Text dimColor={!isCounting} wrap="truncate-end">
-              {wait.picks === null ? 'No recommended option: the question waits for you.' : picksText(wait.picks)}
-            </Text>
+            {wait.picks === null ? (
+              <Text dimColor={!isCounting} wrap="truncate-end">No recommended option: the question waits for you.</Text>
+            ) : (
+              expandable(`autopick:wait:${wait.id}`, 'Recommended options', picksDetail(wait.picks), <Text dimColor={!isCounting} wrap="truncate-end">{picksText(wait.picks)}</Text>)
+            )}
           </Box>
           {isCounting && (
             <Box flexDirection="row" gap={2} flexShrink={0} paddingLeft={1}>
@@ -1506,14 +1560,13 @@ export const register: Register = (on, options) => {
         </Text>,
       ),
       isOpen('#autopick') && autopickSwitch,
-      isOpen('#autopick') && isPickBlocked && (
-        <Text color="warning" wrap="truncate-end">
-          ⚠ The ask-autopick mod is loaded and answers questions too: this switch stays off until you disable it.
-        </Text>
-      ),
+      isOpen('#autopick') && isPickBlocked && expandable('autopick:rival', 'Autopick is off', RIVAL_TEXT, <Text color="warning" wrap="truncate-end">{`⚠ ${RIVAL_TEXT}`}</Text>),
       isOpen('#autopick') && waits.map(waitLine),
-      isOpen('#autopick') && lastPick && (
-        <Text dimColor wrap="truncate-end">{`✓ Picked ${age(clockNow - lastPick.at)} ago: ${picksText(lastPick.picks)}`}</Text>
+      isOpen('#autopick') && lastPick && expandable(
+        'autopick:last',
+        `Picked ${age(clockNow - lastPick.at)} ago`,
+        pickDetail(lastPick),
+        <Text dimColor wrap="truncate-end">{`✓ Picked ${age(clockNow - lastPick.at)} ago: ${picksText(lastPick.picks)}`}</Text>,
       ),
     ])
 
@@ -1589,7 +1642,7 @@ export const register: Register = (on, options) => {
       isOpen('#ci') && ciWatch === null && <Text dimColor>No GitHub Actions run started from this session yet.</Text>,
       isOpen('#ci') && ciWaiting !== undefined && <Text dimColor>{ciWaiting}</Text>,
       isOpen('#ci') && ciRuns.map(ciRunRows),
-      isOpen('#ci') && ciWatch?.error !== undefined && <Text color="error" wrap="truncate-end">{ciWatch.error}</Text>,
+      isOpen('#ci') && ciWatch?.error !== undefined && expandable('ci:error', 'GitHub Actions error', ciWatch.error, <Text color="error" wrap="truncate-end">{ciWatch.error}</Text>),
     ])
 
     const issueRows = (issue: JiraIssue) => (
@@ -1605,7 +1658,7 @@ export const register: Register = (on, options) => {
                 </Button>
               )}
             </Box>
-            <Text wrap="truncate-end">{issue.summary === undefined ? '' : ` · ${issue.summary}`}</Text>
+            {expandable(`jira:${issue.key}:summary`, issue.key, issue.summary ?? '', <Text wrap="truncate-end">{issue.summary === undefined ? '' : ` · ${issue.summary}`}</Text>)}
           </Box>
           {issue.status !== undefined && (
             <Box flexShrink={0} paddingLeft={1}>
@@ -1616,7 +1669,7 @@ export const register: Register = (on, options) => {
         {issue.error === undefined ? (
           <Text dimColor wrap="truncate-end">{`  ${issueDetail(issue, Date.now())}`}</Text>
         ) : (
-          <Text color="error" wrap="truncate-end">{`  ${issue.error}`}</Text>
+          expandable(`jira:${issue.key}:error`, `${issue.key} could not be read`, issue.error, <Text color="error" wrap="truncate-end">{`  ${issue.error}`}</Text>)
         )}
         {needsAllow(issue) && (
           <Box flexDirection="row" gap={2} paddingLeft={2}>
@@ -1654,7 +1707,12 @@ export const register: Register = (on, options) => {
         <Box flexDirection="row">
           <Text color={status.color}>{`${'  '.repeat(depth)}${status.glyph} `}</Text>
           <Text bold={agent.status === 'running'}>{agentLabel(agent)}</Text>
-          <Text dimColor wrap="truncate-end">{`${agentModelText(models[agent.id])}${agent.description ? ` · ${agent.description}` : ''}`}</Text>
+          {expandable(
+            `agent:${agent.id}`,
+            agentLabel(agent),
+            detailLines([agentModelText(models[agent.id]).replace(/^ · /, ''), agent.description]),
+            <Text dimColor wrap="truncate-end">{`${agentModelText(models[agent.id])}${agent.description ? ` · ${agent.description}` : ''}`}</Text>,
+          )}
         </Box>
       )
     }
@@ -1673,13 +1731,13 @@ export const register: Register = (on, options) => {
           <Box flexDirection="row" justifyContent="space-between">
             <Box flexDirection="row" flexShrink={1}>
               <Text color={status.color}>{`${status.glyph} `}</Text>
-              <Text bold={task.status === 'running'} wrap="truncate-end">{taskLabel(task)}</Text>
+              {expandable(`background:${task.id}:name`, 'Background command', detailLines([task.description, task.command]), <Text bold={task.status === 'running'} wrap="truncate-end">{taskLabel(task)}</Text>)}
             </Box>
             <Box flexShrink={0} paddingLeft={1}>
               <Text {...(task.status === 'failed' ? { color: 'error' } : { dimColor: true })}>{taskState(task, Date.now())}</Text>
             </Box>
           </Box>
-          {hasCommandLine(task) && <Text dimColor wrap="truncate-end">{`  ${task.command}`}</Text>}
+          {hasCommandLine(task) && expandable(`background:${task.id}:command`, 'Background command', detailLines([task.description, task.command]), <Text dimColor wrap="truncate-end">{`  ${firstLine(task.command)}`}</Text>)}
         </Box>
       )
     }
@@ -1694,6 +1752,9 @@ export const register: Register = (on, options) => {
     const checkRows = ({ run, label, result, details }: CheckView) => {
       const status = CHECK_STATUS[run.status]
       const tone = run.status === 'failed' ? { color: 'error' } : {}
+      const key = `check:${run.kind}`
+      const title = `${label}: ${result}`
+      const whole = detailLines([run.command, ...details])
 
       return (
         <Box flexDirection="column">
@@ -1701,14 +1762,12 @@ export const register: Register = (on, options) => {
             <Box flexDirection="row">
               <Text color={status.color}>{`${status.glyph} `}</Text>
               <Text bold>{label}</Text>
-              <Text {...tone} wrap="truncate-end">{`  ${result}`}</Text>
+              {expandable(`${key}:result`, title, whole, <Text {...tone} wrap="truncate-end">{`  ${result}`}</Text>)}
             </Box>
             <Text dimColor>{checkWhen(run, Date.now())}</Text>
           </Box>
-          <Text dimColor wrap="truncate-end">{`  ${run.command}`}</Text>
-          {details.map(detail => (
-            <Text {...tone} wrap="truncate-end">{`  ${detail}`}</Text>
-          ))}
+          {expandable(`${key}:command`, title, whole, <Text dimColor wrap="truncate-end">{`  ${run.command}`}</Text>)}
+          {details.map((line, index) => expandable(`${key}:detail:${index}`, title, whole, <Text {...tone} wrap="truncate-end">{`  ${line}`}</Text>))}
         </Box>
       )
     }
@@ -1734,7 +1793,7 @@ export const register: Register = (on, options) => {
       const { total, changed } = repo.submodules
 
       return [
-        repo.operation && <Text color="warning" wrap="truncate-end">{`⚠ ${operationText(repo.operation)}`}</Text>,
+        repo.operation && expandable('git:operation', 'Git operation in progress', operationText(repo.operation), <Text color="warning" wrap="truncate-end">{`⚠ ${operationText(repo.operation)}`}</Text>),
         parts.length > 0 && (
           <Box flexDirection="row" gap={2}>
             {parts.map(part => (
@@ -1748,7 +1807,7 @@ export const register: Register = (on, options) => {
               <Box flexShrink={0}>
                 <Text dimColor>{`◆ ${repo.commit.hash}`}</Text>
               </Box>
-              <Text wrap="truncate-end">{repo.commit.subject}</Text>
+              {expandable('git:commit', `Commit ${repo.commit.hash}`, repo.commit.subject, <Text wrap="truncate-end">{repo.commit.subject}</Text>)}
             </Box>
             <Box flexShrink={0} paddingLeft={1}>
               <Text dimColor>{age(Date.now() - repo.commit.at)}</Text>

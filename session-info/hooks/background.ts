@@ -8,7 +8,7 @@ export const BACKGROUND_LIMIT = 30
 /** The most background commands the section lists; a longer list shows the first ones and a count. */
 export const BACKGROUND_ROOM = 8
 /** The longest command or description the state keeps; a longer one is cut. */
-export const TEXT_LIMIT = 200
+export const TEXT_LIMIT = 1_000
 
 /** Glyph, word and theme color of each status; the word is what a color-blind reader goes by. */
 export const BACKGROUND_STATUS = {
@@ -18,20 +18,23 @@ export const BACKGROUND_STATUS = {
   killed: { glyph: '⊘', word: 'stopped', color: 'warning' },
 } as const satisfies Record<BackgroundStatus, { glyph: string; word: string; color: string }>
 
-const firstLine = (text: string): string => (text.split(/\r?\n/).find(line => line.trim() !== '') ?? '').trim().slice(0, TEXT_LIMIT)
+/** The first line of a text that has any, trimmed: what a row draws of a command that spans lines. */
+export const firstLine = (text: string): string => (text.split(/\r?\n/).find(line => line.trim() !== '') ?? '').trim()
+
+const kept = (text: string): string => text.trim().slice(0, TEXT_LIMIT)
 
 /**
  * The background task a finished shell call started: its id comes from `backgroundTaskId` in the call's result, so a
- * command that ran to its end, failed or was refused gives none. The text kept is the command's first line and the
- * description the caller wrote, never the output.
+ * command that ran to its end, failed or was refused gives none. The text kept is the command and the description
+ * the caller wrote, never the output.
  */
 export function startedTask(input: Record<string, unknown>, ran: Record<string, unknown>, at: number): BackgroundTask | undefined {
   if (ran.deny !== undefined || ran.isError === true) return undefined
   const result = typeof ran.result === 'object' && ran.result !== null ? (ran.result as Record<string, unknown>) : {}
   const id = result.backgroundTaskId
   if (typeof id !== 'string' || id === '') return undefined
-  const command = typeof input.command === 'string' ? firstLine(input.command) : ''
-  const description = typeof input.description === 'string' ? firstLine(input.description) : ''
+  const command = typeof input.command === 'string' ? kept(input.command) : ''
+  const description = typeof input.description === 'string' ? kept(firstLine(input.description)) : ''
 
   return { id, command, ...(description === '' ? {} : { description }), status: 'running', at }
 }
@@ -55,7 +58,7 @@ export const orderedTasks = (tasks: readonly BackgroundTask[]): BackgroundTask[]
   [...tasks.filter(task => task.status === 'running'), ...tasks.filter(task => task.status !== 'running')]
 
 /** What the task is called: the description its caller wrote, else the command. */
-export const taskLabel = (task: BackgroundTask): string => task.description ?? (task.command === '' ? task.id : task.command)
+export const taskLabel = (task: BackgroundTask): string => task.description ?? (task.command === '' ? task.id : firstLine(task.command))
 
 /** Whether the row has a second line: the command under a description that names it. */
 export const hasCommandLine = (task: BackgroundTask): boolean => task.description !== undefined && task.command !== ''

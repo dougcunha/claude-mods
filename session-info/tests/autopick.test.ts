@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { countdown, hasRival, minutesOf, picksOf, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from '../hooks/autopick'
+import { countdown, hasRival, minutesOf, pickDetail, picksDetail, picksOf, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from '../hooks/autopick'
 
 const PANE = {
   plugin: 'session-info',
@@ -57,6 +57,13 @@ test('the pick takes the first option when only it carries the recommended mark'
   expect(picksOf([])).toBeUndefined()
 })
 
+test('the picks read one per line, and a pick says why it happened', async () => {
+  const picks = { 'Color?': 'Blue (Recommended)', 'Size?': 'L' }
+  expect(picksDetail(picks)).toBe('Color? → Blue (Recommended)\nSize? → L')
+  expect(pickDetail({ picks, at: 0, minutes: 5, isByHand: false })).toBe('No answer in 5 min\nColor? → Blue (Recommended)\nSize? → L')
+  expect(pickDetail({ picks, at: 0, minutes: 5, isByHand: true }).startsWith('Pick now pressed\n')).toBe(true)
+})
+
 test('the settings, the minute steps, the countdown and the rival check', async () => {
   expect(settingsOf(undefined, undefined)).toEqual({ isOn: false, minutes: 10 })
   expect(settingsOf(true, 25)).toEqual({ isOn: true, minutes: 25 })
@@ -108,6 +115,14 @@ test('a question left unanswered past the wait gets its recommended option', SLO
   expect(answersOf(await call)).toEqual({ 'Color?': 'Blue (Recommended)' })
   expect(await look({ type: 'Text', text: /^◷/ })).toBeUndefined()
   expect(await look({ type: 'Text', text: /^✓ Picked 0s ago: Color\? → Blue/ })).toBeDefined()
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 80 } })
+  await ui.press({ key: 'detail:autopick:last' })
+  expect(await ui.find({ type: 'Text', text: 'Picked 0s ago' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'No answer in 1 min\nColor? → Blue (Recommended)' })).toBeDefined()
+  await ui.press({ key: 'detail-back' })
+  expect(await ui.find({ type: 'Button', key: 'detail:autopick:last' })).toBeDefined()
+  await ui.unmount()
 })
 
 test('an answer within the wait goes through and nothing is picked', SLOW, async ($, on) => {
