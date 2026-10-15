@@ -1,21 +1,41 @@
-# session-info
+<h1 align="center">🧭 session-info</h1>
 
-A Claude Code mod with one pane and twelve sections:
+<p align="center">
+  A Claude Code mod with one pane and twelve sections.
+</p>
 
-- **Session**: the context window's fill, compactions and /clear commands, the session's cost and duration, and turn stats.
-- **Last turn**: how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, the tools it called, and the calls the permission check refused.
-- **Todos**: the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it.
-- **Autopick**: a switch that answers a question Claude asked and you left unanswered with the option Claude marked as recommended, after a wait you set. A countdown shows the time left, with Pick now and Cancel. The switch starts off.
-- **Skills**: the skills the conversation loaded, which agent loaded each one, and the ones still active.
-- **CI**: the GitHub Actions runs that a push, a pull request, a workflow dispatch or a rerun of the session started, with their jobs, a link and a notification when each run ends.
-- **Jira**: the Jira issues the chat mentions, with summary, status, priority and assignee, read through the Atlassian MCP server you connected.
-- **Usage**: your plan's rate-limit windows as bars, like `/usage`, updated live.
-- **Agents**: the session's subagents and teammates with their status, model and effort, children under the agent that spawned them.
-- **Checks**: whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests, and a prompt that asks Claude to fix a failure. .NET, Node, Bun, Rust, Go and Python tools are recognized.
-- **Git**: the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, the submodules that changed, and every file `git status` lists, in a treeview like the Changes one. Pressing a file opens its diff against HEAD; pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
-- **Changes**: every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
+<p align="center">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdougcunha%2Fclaude-mods%2Fmain%2Fsession-info%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version&color=blue" alt="Version">
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/Claude%20Code-2.1.296-d97757.svg" alt="Tested on Claude Code 2.1.296">
+</p>
 
-It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed.
+<p align="center">
+  <a href="#-install">Install</a> ·
+  <a href="#-use">Use</a> ·
+  <a href="#-settings">Settings</a> ·
+  <a href="#-limitations">Limitations</a> ·
+  <a href="#-development">Development</a>
+</p>
+
+## ✨ Sections
+
+- 📊 [**Session**](#-what-the-session-section-shows): the context window's fill, compactions and /clear commands, the session's cost and duration, and turn stats.
+- 🔁 [**Last turn**](#-what-the-last-turn-section-shows): how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, the tools it called, and the calls the permission check refused.
+- ✅ [**Todos**](#-what-the-todos-section-shows): the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it.
+- ⏳ [**Autopick**](#-what-the-autopick-section-shows): a switch that answers a question Claude asked and you left unanswered with the option Claude marked as recommended, after a wait you set. A countdown shows the time left, with Pick now and Cancel. The switch starts off.
+- 🧠 [**Skills**](#-what-the-skills-section-shows): the skills the conversation loaded, which agent loaded each one, and the ones still active.
+- 🚦 [**CI**](#-what-the-ci-section-shows): the GitHub Actions runs that a push, a pull request, a workflow dispatch or a rerun of the session started, with their jobs, a link and a notification when each run ends.
+- 🎫 [**Jira**](#-what-the-jira-section-shows): the Jira issues the chat mentions, with summary, status, priority and assignee, read through the Atlassian MCP server you connected.
+- 📈 [**Usage**](#-how-usage-updates): your plan's rate-limit windows as bars, like `/usage`, updated live.
+- 🤖 [**Agents**](#-what-the-agents-section-shows): the session's subagents and teammates with their status, model and effort, children under the agent that spawned them.
+- 🧪 [**Checks**](#-what-the-checks-section-shows): whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests, and a prompt that asks Claude to fix a failure. .NET, Node, Bun, Rust, Go and Python tools are recognized.
+- 🌿 [**Git**](#-what-the-git-section-shows): the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, the submodules that changed, and every file `git status` lists, in a treeview like the Changes one. Pressing a file opens its diff against HEAD; pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
+- 📝 [**Changes**](#-how-changes-are-detected): every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
+
+🔔 It also raises a native notification when a usage window reaches 80% or 90%, or the context window reaches 85%, even with the pane closed. See [Alerts](#-alerts).
+
+### 🎨 Cards, tabs and order
 
 Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost and the elapsed time at a glance. Bars fill to the eighth of a cell. In a terminal pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions. The desktop app always draws the frames and tiles, sizing them and the bars by percentage instead of terminal cells.
 
@@ -23,7 +43,7 @@ Sections can share one card as tabs, to make the pane shorter. By default Change
 
 The `sectionOrder` option sets the order of the sections, top to bottom, for example `changes, git, session`. The sections it does not name follow in the default order: Session, Last turn, Todos, Skills, CI, Jira, Usage, Agents, Checks, Git, Changes. A tab group card sits where its first shown section sits in this order, and it stays there when you press another tab. The order of the tabs in the card, and the tab it opens on, come from `tabGroups`. For example, with `sectionOrder` set to `git, session` and the default group `changes+git`, the Changes and Git card is at the top and opens on Changes. A group typed whole, such as `changes+git`, also counts as its sections in order.
 
-## Screenshot
+## 📸 Screenshot
 
 The pane in a fullscreen terminal at the start of a task: an autopick countdown on a question, a task list with its first task in progress, and an active skill:
 
@@ -31,7 +51,7 @@ The pane in a fullscreen terminal at the start of a task: an autopick countdown 
 
 Each section that follows has its own screenshot from the same session.
 
-## Install
+## 🚀 Install
 
 At the Claude Code prompt:
 
@@ -45,7 +65,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 /plugin install session-info@claude-mods
 ```
 
-## Use
+## 🎮 Use
 
 | Action | How |
 | --- | --- |
@@ -60,13 +80,13 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Turn autopick on or off | Press `[ ] Answer unanswered questions` in the Autopick section, or run `/autopick on` or `/autopick off` |
 | Set the autopick wait | Press `−` or `+` in the Autopick section, or run `/autopick <minutes>`, 1 to 120 |
 | Answer a waiting question now, or stop its countdown | Press `Pick now` or `Cancel` on its row in the Autopick section |
-| Move or hide a card | Press `≡ Layout` at the bottom of the pane, or press `l` while the pane has the focus. Each card header then shows `↑`, `↓` and `✕`. Press `≡ Done` or `l` again to leave layout mode. See [Arrange the cards](#arrange-the-cards) |
+| Move or hide a card | Press `≡ Layout` at the bottom of the pane, or press `l` while the pane has the focus. Each card header then shows `↑`, `↓` and `✕`. Press `≡ Done` or `l` again to leave layout mode. See [Arrange the cards](#-arrange-the-cards) |
 | Show a hidden card again | Press its name after `Hidden:` at the bottom of the pane |
 | Return to the prompt | `Esc` |
 
 Status colors follow your theme: green for created (`A`), yellow for modified (`M`), red and struck through for deleted (`D`). Chains of single-child folders collapse into one row, for example `src/app/ui`.
 
-## What the Session section shows
+## 📊 What the Session section shows
 
 ![The Session section with the context legend unfolded: each category's tokens and share, the free space, the compact buffer and the turn stats](images/session.png)
 
@@ -82,7 +102,7 @@ The compaction and clear counts start when the mod loads, so a newly installed m
 
 After a `/clear` or a `/resume` in the same process, Claude Code starts the next conversation with empty pane state and raises no start event for it. The mod waits until the session id changes, then reads the context, the repository, the Autopick switch and the Jira server again and, on a resume, the task list from the transcript.
 
-## What the Last turn section shows
+## 🔁 What the Last turn section shows
 
 The section shows the last turn of the main conversation. It updates when the turn ends.
 
@@ -98,7 +118,7 @@ The section shows the last turn of the main conversation. It updates when the tu
 
 The token counts of the main turn do not include its subagents; the Tools row shows them apart. The Refused row reads the verdict that Claude Code's rules, permission mode and hooks give before a call runs. A call that you refuse in the permission dialog, or that the auto-mode classifier refuses, is not in it: the mod gets no verdict for those. A subagent that runs in the background and ends after the turn is not counted. When the mod loads while a turn runs, for example after a reload, that turn's record has no effort, request count, tools or cost. `/clear` empties the section.
 
-## What the Agents section shows
+## 🤖 What the Agents section shows
 
 ![The Agents section with two completed Explore subagents, each with its model, effort and task](images/agents.png)
 
@@ -118,18 +138,24 @@ Active agents come first; an agent spawned by another is indented under it. Clau
 
 The model comes from the agent's spawn and then from each of its model requests; the effort comes from its requests only, so it shows after the agent's first request. The last request wins, so a fallback model shows too. An agent that started before the mod loaded shows its model and effort after its next request; one that ended before that shows neither. `/clear` forgets them.
 
-## What the Checks section shows
+## 🧪 What the Checks section shows
 
 ![The Checks section with a passed build and a passed test run of 112 tests](images/checks.png)
 
 One row for the last build and one for the last test run, from any shell command the session ran, a subagent's included (marked `agent`). A command counts when one of its segments runs a known tool, so `cd app && npm test` and `rtk dotnet test …` count too. The runners in front of a tool and their options are skipped: `rtk`, `env`, `time`, `npx`/`bunx`/`uvx` (so `npx -y -p typescript tsc` is `tsc`), `pnpm`/`yarn exec` and `dlx`, `uv`/`poetry`/`pipenv`/`hatch run`, `bundle exec` and variable assignments such as `CI=1`.
+
+<details>
+<summary>📋 Recognized build and test commands</summary>
 
 | Check | Commands |
 | --- | --- |
 | Build | `dotnet build`, `dotnet publish`, `dotnet pack`, `dotnet msbuild`, `msbuild`, `npm`/`pnpm`/`yarn`/`bun run build`, `compile`, `typecheck` or `type-check`, `bun build`, `tsc`, `vue-tsc`, `tsgo`, `tsup`, `esbuild`, `webpack`, `rollup`, `vite`/`next`/`nuxt`/`astro`/`ng`/`parcel`/`turbo`/`nx`/`flutter build`, `claude plugin validate`, `cargo build`, `cargo check`, `cargo clippy`, `go build`, `go vet`, Gradle and Maven builds, `swift`/`zig`/`stack`/`cabal build`, `mix compile`, `xcodebuild`, `cmake --build`, `ninja`, and `make` alone or with `all` or `build` |
 | Tests | `dotnet test`, `dotnet run` of a test project, `npm`/`pnpm`/`yarn`/`bun test`, `bun test`, `jest`, `vitest`, `mocha`, `ava`, `playwright test`, `cypress run`, `node --test`, `deno test`, `claude plugin test`, `turbo`/`nx test`, `cargo test`, `cargo nextest`, `go test`, `gotestsum`, `pytest`, `python -m unittest`, `tox`, `nox`, Gradle and Maven `test`, `check` or `verify`, `rspec`, `rake test`, `rails test`, `phpunit`, `pest`, `php artisan test`, `mix`/`swift`/`flutter`/`dart`/`stack`/`cabal test`, `zig build test`, `ctest`, `make test` and `make check` |
 
-Add your own commands, such as `./build.ps1`, with the `buildPattern` and `testPattern` settings.
+</details>
+
+> [!TIP]
+> Add your own commands, such as `./build.ps1`, with the `buildPattern` and `testPattern` settings.
 
 The status comes from the command's exit code; an interrupted or timed-out command shows as failed. When a pipe hid the exit code (`dotnet test | tail -3`), the summary in the output decides. The details come from the output itself:
 
@@ -143,7 +169,7 @@ The output is read as the model got it: raw, filtered by RTK, or localized. Loca
 
 The readers were checked against real output of `dotnet build` and `dotnet test` (VSTest and Microsoft.Testing.Platform, English and Portuguese), tsc, jest, vitest, `node --test`, Bun and `cargo test`, each with and without RTK. Go and pytest are read by their documented formats. For the other tools, the status comes from the exit code, and the counts and failed names show when the output has a format the mod already reads, such as `claude plugin test`, which prints Bun's.
 
-### Fix suggestion
+### 💡 Fix suggestion
 
 When a turn of the main conversation ends and the last build or test run failed, the mod proposes a prompt in the empty prompt box, dim, for Tab to take:
 
@@ -156,7 +182,7 @@ When a turn of the main conversation ends and the last build or test run failed,
 
 A failed build comes first, because a build that fails often explains the failed tests. Each failed run gets one proposal: the next turn proposes again only for a new failed run. Until you send the next prompt, the proposal replaces the suggestion that Claude Code makes after a turn. Claude Code shows no proposal while the prompt box holds text. Set `suggestFix` to `false` to turn it off.
 
-## What the Git section shows
+## 🌿 What the Git section shows
 
 The section shows the repository of the session's folder and only what differs from a clean state. A row with nothing to say is left out, so a clean repository takes one row under the header.
 
@@ -191,7 +217,7 @@ The section shows the repository of the session's folder and only what differs f
 
 The mod reads the repository when the session starts, after each shell command or file edit, when you send a prompt, when you open the pane, and once a minute. It runs `git status --porcelain=v2 --branch --untracked-files=all`, `git log -1`, and `git submodule status` when the repository has a `.gitmodules` file. It never runs `git fetch`, so `↑` and `↓` compare with the last fetch.
 
-### Git client
+### 💻 Git client
 
 Pressing the branch name, or `g`, opens the `gitClient` command (default `lazygit`) in a new terminal window, in the repository root:
 
@@ -201,9 +227,10 @@ Pressing the branch name, or `g`, opens the `gitClient` command (default `lazygi
 | macOS | Terminal.app |
 | Linux | The first of `x-terminal-emulator`, `gnome-terminal`, `konsole` and `xterm` found on the `PATH` |
 
-A toast tells you when the command is not on the `PATH`. Set `gitClient` to empty to make the branch name plain text.
+> [!NOTE]
+> A toast tells you when the command is not on the `PATH`. Set `gitClient` to empty to make the branch name plain text.
 
-## Alerts
+## 🔔 Alerts
 
 The mod notifies once per threshold through your Claude Code notification channel (`preferredNotifChannel`):
 
@@ -214,7 +241,7 @@ The mod notifies once per threshold through your Claude Code notification channe
 
 A usage window alerts again after it resets; the context alert re-arms once the context drops under 85%, for example after a compaction. When notifications are off or the terminal has no channel, the alert shows as a toast instead. Turn alerts off with the `alerts` setting.
 
-## How usage updates
+## 📈 How usage updates
 
 ![The Usage section with the current session and current week bars and their reset countdowns](images/usage.png)
 
@@ -222,7 +249,7 @@ The bars read the same figures as `/usage` and the status line. Claude Code lear
 
 The section shows each window Claude Code reports: the current session (`five_hour`), the current week (`seven_day`) and a gateway's spend limit. A bar and its percentage are green below 50%, yellow from 50%, orange from 70% and red from 90%. The single-color context bar uses the same scale. On API-key or other non-subscription accounts there are no windows to show.
 
-## How a file opens
+## 📂 How a file opens
 
 A **new file** opens in your editor. With the `auto` editor that is VS Code when `code` is on the `PATH`, else the app the system associates with the file (`explorer.exe` on Windows, `open` on macOS, `xdg-open` on Linux). Terminal editors such as `$EDITOR` cannot open from the pane.
 
@@ -239,7 +266,7 @@ With the `auto` viewer, the mod opens the first of these that is available:
 2. **VS Code**: `code --diff`, when `code` is on the `PATH`.
 3. **Inline**: the unified diff drawn inside the pane.
 
-## What the Todos section shows
+## ✅ What the Todos section shows
 
 ![The Todos section with five completed tasks and one in progress](images/todos.png)
 
@@ -263,7 +290,7 @@ The tool and the prompt section use tokens on each request. Set `showTodos` to `
 
 The list belongs to the conversation: `/clear` empties it, a new session starts without one, and `/reload-plugins` keeps it.
 
-## What the Autopick section shows
+## ⏳ What the Autopick section shows
 
 You start a long task and walk away, and the session stops on a question Claude asked in the first minute. With autopick on, a question that waits longer than the wait you set gets the option Claude recommended, and the work goes on.
 
@@ -290,11 +317,13 @@ When a call holds several questions, all of them need a recommended option, or t
 
 The switch and the wait are kept in the mod's store, so they stay across sessions and every open session uses the same values. The switch starts off, and the wait starts at 10 minutes. The `−` and `+` buttons step through 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90 and 120 minutes. Turning the switch off stops every countdown that runs. A change of the wait applies to the next question.
 
-**ask-autopick.** The [ask-autopick](https://github.com/KilimcininKorOglu/claude-code-mods/tree/main/plugins/ask-autopick) mod does the same work. When both answer the same question, the result is not defined, so autopick here stands aside while that mod is loaded: it looks for the `/ask-autopick` command in the session's command list. The section then shows `⚠ The ask-autopick mod is loaded and answers questions too`, and the switch does not turn on until you disable ask-autopick.
+> [!NOTE]
+> **ask-autopick.** The [ask-autopick](https://github.com/KilimcininKorOglu/claude-code-mods/tree/main/plugins/ask-autopick) mod does the same work. When both answer the same question, the result is not defined, so autopick here stands aside while that mod is loaded: it looks for the `/ask-autopick` command in the session's command list. The section then shows `⚠ The ask-autopick mod is loaded and answers questions too`, and the switch does not turn on until you disable ask-autopick.
 
-Autopick answers questions for you: whatever the recommended option does, it is picked. Leave the switch off when a question can lead to a change you must approve. Set `showAutopick` to `false` to remove the section and the `/autopick` command.
+> [!CAUTION]
+> Autopick answers questions for you: whatever the recommended option does, it is picked. Leave the switch off when a question can lead to a change you must approve. Set `showAutopick` to `false` to remove the section and the `/autopick` command.
 
-## What the Skills section shows
+## 🧠 What the Skills section shows
 
 ![The Skills tab with two skills the main conversation loaded, both done](images/skills.png)
 
@@ -302,7 +331,7 @@ Each skill the conversation loaded, newest first: by the Skill tool (Claude's ow
 
 A skill has no end of its own: its text stays in the conversation. The section shows a skill as active (`⟳`) until the turn of the agent that loaded it ends, then as done (`✓`). The section draws the last 6 skills. `/clear` empties it.
 
-## What the CI section shows
+## 🚦 What the CI section shows
 
 The section follows the GitHub Actions runs that the session started through a shell command:
 
@@ -315,11 +344,12 @@ The section follows the GitHub Actions runs that the session started through a s
 
 Each run shows its workflow, branch, commit and time, a row of its jobs and an `↗ Open on GitHub` button that opens the run in your browser. While a run is open the section asks GitHub every 15 seconds with `gh run view`; when a run ends it raises a native notification with the result. The header shows `⟳ running` while a run is open, else the worst result. A new push replaces the runs of the previous one.
 
-The section needs the [GitHub CLI](https://cli.github.com/) on the `PATH`, logged in with `gh auth login`; the mod never reads a token. When `gh` is missing or fails, the section shows its message and stops asking.
+> [!IMPORTANT]
+> The section needs the [GitHub CLI](https://cli.github.com/) on the `PATH`, logged in with `gh auth login`; the mod never reads a token. When `gh` is missing or fails, the section shows its message and stops asking.
 
 A `/clear` or a `/resume` ends the watch: the runs belong to the conversation that started them.
 
-## What the Jira section shows
+## 🎫 What the Jira section shows
 
 ![The Jira tab with one issue: key, summary, status, priority, assignee and last update](images/jira.png)
 
@@ -331,24 +361,27 @@ The section finds an issue key in three places:
 - A `/browse/KEY-123` link, with or without the pattern.
 - Claude's own `getJiraIssue` calls. The section takes the issue from Claude's answer and makes no call of its own.
 
-A key from your prompt or Claude's answer is read by the mod's own call. That call goes through Claude Code's permission check like a tool call of Claude's, so in the default or auto mode it can be refused. Auto mode refuses it every time: its classifier judges only the calls a request of Claude's asked for, and gives no verdict for the mod's own. The row then says which tool to allow, and the transcript gets the whole message. Under it, while no allow rule covers the tool, two buttons help: `Allow reads` puts a request for the rule in the prompt, after any draft, for you to send, and `Copy rule` copies the tool name. The mod never writes your settings itself: the API has no call to add a permission rule, and a plugin that granted itself one would skip your approval. A read Claude made itself is not replaced by a refusal that comes later. To let the mod read issues, allow the two tools it calls in your settings:
+A key from your prompt or Claude's answer is read by the mod's own call. That call goes through Claude Code's permission check like a tool call of Claude's, so in the default or auto mode it can be refused. Auto mode refuses it every time: its classifier judges only the calls a request of Claude's asked for, and gives no verdict for the mod's own. The row then says which tool to allow, and the transcript gets the whole message. Under it, while no allow rule covers the tool, two buttons help: `Allow reads` puts a request for the rule in the prompt, after any draft, for you to send, and `Copy rule` copies the tool name. The mod never writes your settings itself: the API has no call to add a permission rule, and a plugin that granted itself one would skip your approval. A read Claude made itself is not replaced by a refusal that comes later.
 
-```json
-{
-  "permissions": {
-    "allow": [
-      "mcp__plugin_atlassian_atlassian__getJiraIssue",
-      "mcp__plugin_atlassian_atlassian__getAccessibleAtlassianResources"
-    ]
-  }
-}
-```
+> [!TIP]
+> To let the mod read issues, allow the two tools it calls in your settings:
+>
+> ```json
+> {
+>   "permissions": {
+>     "allow": [
+>       "mcp__plugin_atlassian_atlassian__getJiraIssue",
+>       "mcp__plugin_atlassian_atlassian__getAccessibleAtlassianResources"
+>     ]
+>   }
+> }
+> ```
 
 With `jiraSite` set, the mod never calls `getAccessibleAtlassianResources`. The tool names follow the server you connected; `/mcp` lists them.
 
 Each issue shows its key, summary, status, priority, assignee and when it was last updated. Pressing the key opens the issue in your browser. A key read in the last 5 minutes is not read again. The section draws the last 3 issues. `jiraSite` names your site (`https://company.atlassian.net`); left empty, the mod asks the server for the first Jira site your account reaches. `/clear` empties the section.
 
-## Arrange the cards
+## 🧱 Arrange the cards
 
 Layout mode changes the same settings that `/config` changes, so the order and the hidden cards stay for the next sessions.
 
@@ -358,9 +391,9 @@ Layout mode changes the same settings that `/config` changes, so the order and t
 
 After each change, Claude Code loads the mod again with the new settings, so the pane draws once more. The settings stay. A load stops the timers of the mod, so the layout does not change while an autopick countdown runs: the mod shows a toast instead. Cancel the countdown or let it end first. When a managed policy owns a setting, Claude Code refuses the change and the mod shows the reason in a toast.
 
-## Settings
+## 🔧 Settings
 
-Change these in `/config`, or move and hide the cards in [layout mode](#arrange-the-cards):
+Change these in `/config`, or move and hide the cards in [layout mode](#-arrange-the-cards):
 
 | Setting | Values | Default |
 | --- | --- | --- |
@@ -395,7 +428,7 @@ Change these in `/config`, or move and hide the cards in [layout mode](#arrange-
 
 With `openOnStart`, Claude Code draws the pane at session start only on a terminal of 144 columns or more, or 110 once you have opened the pane and not closed it by hand. On a narrower terminal the pane waits until you widen the terminal or run `/session-info`. A `-p` run does not open it. A reload of the mod opens it again.
 
-## How changes are detected
+## 🔍 How changes are detected
 
 ![The Changes tab with one created file and one modified file in a treeview](images/changes.png)
 
@@ -407,7 +440,7 @@ With `openOnStart`, Claude Code draws the pane at session start only on a termin
 
 After every shell command, the mod also checks that each listed file still exists, so a file that was deleted shows as deleted. A file created and then deleted in the same session leaves the list.
 
-## Limitations
+## 🚧 Limitations
 
 - **PowerShell commands:** a file that was already modified before the command and is modified again is not detected. Outside a git repository, only deletions of files already in the list are detected.
 - **Mouse clicks** work in the fullscreen terminal. Elsewhere, use the keyboard.
@@ -419,13 +452,16 @@ After every shell command, the mod also checks that each listed file still exist
 - **Autopick** depends on Claude Code closing the question when the mod answers the call first. This was measured on Claude Code 2.1.296, for a pick after the wait and for Pick now pressed in the pane while the question was open; the mod API does not document it. Waits longer than 1 minute were not measured live. A question in a language whose word for "recommended" is not on the list waits for you. A copy of ask-autopick loaded under another name is not detected.
 - **Usage** shows only the windows Claude Code exposes to mods. The per-model weekly windows and the `~N tok/turn` total that `/usage` prints come from an endpoint mods cannot reach without your OAuth token, so they are left out.
 
-## Development
+## 🔨 Development
 
 ```text
 claude plugin validate .
 claude plugin test .
 claude --plugin-dir .
 ```
+
+<details>
+<summary>🗂 Source files</summary>
 
 | File | Role |
 | --- | --- |
@@ -451,12 +487,14 @@ claude --plugin-dir .
 | `hooks/host.ts` | The engine calls the helper modules use |
 | `types/index.d.ts` | The `$.state` contract |
 
-## Credits
+</details>
+
+## 🙏 Credits
 
 The stacked context bar follows the design of [context-bar](https://github.com/hamzafer/claude-code-mods/tree/main/mods/context-bar) by Hamza Zafar (MIT).
 
 The Autopick section follows [ask-autopick](https://github.com/KilimcininKorOglu/claude-code-mods/tree/main/plugins/ask-autopick) by Kerem Gok (MIT): the rules that find the recommended option, its list of words for "recommended", and the note that tells Claude the pick was not your choice.
 
-## License
+## 📄 License
 
 [MIT](../LICENSE)
