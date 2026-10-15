@@ -504,6 +504,56 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`paneTitle draws a line at the top of the pane in paneTitleColor (${surface})`, { options: { paneTitle: 'Work', paneTitleColor: '#ff8700' } }, async ($, on) => {
+    on('session.cwd', async () => ({ value: '/repo' }))
+    on('agent.list', async () => ({ value: [] }))
+    on('session.usage', async () => usage([]))
+
+    const ui = await $.ui.mount({ ...PANE, surface } as never)
+    const line = await ui.find({ type: 'Text', text: /Work/ })
+    expect((line as unknown as { props: Record<string, unknown> }).props.color).toBe('#ff8700')
+    await ui.unmount()
+  })
+
+  for (const [paneTitleAlign, grows] of [['center', [true, true]], ['right', [true, false]], [undefined, [false, true]]] as const) {
+    test(`paneTitleAlign ${paneTitleAlign ?? 'left by default'} makes ${grows[0] ? 'the left' : 'the right'}${grows[0] && grows[1] ? ' and right' : ''} side of the title rule grow (${surface})`, { options: { paneTitle: 'Work', paneTitleAlign } }, async ($, on) => {
+      on('session.cwd', async () => ({ value: '/repo' }))
+      on('agent.list', async () => ({ value: [] }))
+      on('session.usage', async () => usage([]))
+
+      const ui = await $.ui.mount({ ...PANE, surface } as never)
+      const sides = await Promise.all(['pane-title:left', 'pane-title:right'].map(key => ui.find({ key })))
+      expect(sides.map(side => (side as unknown as { props: Record<string, unknown> }).props.flexGrow === 1)).toEqual(grows)
+      await ui.unmount()
+    })
+  }
+
+  test(`the pane has no title line without paneTitle (${surface})`, async ($, on) => {
+    on('session.cwd', async () => ({ value: '/repo' }))
+    on('agent.list', async () => ({ value: [] }))
+    on('session.usage', async () => usage([]))
+
+    const ui = await $.ui.mount({ ...PANE, surface } as never)
+    expect(await ui.findAll({ key: 'pane-title' })).toEqual([])
+    await ui.unmount()
+  })
+}
+
+for (const [paneTitle, title] of [['Work', 'Work'], ['', 'Session info']] as const) {
+  test(`opens the pane titled ${title} (paneTitle ${paneTitle === '' ? 'empty' : paneTitle})`, { options: { openOnStart: true, paneTitle } }, async ($, on) => {
+    const titles: (string | undefined)[] = []
+    mock.clock(on)
+    on('session.start', async (_, e) => ({ cwd: e.cwd }))
+    on('command.register', async (_, e) => ({ value: { command: e.name } }))
+    on('ui.open', async (_, e) => (titles.push(e.title), { value: { isPlaced: true } }))
+    on('process.run', async () => ({ value: ran('', 128) }))
+
+    await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+    expect(titles).toEqual([title])
+  })
+}
+
 test('usage colors go from green to red as a window nears its limit', async () => {
   expect([0, 49, 50, 69, 70, 89, 90, 100].map(colorOf)).toEqual(['success', 'success', 'warning', 'warning', '#ff8700', '#ff8700', 'error', 'error'])
 })

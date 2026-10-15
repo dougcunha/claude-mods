@@ -425,11 +425,16 @@ Change these in `/config`, or move and hide the cards in [layout mode](#-arrange
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
 | `session-info.paneBackground` | A color for the body of the pane in the terminal: hex such as `#2e3440`, or a color name. Empty keeps the color Claude Code draws. The frame and the close row keep Claude Code's color | empty |
+| `session-info.paneTitle` | A name for this pane, up to 40 characters, for example `Personal` or `Work`, to tell accounts apart. It becomes the pane's tab title and a one-row rule at the top of the pane, `─── Title ───`. Empty keeps the title `Session info` and draws no rule | empty |
+| `session-info.paneTitleColor` | The color of the rule and the title: hex such as `#ff8700`, a color name or a theme key such as `success`. Needs a pane title. Empty keeps the default text color | empty |
+| `session-info.paneTitleAlign` | `left`, `center`, `right`: where the title sits on its rule. Needs a pane title | `left` |
 | `session-info.icons` | `unicode`, `nerd` (needs a [Nerd Font](https://www.nerdfonts.com/)), `emoji` | `unicode` |
 | `session-info.buildPattern` | A case-insensitive regular expression matched against each command segment, for example `^make( \|$)` | empty |
 | `session-info.testPattern` | The same, for test runs, for example `^just test\|^task test` | empty |
 
 With `openOnStart`, Claude Code draws the pane at session start only on a terminal of 144 columns or more, or 110 once you have opened the pane and not closed it by hand. On a narrower terminal the pane waits until you widen the terminal or run `/session-info`. A `-p` run does not open it. A reload of the mod opens it again.
+
+Claude Code draws a pane's tab title only while more than one pane is open, so `paneTitle` also draws its own rule at the top of the pane. The mod cannot read which account is logged in, because the supported API does not expose it: the name is one you set. If you keep one settings folder per account, for example with `CLAUDE_CONFIG_DIR`, each account keeps its own title and color.
 
 ## 🔍 How changes are detected
 

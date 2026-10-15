@@ -1,5 +1,8 @@
 import type { Color, Elements, RenderChildren } from 'claude-code'
 
+import { ALIGN_GROW } from './title'
+import type { TitleAlign } from './title'
+
 type Widgets = Pick<Elements['terminal'], 'Box' | 'Text'>
 
 /** One headline figure of the tiles row: a bold value, then a dim label. */
@@ -13,6 +16,12 @@ export const FRAME_ROWS = 2
 export const FRAME_COLUMNS = 4
 const TILE_MIN_COLUMNS = 18
 const TILE_ROWS = 3
+/** Rows the pane's title banner takes: its rule row alone. The blank row below comes from the pane itself. */
+export const BANNER_ROWS = 1
+/** Dashes in each side of the title rule, more than any pane is wide; the box clips them. */
+const RULE_LENGTH = 400
+/** Columns of the side of the rule that does not grow. */
+const RULE_STUB = 2
 
 export const isFramed = (columns: number): boolean => columns >= FRAME_MIN_COLUMNS
 
@@ -56,6 +65,8 @@ export function widgets({ Box, Text }: Widgets, isTerminal = true) {
           <Box
             key={`tile:${tile.key}`}
             width={isTerminal ? width : '49%'}
+            // bodyColumns is a little narrower than the row: the width sets the wrap and the grow takes up what is left.
+            {...(isTerminal ? { flexGrow: 1 } : {})}
             flexDirection="row"
             borderStyle="round"
             borderColor="subtle"
@@ -70,5 +81,27 @@ export function widgets({ Box, Text }: Widgets, isTerminal = true) {
     )
   }
 
-  return { card, tiles }
+  /** One side of the title rule: a row of dashes clipped to the width the box gets, which is the rest of the row when it grows and RULE_STUB columns when it does not. */
+  const rule = (key: string, color: string, isGrowing: boolean) => (
+    <Box key={key} height={1} overflow="hidden" {...(isGrowing ? { flexGrow: 1 } : { width: RULE_STUB, flexShrink: 0 })}>
+      <Text color={color || 'subtle'}>{'─'.repeat(RULE_LENGTH)}</Text>
+    </Box>
+  )
+
+  /** The pane's custom title on one row between two rules, no margin, the title bold in the title color; align picks the side that grows. */
+  const banner = (title: string, color: string, align: TitleAlign) => {
+    const [isLeftGrowing, isRightGrowing] = ALIGN_GROW[align]
+
+    return (
+      <Box key="pane-title" flexDirection="row">
+        {rule('pane-title:left', color, isLeftGrowing)}
+        <Box key="pane-title:text" flexShrink={0}>
+          <Text bold {...(color === '' ? {} : { color })}>{` ${title} `}</Text>
+        </Box>
+        {rule('pane-title:right', color, isRightGrowing)}
+      </Box>
+    )
+  }
+
+  return { card, tiles, banner }
 }

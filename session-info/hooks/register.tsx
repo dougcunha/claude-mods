@@ -8,7 +8,7 @@ import { crossings } from './alerts'
 import { AUTOPICK_USAGE, autopickSummary, countdown, DEFAULT_SETTINGS, hasRival, minutesOf, pickedLog, pickedNote, picksOf, picksText, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from './autopick'
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
-import { FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
+import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
 import { openClient } from './client'
 import { cellWidths, contextText, GLYPH, LEGEND_GAP, legendLines, legendText, SWATCH, toReading } from './context'
@@ -34,6 +34,7 @@ import { buildTree, flatten } from './tree'
 import { modelText, refusedText, RESULT, resultText, startDraft, toolsText, tokensText, toRecord, turnLines, withRefusal, withSpawn, withStep, withSubagentUsage, withTool } from './turn'
 import type { TurnDraft } from './turn'
 import type { Row } from './tree'
+import { customTitle, DEFAULT_TITLE, titleAlign, titleColor } from './title'
 import { bar, colorOf, labelOf, ordered, percentText, resetIn } from './usage'
 import type { Limit } from './usage'
 import { openChange, openRepoFile, openUrl } from './viewer'
@@ -67,7 +68,6 @@ const changesTop = atom({ plugin: 'session-info', key: 'changesTop' } as const, 
 const gitTop = atom({ plugin: 'session-info', key: 'gitTop' } as const, 0)
 
 const PANE = 'session-info'
-const TITLE = 'Session info'
 const MINUTE = 60_000
 
 /** Tools whose calls can change the working tree, so the Git section reads the repository again after them. */
@@ -547,10 +547,12 @@ async function answerOrPick($: EngineInterface, live: Countdowns, input: { tool_
   }
 }
 
-async function openPane($: EngineInterface, isGitShown: boolean, isSessionShown: boolean): Promise<{ text: string }> {
+type OpenPaneArgs = { title: string; isGitShown: boolean; isSessionShown: boolean }
+
+async function openPane($: EngineInterface, { title, isGitShown, isSessionShown }: OpenPaneArgs): Promise<{ text: string }> {
   if (isGitShown) void refreshRepo($)
   if (isSessionShown) void refreshContext($).catch(() => undefined)
-  await $.ui.open({ id: PANE, title: TITLE, focus: true })
+  await $.ui.open({ id: PANE, title, focus: true })
 
   return { text: 'Session info pane opened.' }
 }
@@ -579,6 +581,10 @@ export const register: Register = (on, options) => {
   const keyPattern = toKeyPattern(options.jiraKeyPattern)
   const gitClient = typeof options.gitClient === 'string' ? options.gitClient.trim() : 'lazygit'
   const paneBackground = typeof options.paneBackground === 'string' ? options.paneBackground.trim() : ''
+  const paneTitle = customTitle(options.paneTitle)
+  const paneTitleColor = titleColor(options.paneTitleColor)
+  const paneTitleAlign = titleAlign(options.paneTitleAlign)
+  const openArgs: OpenPaneArgs = { title: paneTitle || DEFAULT_TITLE, isGitShown: shows.git, isSessionShown: shows.session }
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
   const isSuggestingFix = shows.checks && options.suggestFix !== false
@@ -633,7 +639,7 @@ export const register: Register = (on, options) => {
       $.clock.after(5_000, () => void checkRival($).catch(() => undefined))
     }
     // The engine draws a pane that the person did not ask for only on a wide terminal; a narrow one keeps it until /session-info.
-    if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: TITLE })
+    if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: openArgs.title })
 
     return next(e)
   })
@@ -683,9 +689,9 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  on('command.run', { command: 'session-info' }, async $ => openPane($, shows.git, shows.session))
+  on('command.run', { command: 'session-info' }, async $ => openPane($, openArgs))
 
-  on('command.run', { command: 'changes' }, async $ => openPane($, shows.git, shows.session))
+  on('command.run', { command: 'changes' }, async $ => openPane($, openArgs))
 
   if (shows.autopick) on('command.run', { command: 'autopick' }, async ($, e) => runAutopick($, live, String(e.args ?? '')))
 
@@ -899,7 +905,7 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button, Code } = $.ui.resolve(e)
     const isTerminal = e.surface === 'terminal'
-    const { card, tiles } = widgets({ Box, Text }, isTerminal)
+    const { card, tiles, banner } = widgets({ Box, Text }, isTerminal)
     const cols = Math.max(20, e.props.bodyColumns)
     const isCards = !isTerminal || isFramed(cols)
     const inner = isCards ? cols - FRAME_COLUMNS : cols
@@ -991,7 +997,8 @@ export const register: Register = (on, options) => {
             { key: 'elapsed', value: duration(Date.now() - usage.startedAt), label: 'elapsed' },
           ]
         : []
-    const tileRows = tileLayout(figures.length, cols).rows
+    // The rows above the first section: the title line and the figure tiles.
+    const tileRows = (paneTitle !== '' ? BANNER_ROWS : 0) + tileLayout(figures.length, cols).rows
     const turnRows = counts('#turn') ? chrome + (isOpen('#turn') ? (turnRecord ? turnLines(turnRecord).length : 1) : 0) : 0
     const skillRoom = Math.min(skillList.length, SKILL_ROOM)
     const skillsRows = counts('#skills') ? chrome + (isOpen('#skills') ? Math.max(1, skillRoom + (skillList.length > skillRoom ? 1 : 0)) : 0) : 0
@@ -1870,6 +1877,7 @@ export const register: Register = (on, options) => {
 
     return (
       <Box flexDirection="column" {...paint}>
+        {paneTitle !== '' && banner(paneTitle, paneTitleColor, paneTitleAlign)}
         {figures.length > 0 && tiles(figures, cols)}
         {slots.map(key => [key === '#changes' ? changesSection : nodes[key], key === diffSlot && diffView])}
         {checklist}
