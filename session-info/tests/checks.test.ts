@@ -1,4 +1,5 @@
 import { expect, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 
 import { checkRuns, checkViews, classify, fixSuggestion, toPattern } from '../hooks/checks'
 import type { ShellRun } from '../hooks/checks'
@@ -10,7 +11,7 @@ const PANE = {
   plugin: 'session-info',
   component: 'Pane',
   requestId: 'session-info',
-  props: { title: 'Session info', isFocused: true, bodyColumns: 100 },
+  props: { title: 'Session info', isFocused: true, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 200 }, view: {} },
 } as const
 
 const usage = { value: { startedAt: 0, context: {}, rateLimits: [] } } as never
@@ -403,7 +404,7 @@ test('the fix prompt asks for the failed build first, then names the failed test
 })
 
 /** A session whose shell runs a failing test run, with the prompt box's suggestions kept in `shown`. */
-function failingSession(on: Parameters<Parameters<typeof test>[1] & ((...args: never[]) => unknown)>[1], shown: string[]) {
+function failingSession(on: Parameters<TestBody>[1], shown: string[]) {
   on('session.cwd', async () => ({ value: '/repo' }))
   on('agent.list', async () => ({ value: [] }))
   on('session.usage', async () => usage)

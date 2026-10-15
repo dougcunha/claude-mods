@@ -7,7 +7,7 @@ const PANE = {
   plugin: 'session-info',
   component: 'Pane',
   requestId: 'session-info',
-  props: { title: 'Session info', isFocused: true, bodyColumns: 100 },
+  props: { title: 'Session info', isFocused: true, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 200 }, view: {} },
 } as const
 
 const MINUTE = 60_000

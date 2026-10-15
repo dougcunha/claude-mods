@@ -31,8 +31,15 @@ export async function platformOf(host: Host): Promise<Platform> {
   return platform
 }
 
+/** The argv that succeeds when the program is on the PATH: `where` on Windows; `command -v` elsewhere, as minimal Linux images lack `which`. */
+export const lookupArgv = (platform: Platform, program: string): string[] =>
+  platform === 'windows' ? ['where', program] : ['sh', '-c', 'command -v "$1"', 'sh', program]
+
+export const onPath = async (host: Host, program: string): Promise<boolean> =>
+  succeeds(host, lookupArgv(await platformOf(host), program))
+
 async function codeOnPath(host: Host): Promise<boolean> {
-  hasCode ??= await succeeds(host, (await platformOf(host)) === 'windows' ? ['where', 'code'] : ['which', 'code'])
+  hasCode ??= await onPath(host, 'code')
 
   return hasCode
 }

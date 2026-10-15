@@ -1,14 +1,22 @@
 import type { Host } from './host'
-import { launch, platformOf, succeeds } from './viewer'
+import { launch, lookupArgv, onPath, platformOf, succeeds } from './viewer'
 import type { Platform } from './viewer'
 
-/** Terminal emulators tried in order on Linux, each with the flag that runs a command in it. */
-const TERMINALS: readonly (readonly [string, string])[] = [
+/** Terminal emulators tried in order on Linux, each with the arguments that come before the command it runs. */
+const TERMINALS: readonly (readonly string[])[] = [
   ['x-terminal-emulator', '-e'],
   ['gnome-terminal', '--'],
   ['konsole', '-e'],
+  ['xfce4-terminal', '-x'],
+  ['kitty'],
+  ['alacritty', '-e'],
+  ['wezterm', 'start', '--'],
+  ['foot'],
   ['xterm', '-e'],
 ]
+
+/** Runs the command from the folder in its first argument, as not every terminal starts in its own working directory. */
+const IN_FOLDER = ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh']
 
 /** Splits a command line on spaces; double quotes keep a path with spaces in one piece. */
 export function splitCommand(line: string): string[] {
@@ -22,7 +30,7 @@ const appleString = (text: string): string => `"${text.replace(/\\/g, '\\\\').re
 /**
  * The argv that opens the client in a new terminal window, in the repository's root.
  * Windows: `start` opens the default terminal, Windows Terminal on Windows 11; its quoted title comes first.
- * macOS: Terminal.app through AppleScript. Linux: the first terminal emulator found, given by the caller.
+ * macOS: Terminal.app through AppleScript. Linux: the first terminal emulator found, given by the caller, with `sh` changing to the root.
  */
 export function clientArgv(platform: Platform, root: string, command: readonly string[], terminal?: readonly string[]): string[] | undefined {
   if (platform === 'windows') return ['cmd', '/c', 'start', 'Git client', '/D', root.replace(/\//g, '\\'), ...command]
@@ -32,11 +40,12 @@ export function clientArgv(platform: Platform, root: string, command: readonly s
     return ['osascript', '-e', `tell application "Terminal" to do script ${appleString(script)}`, '-e', 'tell application "Terminal" to activate']
   }
 
-  return terminal === undefined ? undefined : [...terminal, ...command]
+  return terminal === undefined ? undefined : [...terminal, ...IN_FOLDER, root, ...command]
 }
 
-async function linuxTerminal(host: Host): Promise<readonly string[] | undefined> {
-  for (const terminal of TERMINALS) if (await succeeds(host, ['which', terminal[0]])) return terminal
+/** The first terminal emulator of `TERMINALS` on the PATH, with its arguments; undefined when there is none. */
+export async function linuxTerminal(host: Host): Promise<readonly string[] | undefined> {
+  for (const terminal of TERMINALS) if (await succeeds(host, lookupArgv('linux', terminal[0] ?? ''))) return terminal
 
   return undefined
 }
@@ -47,12 +56,10 @@ export async function openClient(host: Host, root: string, line: string): Promis
   const program = command[0]
   if (program === undefined) return
 
-  const platform = await platformOf(host)
-  const isFound = /[\\/]/.test(program)
-    ? await host.exists(program)
-    : await succeeds(host, [platform === 'windows' ? 'where' : 'which', program])
+  const isFound = /[\\/]/.test(program) ? await host.exists(program) : await onPath(host, program)
   if (!isFound) return host.toast(`session-info: ${program} is not on the PATH. Set the Git client in /config.`)
 
+  const platform = await platformOf(host)
   const terminal = platform === 'linux' ? await linuxTerminal(host) : undefined
   const argv = clientArgv(platform, root, command, terminal)
   if (argv === undefined) return host.toast('session-info: no terminal emulator found to open the Git client.')

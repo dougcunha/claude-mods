@@ -7,7 +7,7 @@ const PANE = {
   plugin: 'session-info',
   component: 'Pane',
   requestId: 'session-info',
-  props: { title: 'Session info', isFocused: true, bodyColumns: 80 },
+  props: { title: 'Session info', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 200 }, view: {} },
 } as const
 
 const TODOS = [

@@ -1,15 +1,18 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { clientArgv, splitCommand } from '../hooks/client'
+import { clientArgv, linuxTerminal, splitCommand } from '../hooks/client'
 import type { Host } from '../hooks/host'
 import { age, branchText, codeParts, countParts, fileStatus, mergeSubmodules, operationText, parseCommit, parseStatus, parseSubmoduleStatus, readOperation, repoRowCount } from '../hooks/repo'
+import { lookupArgv } from '../hooks/viewer'
 import type { Repo } from '../types'
+
+const IN_FOLDER = ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh']
 
 const PANE = {
   plugin: 'session-info',
   component: 'Pane',
   requestId: 'session-info',
-  props: { title: 'Session info', isFocused: true, bodyColumns: 100 },
+  props: { title: 'Session info', isFocused: true, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 200 }, view: {} },
 } as const
 
 const STATUS = [
@@ -152,8 +155,32 @@ test('builds the argv that opens the Git client in a new terminal window', async
     '-e',
     'tell application "Terminal" to activate',
   ])
-  expect(clientArgv('linux', '/repo', ['lazygit'], ['xterm', '-e'])).toEqual(['xterm', '-e', 'lazygit'])
+  expect(clientArgv('linux', '/my repo', ['tig', '--all'], ['xterm', '-e'])).toEqual(['xterm', '-e', ...IN_FOLDER, '/my repo', 'tig', '--all'])
+  expect(clientArgv('linux', '/repo', ['lazygit'], ['foot'])).toEqual(['foot', ...IN_FOLDER, '/repo', 'lazygit'])
   expect(clientArgv('linux', '/repo', ['lazygit'])).toBe(undefined)
+})
+
+test('looks a program up with where on Windows and with command -v through sh elsewhere', async () => {
+  expect(lookupArgv('windows', 'lazygit')).toEqual(['where', 'lazygit'])
+  expect(lookupArgv('mac', 'lazygit')).toEqual(['sh', '-c', 'command -v "$1"', 'sh', 'lazygit'])
+  expect(lookupArgv('linux', 'my tool')).toEqual(['sh', '-c', 'command -v "$1"', 'sh', 'my tool'])
+})
+
+test('picks the first Linux terminal emulator on the PATH, or none', async () => {
+  const hostWith = (installed: readonly string[]) => {
+    const runs: string[][] = []
+    const host = {
+      run: async (argv: string[]) => (runs.push(argv), { exitCode: installed.includes(argv.at(-1) ?? '') ? 0 : 1, stdout: '' }),
+    } as unknown as Host
+
+    return { host, runs }
+  }
+
+  const kitty = hostWith(['kitty', 'xterm'])
+  expect(await linuxTerminal(kitty.host)).toEqual(['kitty'])
+  expect(kitty.runs.every(argv => argv[0] === 'sh' && argv[2] === 'command -v "$1"')).toBe(true)
+  expect(await linuxTerminal(hostWith(['wezterm']).host)).toEqual(['wezterm', 'start', '--'])
+  expect(await linuxTerminal(hostWith([]).host)).toBe(undefined)
 })
 
 for (const surface of ['terminal', 'desktop'] as const) {

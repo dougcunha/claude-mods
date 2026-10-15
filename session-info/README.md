@@ -225,10 +225,10 @@ Pressing the branch name, or `g`, opens the `gitClient` command (default `lazygi
 | --- | --- |
 | Windows | `start`, which opens the default terminal app: Windows Terminal on Windows 11 |
 | macOS | Terminal.app |
-| Linux | The first of `x-terminal-emulator`, `gnome-terminal`, `konsole` and `xterm` found on the `PATH` |
+| Linux | The first of `x-terminal-emulator`, `gnome-terminal`, `konsole`, `xfce4-terminal`, `kitty`, `alacritty`, `wezterm`, `foot` and `xterm` found on the `PATH`. `sh` changes to the repository root before it starts the client |
 
 > [!NOTE]
-> A toast tells you when the command is not on the `PATH`. Set `gitClient` to empty to make the branch name plain text.
+> A toast tells you when the command is not on the `PATH`. The mod looks for it with `where` on Windows and `command -v` on macOS and Linux. Set `gitClient` to empty to make the branch name plain text.
 
 ## 🔔 Alerts
 
