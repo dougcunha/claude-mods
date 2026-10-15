@@ -38,17 +38,16 @@ export function resetIn(resetsAt: string | undefined, now: number): string | und
   return `resets in ${minutes}m`
 }
 
-const EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉']
-
-/** The filled run and the empty line of a bar `width` cells wide, filled to the eighth of a cell; any use shows at least one eighth. */
+/**
+ * The filled run and the empty line of a bar `width` cells wide, filled in whole cells so the line starts flush against
+ * the run, as the context bar's does; any use shows at least one cell.
+ */
 export function bar(percent: number, width: number): { filled: string; empty: string } {
   const cells = Math.max(1, width)
   const share = Math.min(100, Math.max(0, percent)) / 100
-  const eighths = percent > 0 ? Math.max(1, Math.round(share * cells * 8)) : 0
-  const full = Math.floor(eighths / 8)
-  const partial = EIGHTHS[eighths % 8]
+  const full = percent > 0 ? Math.min(cells, Math.max(1, Math.round(share * cells))) : 0
 
-  return { filled: '█'.repeat(full) + partial, empty: '─'.repeat(cells - full - (partial === '' ? 0 : 1)) }
+  return { filled: '█'.repeat(full), empty: '─'.repeat(cells - full) }
 }
 
 /** Between the theme's warning and error colors; no theme key holds an orange. */

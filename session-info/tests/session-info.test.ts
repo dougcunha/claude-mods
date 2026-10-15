@@ -336,10 +336,11 @@ test('a narrow desktop pane still draws the tiles and percentage bars, not block
   await ui.unmount()
 })
 
-test('bars fill to the eighth of a cell and show any use', async () => {
+test('bars fill in whole cells, so the line starts flush against the run, and show any use', async () => {
   expect(bar(50, 10)).toEqual({ filled: '█████', empty: '─────' })
-  expect(bar(55, 10)).toEqual({ filled: '█████▌', empty: '────' })
-  expect(bar(0.1, 10)).toEqual({ filled: '▏', empty: '─────────' })
+  expect(bar(54, 10)).toEqual({ filled: '█████', empty: '─────' })
+  expect(bar(55, 10)).toEqual({ filled: '██████', empty: '────' })
+  expect(bar(0.1, 10)).toEqual({ filled: '█', empty: '─────────' })
   expect(bar(0, 4)).toEqual({ filled: '', empty: '────' })
   expect(bar(120, 4)).toEqual({ filled: '████', empty: '' })
 })

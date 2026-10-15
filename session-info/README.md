@@ -38,7 +38,7 @@
 
 ### 🎨 Cards, tabs and order
 
-Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost and the elapsed time at a glance. Bars fill to the eighth of a cell. In a terminal pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions. The desktop app always draws the frames and tiles, sizing them and the bars by percentage instead of terminal cells.
+Each section is a card with a rounded frame that lights up under the pointer in the fullscreen terminal, and a row of tiles above them shows the cost and the elapsed time at a glance. Bars fill in whole cells, so the line after the filled run starts flush against it in every bar. In a terminal pane narrower than 44 columns the frames and tiles step aside and the sections draw bare, as in earlier versions. The desktop app always draws the frames and tiles, sizing them and the bars by percentage instead of terminal cells.
 
 Sections can share one card as tabs, to make the pane shorter. By default Changes and Git do: the card opens on Changes, and pressing a tab shows that section in the same place. A tab that is not active shows a count, such as `Changes 12`, so a hidden section still says it has something. The `tabGroups` option sets the groups, for example `changes+git, ci+jira+skills`.
 
