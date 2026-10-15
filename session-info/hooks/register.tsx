@@ -1,13 +1,14 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
 
-import type { AgentModel, AutopickPick, AutopickSettings, AutopickWait, ChangeStatus, Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
+import type { AgentModel, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, ChangeStatus, Checks, CiRun, CiWatch, ContextReading, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentModelText, agentRows, agentSummary, withAgentModel } from './agents'
 import { crossings } from './alerts'
 import { AUTOPICK_USAGE, autopickSummary, countdown, DEFAULT_SETTINGS, hasRival, minutesOf, pickedLog, pickedNote, picksOf, picksText, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from './autopick'
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
+import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, hasCommandLine, orderedTasks, startedTask, taskLabel, taskRowCount, taskState, withEnd, withTask } from './background'
 import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
 import { openClient } from './client'
@@ -50,6 +51,7 @@ const breakdown = atom({ plugin: 'session-info', key: 'breakdown' } as const, fa
 const contextState = atom({ plugin: 'session-info', key: 'context' } as const, null as ContextReading | null)
 const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as string[])
 const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECKS as Checks)
+const background = atom({ plugin: 'session-info', key: 'background' } as const, [] as BackgroundTask[])
 const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
 const lastTurn = atom({ plugin: 'session-info', key: 'lastTurn' } as const, null as TurnRecord | null)
 const todos = atom({ plugin: 'session-info', key: 'todos' } as const, [] as Todo[])
@@ -212,9 +214,14 @@ async function seedTurns($: EngineInterface): Promise<void> {
   await update($, turns, stats => ((stats ?? NO_TURNS).count > 0 ? (stats ?? NO_TURNS) : { ...(stats ?? NO_TURNS), count: sent }))
 }
 
-/** Reads the checks of each background command whose task the notification says ended. */
-async function finishTasks($: EngineInterface, text: string): Promise<void> {
+/** Which sections a task notification can change: the Background list marks the task ended, Checks reads the run it ran. */
+type TaskSections = { isBackground: boolean; isChecks: boolean }
+
+/** Marks each background task the notification says ended, and reads the checks of its command. */
+async function finishTasks($: EngineInterface, text: string, { isBackground, isChecks }: TaskSections): Promise<void> {
   for (const end of taskEnds(text)) {
+    if (isBackground) await update($, background, tasks => withEnd(tasks ?? [], end, Date.now()))
+    if (!isChecks) continue
     const runs = await finishedRuns(hostOf($), await read($, checks), end, Date.now())
     if (runs.length > 0) await update($, checks, current => withFinished(current ?? NO_CHECKS, end, runs))
   }
@@ -571,6 +578,7 @@ export const register: Register = (on, options) => {
     ci: options.showCi !== false,
     usage: options.showUsage !== false,
     agents: options.showAgents !== false,
+    background: options.showBackground !== false,
     checks: options.showChecks !== false,
     git: options.showGit !== false,
     changes: options.showChanges !== false,
@@ -593,10 +601,10 @@ export const register: Register = (on, options) => {
   const groupOf = new Map(groups.flatMap(group => group.members.map(key => [key, group] as const)))
   /** A grouped section folds with its group, whichever members show now. */
   const foldOf = (key: SectionKey): string => groupOf.get(key)?.key ?? key
-  const isLive = shows.session || shows.usage || shows.agents || shows.checks
+  const isLive = shows.session || shows.usage || shows.agents || shows.checks || shows.background
   const isOpenOnStart = options.openOnStart === true
 
-  /** The pane's layout mode toggles the sections, so /config leaves out their twelve show* rows. */
+  /** The pane's layout mode toggles the sections, so /config leaves out their thirteen show* rows. */
   on('config.describe', { key: ORDER.map(key => `session-info.${showOption(key)}`) }, async ($, e, next) => ({ ...(await next(e)), isHidden: true }))
 
   on('session.start', async ($, e, next) => {
@@ -654,6 +662,7 @@ export const register: Register = (on, options) => {
       if (shows.skills) await update($, skills, () => [])
       if (shows.jira) await update($, jiraIssues, () => [])
       if (shows.agents) await update($, agentModels, () => ({}))
+      if (shows.background) await update($, background, () => [])
       if (shows.autopick) await update($, autopickLast, () => null)
     }
 
@@ -700,8 +709,8 @@ export const register: Register = (on, options) => {
     if (shows.git) void refreshRepo($)
     if (fix) fix.isOpen = false
     // A background command's end reaches the session as a notification prompt, the one place its exit status shows.
-    if (shows.checks && e.origin?.kind === 'task-notification')
-      void finishTasks($, e.text).catch(error => $.ui.toast(`session-info: ${String(error)}`))
+    if ((shows.checks || shows.background) && e.origin?.kind === 'task-notification')
+      void finishTasks($, e.text, { isBackground: shows.background, isChecks: shows.checks }).catch(error => $.ui.toast(`session-info: ${String(error)}`))
     if (shows.jira) {
       // MCP servers connect after the session starts: each prompt looks again until one serves Jira.
       void findJiraServer($).catch(() => undefined)
@@ -848,18 +857,23 @@ export const register: Register = (on, options) => {
     if (e.tool === 'AskUserQuestion') return next(e)
     const isShell = (SHELLS as readonly string[]).includes(e.tool)
     const isChecked = shows.checks && isShell
+    const isBackgrounded = shows.background && isShell
     const isRepoTool = shows.git && FILE_TOOLS.includes(e.tool)
     const isCiTool = shows.ci && isShell
     // The model's own read of an issue names it as clearly as a mention, and its answer is the read the section needs.
     const input = e as Record<string, unknown>
     const asked = typeof input.issueIdOrKey === 'string' ? input.issueIdOrKey.toUpperCase() : ''
     const isJiraRead = shows.jira && serverOf(e.tool) !== undefined && isIssueKey(asked)
-    if (!shows.changes && !isChecked && !isRepoTool && !isCiTool && !isJiraRead) return next(e)
+    if (!shows.changes && !isChecked && !isBackgrounded && !isRepoTool && !isCiTool && !isJiraRead) return next(e)
     const before = shows.changes && isShell ? await gitStatus(hostOf($)).catch(() => undefined) : undefined
     const ran = await next(e)
     const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
     if (shows.changes && ran.deny === undefined && !ran.isError) await track(hostOf($), e.tool, ran.result, before).catch(toast)
     if (isChecked) await inspect($, e as Record<string, unknown>, ran as Record<string, unknown>, patterns).catch(toast)
+    if (isBackgrounded) {
+      const started = startedTask(input, ran as Record<string, unknown>, Date.now())
+      if (started !== undefined) await update($, background, tasks => withTask(tasks ?? [], started)).catch(toast)
+    }
     if (isRepoTool && ran.deny === undefined) void refreshRepo($)
     if (isCiTool && ran.deny === undefined && !ran.isError) {
       const command = typeof (e as Record<string, unknown>).command === 'string' ? String((e as Record<string, unknown>).command) : ''
@@ -925,6 +939,7 @@ export const register: Register = (on, options) => {
       '#jira': isJiraShown,
       '#usage': shows.usage,
       '#agents': shows.agents,
+      '#background': shows.background,
       '#checks': shows.checks,
       '#git': shows.git,
       '#changes': shows.changes,
@@ -1016,6 +1031,11 @@ export const register: Register = (on, options) => {
     const models = shows.agents ? await read($, agentModels) : {}
     const agentRoom = Math.min(agentLines.length, 8)
     const agentsRows = counts('#agents') ? chrome + (isOpen('#agents') ? agentRoom + (agentLines.length > agentRoom ? 1 : 0) : 0) : 0
+    const backgroundList = shows.background ? orderedTasks(await read($, background)) : []
+    const backgroundShown = backgroundList.slice(0, BACKGROUND_ROOM)
+    const backgroundRows = counts('#background')
+      ? chrome + (isOpen('#background') ? Math.max(1, taskRowCount(backgroundShown) + (backgroundList.length > backgroundShown.length ? 1 : 0)) : 0)
+      : 0
     const lastChecks = shows.checks ? await read($, checks) : NO_CHECKS
     const views = checkViews(lastChecks)
     const checksRows = counts('#checks') ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
@@ -1030,7 +1050,7 @@ export const register: Register = (on, options) => {
     const hidden = order.filter(key => options[showOption(key)] === false)
     // Layout mode adds the Sections checklist above the footer: its title and the toggles, wrapped on about two lines.
     const footerRows = isEditing ? 4 : 1
-    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + autopickRows + skillsRows + ciRows + jiraRows + agentsRows + checksRows + gitRows + changesFrame + footerRows
+    const above = tileRows + usageRows + sessionRows + turnRows + todosRows + autopickRows + skillsRows + ciRows + jiraRows + agentsRows + backgroundRows + checksRows + gitRows + changesFrame + footerRows
     // The terminal's height is a guess at what the pane may take; the window Claude Code gives the body is the limit, and a tree taller than it is clipped.
     const bodyRows = e.props.scroll?.bodyRows ?? Number.MAX_SAFE_INTEGER
     const room = isTerminal ? Math.max(MIN_LIST_ROWS, Math.min((e.viewport?.rows ?? 30) - above - (diff ? 16 : 7), bodyRows - above - (diff ? 16 : 7))) : Number.MAX_SAFE_INTEGER
@@ -1054,6 +1074,7 @@ export const register: Register = (on, options) => {
       '#jira': jiraRows,
       '#usage': usageRows,
       '#agents': agentsRows,
+      '#background': backgroundRows,
       '#checks': checksRows,
     }
     const gitShown = Math.min(gitTree.length, gitRoom)
@@ -1089,6 +1110,7 @@ export const register: Register = (on, options) => {
         '#todos': taskList.length,
         '#autopick': waits.length,
         '#agents': agents.length,
+        '#background': backgroundList.filter(task => task.status === 'running').length,
       }
 
       return count[key] ? ` ${count[key]}` : ''
@@ -1643,6 +1665,32 @@ export const register: Register = (on, options) => {
       isOpen('#agents') && agentLines.length > agentRoom && <Text dimColor>{`… ${agentLines.length - agentRoom} more`}</Text>,
     ])
 
+    const backgroundLine = (task: BackgroundTask) => {
+      const status = BACKGROUND_STATUS[task.status]
+
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" justifyContent="space-between">
+            <Box flexDirection="row" flexShrink={1}>
+              <Text color={status.color}>{`${status.glyph} `}</Text>
+              <Text bold={task.status === 'running'} wrap="truncate-end">{taskLabel(task)}</Text>
+            </Box>
+            <Box flexShrink={0} paddingLeft={1}>
+              <Text {...(task.status === 'failed' ? { color: 'error' } : { dimColor: true })}>{taskState(task, Date.now())}</Text>
+            </Box>
+          </Box>
+          {hasCommandLine(task) && <Text dimColor wrap="truncate-end">{`  ${task.command}`}</Text>}
+        </Box>
+      )
+    }
+
+    const backgroundSection = section('#background', [
+      header('#background', 'Background', backgroundSummary(backgroundList)),
+      isOpen('#background') && backgroundList.length === 0 && <Text dimColor>No command started in the background in this conversation yet.</Text>,
+      isOpen('#background') && backgroundShown.map(backgroundLine),
+      isOpen('#background') && backgroundList.length > backgroundShown.length && <Text dimColor>{`… ${backgroundList.length - backgroundShown.length} more`}</Text>,
+    ])
+
     const checkRows = ({ run, label, result, details }: CheckView) => {
       const status = CHECK_STATUS[run.status]
       const tone = run.status === 'failed' ? { color: 'error' } : {}
@@ -1821,6 +1869,7 @@ export const register: Register = (on, options) => {
       '#jira': jiraSection,
       '#usage': usageSection,
       '#agents': agentsSection,
+      '#background': backgroundSection,
       '#checks': checksSection,
       '#git': gitSection,
     }

@@ -1,7 +1,7 @@
 <h1 align="center">🧭 session-info</h1>
 
 <p align="center">
-  A Claude Code mod with one pane and twelve sections.
+  A Claude Code mod with one pane and thirteen sections.
 </p>
 
 <p align="center">
@@ -29,6 +29,7 @@
 - 🎫 [**Jira**](#-what-the-jira-section-shows): the Jira issues the chat mentions, with summary, status, priority and assignee, read through the Atlassian MCP server you connected.
 - 📈 [**Usage**](#-how-usage-updates): your plan's rate-limit windows as bars, like `/usage`, updated live.
 - 🤖 [**Agents**](#-what-the-agents-section-shows): the session's subagents and teammates with their status, model and effort, children under the agent that spawned them.
+- 🛰️ [**Background**](#️-what-the-background-section-shows): the shell commands Claude started in the background, such as a dev server or a long build, with their status and how long they ran.
 - 🧪 [**Checks**](#-what-the-checks-section-shows): whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests, and a prompt that asks Claude to fix a failure. .NET, Node, Bun, Rust, Go and Python tools are recognized.
 - 🌿 [**Git**](#-what-the-git-section-shows): the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, the submodules that changed, and every file `git status` lists, in a treeview like the Changes one. Pressing a file opens its diff against HEAD; pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
 - 📝 [**Changes**](#-how-changes-are-detected): every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
@@ -41,7 +42,7 @@ Each section is a card with a rounded frame that lights up under the pointer in 
 
 Sections can share one card as tabs, to make the pane shorter. By default Changes and Git do: the card opens on Changes, and pressing a tab shows that section in the same place. A tab that is not active shows a count, such as `Changes 12`, so a hidden section still says it has something. The `tabGroups` option sets the groups, for example `changes+git, ci+jira+skills`.
 
-The `sectionOrder` option sets the order of the sections, top to bottom, for example `changes, git, session`. The sections it does not name follow in the default order: Session, Last turn, Todos, Skills, CI, Jira, Usage, Agents, Checks, Git, Changes. A tab group card sits where its first shown section sits in this order, and it stays there when you press another tab. The order of the tabs in the card, and the tab it opens on, come from `tabGroups`. For example, with `sectionOrder` set to `git, session` and the default group `changes+git`, the Changes and Git card is at the top and opens on Changes. A group typed whole, such as `changes+git`, also counts as its sections in order.
+The `sectionOrder` option sets the order of the sections, top to bottom, for example `changes, git, session`. The sections it does not name follow in the default order: Session, Last turn, Todos, Skills, CI, Jira, Usage, Agents, Background, Checks, Git, Changes. A tab group card sits where its first shown section sits in this order, and it stays there when you press another tab. The order of the tabs in the card, and the tab it opens on, come from `tabGroups`. For example, with `sectionOrder` set to `git, session` and the default group `changes+git`, the Changes and Git card is at the top and opens on Changes. A group typed whole, such as `changes+git`, also counts as its sections in order.
 
 ## 📸 Screenshot
 
@@ -137,6 +138,21 @@ Every agent loop of the session, as Claude Code lists it: subagents the model or
 Active agents come first; an agent spawned by another is indented under it. Claude Code drops a finished agent from its list some time after it ends, and the row leaves with it. The section redraws when an agent starts or finishes a turn, and once a minute. Up to 8 rows are shown.
 
 The model comes from the agent's spawn and then from each of its model requests; the effort comes from its requests only, so it shows after the agent's first request. The last request wins, so a fallback model shows too. An agent that started before the mod loaded shows its model and effort after its next request; one that ended before that shows neither. `/clear` forgets them.
+
+## 🛰️ What the Background section shows
+
+The shell commands that Claude started with `run_in_background`, in a `Bash` or `PowerShell` call of the main conversation or of a subagent. Each row shows a status glyph, the task's name, and its state in words with the time it has run or ran for:
+
+| Glyph | State | Meaning |
+| --- | --- | --- |
+| `⟳` | `running · 3m 2s` | The command runs, and the time counts up |
+| `✓` | `done · 12s` | The task ended with the status `completed` |
+| `✖` | `failed · 4s` | The task ended with any other status than `completed` or `killed` |
+| `⊘` | `stopped · 1m 1s` | The task was killed |
+
+The name is the description Claude wrote for the call, with the command on a dim line under it; with no description, the command's first line is the name. Running tasks come first, then the ended ones, newest first. The header counts them by state, and a tab that is not active shows how many run. Up to 8 rows are shown, then a count of the rest, and the section keeps the last 30 commands.
+
+A command is `running` until its task notification reaches the session: Claude Code sends one when a background task ends, and the mod marks the task ended then, not at the moment the command exits. The time of an ended task is the time the notification took to arrive. A foreground command is not listed, and neither is a task that Claude Code started without a shell call, such as a background subagent (the Agents section has those). The section keeps only the command, the description and the state: it never keeps a command's output. `/clear` empties it. Commands that the Checks section recognizes as a build or test run show in both sections.
 
 ## 🧪 What the Checks section shows
 
@@ -390,7 +406,7 @@ Layout mode changes the same settings that `/config` changes, so the order and t
 - **`Sections`**, above the footer, lists every section in the order of the pane with `[x]` (shown) or `[ ]` (hidden). Press a name to show or hide that section. Layout mode scrolls the pane to its end, so the list shows when the mode turns on.
 - **`Hidden:`** at the bottom of the pane lists the sections whose `show*` setting is `false`. Press a name to set it back to `true`. Layout mode replaces this list with `Sections`.
 
-`/config` does not list the twelve `show*` settings: the `Sections` list sets them. They stay settings, so `/config session-info.showGit=false` and your settings file still change them.
+`/config` does not list the thirteen `show*` settings: the `Sections` list sets them. They stay settings, so `/config session-info.showGit=false` and your settings file still change them.
 
 After each change, Claude Code loads the mod again with the new settings, so the pane draws once more. The settings stay. A load stops the timers of the mod, so the layout does not change while an autopick countdown runs: the mod shows a toast instead. Cancel the countdown or let it end first. When a managed policy owns a setting, Claude Code refuses the change and the mod shows the reason in a toast.
 
@@ -414,13 +430,14 @@ Change these in `/config`, or move and hide the cards in [layout mode](#-arrange
 | `session-info.jiraSite` | Your Jira site URL, for example `https://company.atlassian.net`, or its cloud id. Empty uses the first site your account reaches | empty |
 | `session-info.showUsage` | `true`, `false` | `true` |
 | `session-info.showAgents` | `true`, `false` | `true` |
+| `session-info.showBackground` | `true`, `false` | `true` |
 | `session-info.showChecks` | `true`, `false` | `true` |
 | `session-info.suggestFix` | `true`, `false`: propose a prompt that fixes a failed build or test run after the turn | `true` |
 | `session-info.showGit` | `true`, `false` | `true` |
 | `session-info.gitClient` | A command, for example `lazygit`, `gitui` or `tig`. Put a path with spaces in double quotes. Empty turns it off | `lazygit` |
 | `session-info.showChanges` | `true`, `false` | `true` |
-| `session-info.tabGroups` | Sections that share one card as tabs: groups split by commas, sections by `+`, for example `changes+git, ci+jira+skills`. Names: `session`, `lastTurn`, `todos`, `autopick`, `skills`, `ci`, `jira`, `usage`, `agents`, `checks`, `git`, `changes`. The first section of a group is the tab it opens on. Empty gives each section its own card | `changes+git` |
-| `session-info.sectionOrder` | The sections in order, top to bottom, split by commas, for example `changes, git, session`. Same names as `tabGroups`. The sections not named follow in the default order; a tab group card sits where its first shown section sits. Empty keeps the default order | `session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, checks, git, changes` |
+| `session-info.tabGroups` | Sections that share one card as tabs: groups split by commas, sections by `+`, for example `changes+git, ci+jira+skills`. Names: `session`, `lastTurn`, `todos`, `autopick`, `skills`, `ci`, `jira`, `usage`, `agents`, `background`, `checks`, `git`, `changes`. The first section of a group is the tab it opens on. Empty gives each section its own card | `changes+git` |
+| `session-info.sectionOrder` | The sections in order, top to bottom, split by commas, for example `changes, git, session`. Same names as `tabGroups`. The sections not named follow in the default order; a tab group card sits where its first shown section sits. Empty keeps the default order | `session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, background, checks, git, changes` |
 | `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
@@ -482,6 +499,7 @@ claude --plugin-dir .
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
 | `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, its rows and the fix prompt |
+| `hooks/background.ts` | The list of background commands: starting one from a shell call's result, ending it from its notification, ordering, texts and status glyphs |
 | `hooks/tasks.ts` | Reads a background task's end from its notification and finishes the check that waits on it |
 | `hooks/parse.ts` | Reads error lines, error counts, test counts and failed test names from build and test output |
 | `hooks/track.ts` | Turns tool results into created, modified or deleted entries |

@@ -33,6 +33,21 @@ export type CheckRun = {
 
 export type Checks = { build: CheckRun | null; test: CheckRun | null }
 
+export type BackgroundStatus = 'running' | 'completed' | 'failed' | 'killed'
+
+/**
+ * A shell command the session started in the background: the task id the engine gave it, the command's first line,
+ * the description its caller wrote when there is one, and when it started. `endedAt` is absent while it runs.
+ */
+export type BackgroundTask = {
+  id: string
+  command: string
+  description?: string
+  status: BackgroundStatus
+  at: number
+  endedAt?: number
+}
+
 export type SubmoduleIssue = 'conflict' | 'uninitialized' | 'commit' | 'modified'
 
 /** A submodule that needs a look: its path in the repository and what is wrong with it. */
@@ -202,6 +217,8 @@ declare module 'claude-code' {
       alerted: string[]
       /** The last build and the last test run of the session. */
       checks: Checks
+      /** The background commands of this conversation, newest first; an empty list before the first one starts. */
+      background: BackgroundTask[]
       /** The repository the Git section shows; `outside` when the folder is in none, null before the first read. */
       repo: Repo | 'outside' | null
       /** The last main-thread turn; null before the first one ends. */

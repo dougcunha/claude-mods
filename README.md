@@ -29,6 +29,7 @@ The **session-info** pane shows:
 - ✅ A task list Claude keeps, like OpenCode's todos.
 - ⏱️ An autopick switch that answers a question you left unanswered with its recommended option after a countdown.
 - 🧠 The skills in use, and the session's agents with their model and effort.
+- 🛰️ The shell commands Claude runs in the background, with their status and run time.
 - 🚀 The GitHub Actions runs the session started, and the Jira issues the chat mentions.
 - 📈 Live plan usage bars, like `/usage`.
 - 🧪 The status of the last build and test run, background runs included, with a prompt that asks Claude to fix a failure.

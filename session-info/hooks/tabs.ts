@@ -1,10 +1,10 @@
-export type SectionKey = '#session' | '#turn' | '#todos' | '#autopick' | '#skills' | '#ci' | '#jira' | '#usage' | '#agents' | '#checks' | '#git' | '#changes'
+export type SectionKey = '#session' | '#turn' | '#todos' | '#autopick' | '#skills' | '#ci' | '#jira' | '#usage' | '#agents' | '#background' | '#checks' | '#git' | '#changes'
 
 /** Sections that share one card as tabs; `key` folds the group and holds its active tab, the first member opens. */
 export type TabGroup = { key: string; members: SectionKey[] }
 
 /** Sections in the order the pane draws them. */
-export const ORDER: readonly SectionKey[] = ['#session', '#turn', '#todos', '#autopick', '#skills', '#ci', '#jira', '#usage', '#agents', '#checks', '#git', '#changes']
+export const ORDER: readonly SectionKey[] = ['#session', '#turn', '#todos', '#autopick', '#skills', '#ci', '#jira', '#usage', '#agents', '#background', '#checks', '#git', '#changes']
 
 /** The title a tab shows while another tab of its group is active. */
 export const TITLES: Record<SectionKey, string> = {
@@ -17,6 +17,7 @@ export const TITLES: Record<SectionKey, string> = {
   '#jira': 'Jira',
   '#usage': 'Usage',
   '#agents': 'Agents',
+  '#background': 'Background',
   '#checks': 'Checks',
   '#git': 'Git',
   '#changes': 'Changes',
@@ -33,6 +34,7 @@ export const NAMES: Record<SectionKey, string> = {
   '#jira': 'jira',
   '#usage': 'usage',
   '#agents': 'agents',
+  '#background': 'background',
   '#checks': 'checks',
   '#git': 'git',
   '#changes': 'changes',
@@ -52,6 +54,7 @@ const SECTION_NAMES: Record<string, SectionKey> = {
   jira: '#jira',
   usage: '#usage',
   agents: '#agents',
+  background: '#background',
   checks: '#checks',
   git: '#git',
   changes: '#changes',

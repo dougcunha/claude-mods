@@ -34,9 +34,9 @@ test('the section order puts the named sections first and the others after them 
   expect(parseSectionOrder(undefined)).toEqual(ORDER)
   expect(parseSectionOrder('')).toEqual(ORDER)
   // The value /config starts with names every section in the default order.
-  expect(parseSectionOrder('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, checks, git, changes')).toEqual(ORDER)
+  expect(parseSectionOrder('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, background, checks, git, changes')).toEqual(ORDER)
   expect(parseSectionOrder(' Agents ; nope, git+changes, agents, LastTurn')).toEqual([
-    '#agents', '#git', '#changes', '#turn', '#session', '#todos', '#autopick', '#skills', '#ci', '#jira', '#usage', '#checks',
+    '#agents', '#git', '#changes', '#turn', '#session', '#todos', '#autopick', '#skills', '#ci', '#jira', '#usage', '#background', '#checks',
   ])
 })
 
@@ -44,11 +44,11 @@ test('a card moves past the nearest shown card, a tab group moves whole, and hid
   const groups = parseTabGroups(undefined)
   const shown = (key: string) => key !== '#jira'
   const at = (order: readonly string[]) => orderText(order as typeof ORDER)
-  expect(at(moveCard(ORDER, groups, shown, '#todos', -1))).toBe('session, todos, lastTurn, autopick, skills, ci, jira, usage, agents, checks, git, changes')
+  expect(at(moveCard(ORDER, groups, shown, '#todos', -1))).toBe('session, todos, lastTurn, autopick, skills, ci, jira, usage, agents, background, checks, git, changes')
   expect(moveCard(ORDER, groups, shown, '#session', -1)).toEqual(ORDER)
-  expect(at(moveCard(ORDER, groups, shown, '#ci', 1))).toBe('session, lastTurn, todos, autopick, skills, usage, jira, ci, agents, checks, git, changes')
-  expect(at(moveCard(ORDER, groups, shown, '#git', -1))).toBe('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, git, changes, checks')
-  expect(at(moveCard(ORDER, groups, shown, '#changes', -1))).toBe('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, git, changes, checks')
+  expect(at(moveCard(ORDER, groups, shown, '#ci', 1))).toBe('session, lastTurn, todos, autopick, skills, usage, jira, ci, agents, background, checks, git, changes')
+  expect(at(moveCard(ORDER, groups, shown, '#git', -1))).toBe('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, background, git, changes, checks')
+  expect(at(moveCard(ORDER, groups, shown, '#changes', -1))).toBe('session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, background, git, changes, checks')
   expect(moveCard(ORDER, groups, shown, '#changes', 1)).toEqual(ORDER)
   expect(showOption('#turn')).toBe('showLastTurn')
   expect(showOption('#ci')).toBe('showCi')
@@ -75,7 +75,7 @@ test('layout mode moves, hides and toggles cards through /config, and the footer
   await ui.press({ key: 'toggle:#ci' })
   await ui.press({ key: 'toggle:#git' })
   expect(sets).toEqual([
-    ['session-info.sectionOrder', 'session, todos, lastTurn, autopick, skills, ci, jira, usage, agents, checks, git, changes'],
+    ['session-info.sectionOrder', 'session, todos, lastTurn, autopick, skills, ci, jira, usage, agents, background, checks, git, changes'],
     ['session-info.showSkills', false],
     ['session-info.showCi', true],
     ['session-info.showGit', false],
