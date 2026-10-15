@@ -12,7 +12,7 @@ import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCo
 import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
 import { openClient } from './client'
-import { detailLines, detailOf } from './detail'
+import { clip, detailLines, detailOf } from './detail'
 import { cellWidths, contextText, GLYPH, LEGEND_GAP, legendLines, legendText, SWATCH, toReading } from './context'
 import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, fixSuggestion, NO_CHECKS, toPattern } from './checks'
 import { CI_POLL_MS, CI_ROOM, CI_STATUS, ciTrigger, isWatching, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from './ci'
@@ -75,6 +75,11 @@ const PANE = 'session-info'
 /** Why the Autopick switch stays off while the ask-autopick mod answers the same questions. */
 const RIVAL_TEXT = 'The ask-autopick mod is loaded and answers questions too: this switch stays off until you disable it.'
 const MINUTE = 60_000
+/** Cells an Autopick row keeps free so its text, cut with `…`, never meets the edge. */
+const ROW_SPARE_COLUMNS = 1
+/** Cells a wait row spends beside its picks: the countdown, its gap, Pick now, Cancel and their gaps; and, with no countdown, the glyph and its gap. */
+const WAIT_COUNTING_COLUMNS = 26
+const WAIT_IDLE_COLUMNS = 2
 
 /** Tools whose calls can change the working tree, so the Git section reads the repository again after them. */
 const FILE_TOOLS: readonly string[] = [...SHELLS, 'Write', 'Edit', 'NotebookEdit']
@@ -1167,6 +1172,9 @@ export const register: Register = (on, options) => {
      * A line the row cuts short, pressed to read the whole text in the detail view; the key names the line. A Button
      * draws its text with the wrap of its own, not the inner Text's, so the box keeps the line to one row and clips the rest.
      */
+    /** The text cut with `…` to what is left of the row once `taken` cells beside it are spent, for a line that `expandable` clips. */
+    const fit = (text: string, taken = 0) => clip(text, inner - ROW_SPARE_COLUMNS - taken)
+
     const expandable = (key: string, title: string, text: string, line: RenderChildren) =>
       text.trim() === '' ? line : (
         <Box key={`detail-row:${key}`} height={1} flexShrink={1} overflow="hidden">
@@ -1466,8 +1474,8 @@ export const register: Register = (on, options) => {
       isOpen('#turn') && turnRecord === null && <Text dimColor>No turn finished yet.</Text>,
       isOpen('#turn') && turnRecord && turnModel !== '' && <Text wrap="truncate-end">{turnModel}</Text>,
       isOpen('#turn') && turnRecord && <Text dimColor wrap="truncate-end">{tokensText(turnRecord)}</Text>,
-      isOpen('#turn') && turnRecord && turnTools !== '' && expandable('turn:tools', 'Tools of the last turn', turnTools, <Text dimColor wrap="truncate-end">{turnTools}</Text>),
-      isOpen('#turn') && turnRecord && turnRefused !== '' && expandable('turn:refused', 'Refused calls of the last turn', turnRefused, <Text color="warning" wrap="truncate-end">{turnRefused}</Text>),
+      isOpen('#turn') && turnRecord && turnTools !== '' && expandable('turn:tools', 'Tools of the last turn', turnTools, <Text dimColor wrap="truncate-end">{fit(turnTools)}</Text>),
+      isOpen('#turn') && turnRecord && turnRefused !== '' && expandable('turn:refused', 'Refused calls of the last turn', turnRefused, <Text color="warning" wrap="truncate-end">{fit(turnRefused)}</Text>),
     ])
 
     const todoLine = (todo: Todo) => {
@@ -1533,7 +1541,14 @@ export const register: Register = (on, options) => {
             {wait.picks === null ? (
               <Text dimColor={!isCounting} wrap="truncate-end">No recommended option: the question waits for you.</Text>
             ) : (
-              expandable(`autopick:wait:${wait.id}`, 'Recommended options', picksDetail(wait.picks), <Text dimColor={!isCounting} wrap="truncate-end">{picksText(wait.picks)}</Text>)
+              expandable(
+                `autopick:wait:${wait.id}`,
+                'Recommended options',
+                picksDetail(wait.picks),
+                <Text dimColor={!isCounting} wrap="truncate-end">
+                  {fit(picksText(wait.picks), isCounting ? WAIT_COUNTING_COLUMNS : WAIT_IDLE_COLUMNS)}
+                </Text>,
+              )
             )}
           </Box>
           {isCounting && (
@@ -1560,13 +1575,15 @@ export const register: Register = (on, options) => {
         </Text>,
       ),
       isOpen('#autopick') && autopickSwitch,
-      isOpen('#autopick') && isPickBlocked && expandable('autopick:rival', 'Autopick is off', RIVAL_TEXT, <Text color="warning" wrap="truncate-end">{`⚠ ${RIVAL_TEXT}`}</Text>),
+      isOpen('#autopick') && isPickBlocked && expandable('autopick:rival', 'Autopick is off', RIVAL_TEXT, <Text color="warning" wrap="truncate-end">{fit(`⚠ ${RIVAL_TEXT}`)}</Text>),
       isOpen('#autopick') && waits.map(waitLine),
       isOpen('#autopick') && lastPick && expandable(
         'autopick:last',
         `Picked ${age(clockNow - lastPick.at)} ago`,
         pickDetail(lastPick),
-        <Text dimColor wrap="truncate-end">{`✓ Picked ${age(clockNow - lastPick.at)} ago: ${picksText(lastPick.picks)}`}</Text>,
+        <Text dimColor wrap="truncate-end">
+          {fit(`✓ Picked ${age(clockNow - lastPick.at)} ago: ${picksText(lastPick.picks)}`)}
+        </Text>,
       ),
     ])
 
@@ -1642,7 +1659,7 @@ export const register: Register = (on, options) => {
       isOpen('#ci') && ciWatch === null && <Text dimColor>No GitHub Actions run started from this session yet.</Text>,
       isOpen('#ci') && ciWaiting !== undefined && <Text dimColor>{ciWaiting}</Text>,
       isOpen('#ci') && ciRuns.map(ciRunRows),
-      isOpen('#ci') && ciWatch?.error !== undefined && expandable('ci:error', 'GitHub Actions error', ciWatch.error, <Text color="error" wrap="truncate-end">{ciWatch.error}</Text>),
+      isOpen('#ci') && ciWatch?.error !== undefined && expandable('ci:error', 'GitHub Actions error', ciWatch.error, <Text color="error" wrap="truncate-end">{fit(ciWatch.error)}</Text>),
     ])
 
     const issueRows = (issue: JiraIssue) => (
@@ -1658,7 +1675,14 @@ export const register: Register = (on, options) => {
                 </Button>
               )}
             </Box>
-            {expandable(`jira:${issue.key}:summary`, issue.key, issue.summary ?? '', <Text wrap="truncate-end">{issue.summary === undefined ? '' : ` · ${issue.summary}`}</Text>)}
+            {expandable(
+              `jira:${issue.key}:summary`,
+              issue.key,
+              issue.summary ?? '',
+              <Text wrap="truncate-end">
+                {issue.summary === undefined ? '' : fit(` · ${issue.summary}`, issue.key.length + (issue.status === undefined ? 0 : issue.status.length + 1))}
+              </Text>,
+            )}
           </Box>
           {issue.status !== undefined && (
             <Box flexShrink={0} paddingLeft={1}>
@@ -1669,7 +1693,7 @@ export const register: Register = (on, options) => {
         {issue.error === undefined ? (
           <Text dimColor wrap="truncate-end">{`  ${issueDetail(issue, Date.now())}`}</Text>
         ) : (
-          expandable(`jira:${issue.key}:error`, `${issue.key} could not be read`, issue.error, <Text color="error" wrap="truncate-end">{`  ${issue.error}`}</Text>)
+          expandable(`jira:${issue.key}:error`, `${issue.key} could not be read`, issue.error, <Text color="error" wrap="truncate-end">{fit(`  ${issue.error}`)}</Text>)
         )}
         {needsAllow(issue) && (
           <Box flexDirection="row" gap={2} paddingLeft={2}>
@@ -1711,7 +1735,9 @@ export const register: Register = (on, options) => {
             `agent:${agent.id}`,
             agentLabel(agent),
             detailLines([agentModelText(models[agent.id]).replace(/^ · /, ''), agent.description]),
-            <Text dimColor wrap="truncate-end">{`${agentModelText(models[agent.id])}${agent.description ? ` · ${agent.description}` : ''}`}</Text>,
+            <Text dimColor wrap="truncate-end">
+              {fit(`${agentModelText(models[agent.id])}${agent.description ? ` · ${agent.description}` : ''}`, depth * 2 + 2 + agentLabel(agent).length)}
+            </Text>,
           )}
         </Box>
       )
@@ -1725,19 +1751,27 @@ export const register: Register = (on, options) => {
 
     const backgroundLine = (task: BackgroundTask) => {
       const status = BACKGROUND_STATUS[task.status]
+      const state = taskState(task, Date.now())
 
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" justifyContent="space-between">
             <Box flexDirection="row" flexShrink={1}>
               <Text color={status.color}>{`${status.glyph} `}</Text>
-              {expandable(`background:${task.id}:name`, 'Background command', detailLines([task.description, task.command]), <Text bold={task.status === 'running'} wrap="truncate-end">{taskLabel(task)}</Text>)}
+              {expandable(
+                `background:${task.id}:name`,
+                'Background command',
+                detailLines([task.description, task.command]),
+                <Text bold={task.status === 'running'} wrap="truncate-end">
+                  {fit(taskLabel(task), 2 + state.length + 1)}
+                </Text>,
+              )}
             </Box>
             <Box flexShrink={0} paddingLeft={1}>
-              <Text {...(task.status === 'failed' ? { color: 'error' } : { dimColor: true })}>{taskState(task, Date.now())}</Text>
+              <Text {...(task.status === 'failed' ? { color: 'error' } : { dimColor: true })}>{state}</Text>
             </Box>
           </Box>
-          {hasCommandLine(task) && expandable(`background:${task.id}:command`, 'Background command', detailLines([task.description, task.command]), <Text dimColor wrap="truncate-end">{`  ${firstLine(task.command)}`}</Text>)}
+          {hasCommandLine(task) && expandable(`background:${task.id}:command`, 'Background command', detailLines([task.description, task.command]), <Text dimColor wrap="truncate-end">{fit(`  ${firstLine(task.command)}`)}</Text>)}
         </Box>
       )
     }
@@ -1755,6 +1789,7 @@ export const register: Register = (on, options) => {
       const key = `check:${run.kind}`
       const title = `${label}: ${result}`
       const whole = detailLines([run.command, ...details])
+      const when = checkWhen(run, Date.now())
 
       return (
         <Box flexDirection="column">
@@ -1762,12 +1797,12 @@ export const register: Register = (on, options) => {
             <Box flexDirection="row">
               <Text color={status.color}>{`${status.glyph} `}</Text>
               <Text bold>{label}</Text>
-              {expandable(`${key}:result`, title, whole, <Text {...tone} wrap="truncate-end">{`  ${result}`}</Text>)}
+              {expandable(`${key}:result`, title, whole, <Text {...tone} wrap="truncate-end">{fit(`  ${result}`, 2 + label.length + when.length + 1)}</Text>)}
             </Box>
-            <Text dimColor>{checkWhen(run, Date.now())}</Text>
+            <Text dimColor>{when}</Text>
           </Box>
-          {expandable(`${key}:command`, title, whole, <Text dimColor wrap="truncate-end">{`  ${run.command}`}</Text>)}
-          {details.map((line, index) => expandable(`${key}:detail:${index}`, title, whole, <Text {...tone} wrap="truncate-end">{`  ${line}`}</Text>))}
+          {expandable(`${key}:command`, title, whole, <Text dimColor wrap="truncate-end">{fit(`  ${run.command}`)}</Text>)}
+          {details.map((line, index) => expandable(`${key}:detail:${index}`, title, whole, <Text {...tone} wrap="truncate-end">{fit(`  ${line}`)}</Text>))}
         </Box>
       )
     }
@@ -1793,7 +1828,7 @@ export const register: Register = (on, options) => {
       const { total, changed } = repo.submodules
 
       return [
-        repo.operation && expandable('git:operation', 'Git operation in progress', operationText(repo.operation), <Text color="warning" wrap="truncate-end">{`⚠ ${operationText(repo.operation)}`}</Text>),
+        repo.operation && expandable('git:operation', 'Git operation in progress', operationText(repo.operation), <Text color="warning" wrap="truncate-end">{fit(`⚠ ${operationText(repo.operation)}`)}</Text>),
         parts.length > 0 && (
           <Box flexDirection="row" gap={2}>
             {parts.map(part => (
@@ -1807,7 +1842,7 @@ export const register: Register = (on, options) => {
               <Box flexShrink={0}>
                 <Text dimColor>{`◆ ${repo.commit.hash}`}</Text>
               </Box>
-              {expandable('git:commit', `Commit ${repo.commit.hash}`, repo.commit.subject, <Text wrap="truncate-end">{repo.commit.subject}</Text>)}
+              {expandable('git:commit', `Commit ${repo.commit.hash}`, repo.commit.subject, <Text wrap="truncate-end">{fit(repo.commit.subject, 2 + repo.commit.hash.length + 1 + age(Date.now() - repo.commit.at).length + 1)}</Text>)}
             </Box>
             <Box flexShrink={0} paddingLeft={1}>
               <Text dimColor>{age(Date.now() - repo.commit.at)}</Text>

@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { DETAIL_LIMIT, detailLines, detailOf } from '../hooks/detail'
+import { clip, DETAIL_LIMIT, detailLines, detailOf } from '../hooks/detail'
 
 const PANE = {
   plugin: 'session-info',
@@ -23,6 +23,14 @@ test('a detail keeps its title and the text trimmed, and cuts a text past the li
 test('the parts of a detail join one per line and an empty part drops out', () => {
   expect(detailLines(['Start the server', undefined, '', '  ', 'npm run dev'])).toBe('Start the server\nnpm run dev')
   expect(detailLines([])).toBe('')
+})
+
+test('a text longer than its room is cut to the room with a trailing ellipsis, and a text that fits stays whole', () => {
+  expect(clip('abcdefghij', 6)).toBe('abcde…')
+  expect(clip('abcdef', 6)).toBe('abcdef')
+  expect(clip('abc', 6)).toBe('abc')
+  expect(clip('abcdef', 0)).toBe('abcdef')
+  expect(clip('a😀b😀c', 3)).toBe('a😀…')
 })
 
 /** Answers what the pane reads, and a Bash call that starts the background task `b1`. */
@@ -62,6 +70,20 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.press({ key: 'detail-back' })
     expect(await ui.find({ type: 'Button', key: 'detail-back' })).toBeUndefined()
     expect(await ui.find({ type: 'Button', key: 'section:#background' })).toBeDefined()
+    await ui.unmount()
+  })
+}
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`a cut row ends in an ellipsis in a narrow pane, and a row that fits has none (${surface})`, async ($, on) => {
+    stub(on)
+
+    await $.tool.call({ tool: 'Bash', command: LONG_COMMAND, description: 'Start the dev server', run_in_background: true })
+    await $.tool.call({ tool: 'Bash', command: 'tsc -p app' })
+    const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: 40 }, surface, viewport: { columns: 40, rows: 80 } })
+    expect(await ui.find({ type: 'Text', text: /^  npm run dev.*…$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^  tsc -p app$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'Start the dev server' })).toBeDefined()
     await ui.unmount()
   })
 }

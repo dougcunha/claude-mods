@@ -12,6 +12,16 @@ export function detailOf(title: string, text: string): Detail {
   return { title, text: whole.length > DETAIL_LIMIT ? `${whole.slice(0, DETAIL_LIMIT)}${CUT}` : whole }
 }
 
+const ELLIPSIS = '…'
+
+/** The text cut to `room` cells with a trailing `…` when it is longer, else as it is; a row's box clips by itself and leaves no mark. */
+export function clip(text: string, room: number): string {
+  const chars = Array.from(text)
+  if (room < 1 || chars.length <= room) return text
+
+  return `${chars.slice(0, room - 1).join('')}${ELLIPSIS}`
+}
+
 /** Joins the parts of a detail text, one per line, and leaves out an empty part. */
 export const detailLines = (parts: readonly (string | undefined)[]): string =>
   parts.filter((part): part is string => part !== undefined && part.trim() !== '').join('\n')

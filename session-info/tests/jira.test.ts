@@ -166,7 +166,11 @@ for (const allow of [[], [TOOL], ['mcp__plugin_atlassian_atlassian']]) {
 
     await $.prompt.submit({ text: 'WIN-3159' } as never)
     const ui = await mountRead($, 'terminal', /Auto mode cannot approve/)
-    expect(await ui.find({ type: 'Text', text: `  Auto mode cannot approve the mod's read: allow ${TOOL} in permissions.` })).toBeDefined()
+    // The pane is narrower than the message, so the row cuts it with an ellipsis; pressing it shows the whole text.
+    expect(await ui.find({ type: 'Text', text: /^ {2}Auto mode cannot approve the mod's read: allow .*…$/ })).toBeDefined()
+    await ui.press({ key: `detail:jira:WIN-3159:error` })
+    expect(await ui.find({ type: 'Text', text: `Auto mode cannot approve the mod's read: allow ${TOOL} in permissions.` })).toBeDefined()
+    await ui.press({ key: 'detail-back' })
     if (allow.length > 0) {
       expect(await ui.find({ type: 'Text', text: 'Allow reads' })).toBeUndefined()
       await ui.unmount()

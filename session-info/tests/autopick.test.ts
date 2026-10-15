@@ -123,6 +123,10 @@ test('a question left unanswered past the wait gets its recommended option', SLO
   await ui.press({ key: 'detail-back' })
   expect(await ui.find({ type: 'Button', key: 'detail:autopick:last' })).toBeDefined()
   await ui.unmount()
+
+  const narrow = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: 40 }, surface: 'terminal', viewport: { columns: 40, rows: 80 } })
+  expect(await narrow.find({ type: 'Text', text: /^✓ Picked 0s ago: .*…$/ })).toBeDefined()
+  await narrow.unmount()
 })
 
 test('an answer within the wait goes through and nothing is picked', SLOW, async ($, on) => {
