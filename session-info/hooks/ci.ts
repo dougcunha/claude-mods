@@ -1,6 +1,7 @@
 import type { CiJob, CiRun, CiTriggerKind, CiWatch } from '../types'
 
 import { segments } from './checks'
+import { absolute } from './paths'
 import { duration } from './session'
 
 /** Runs a command and resolves its exit code and output; rejects when the command cannot start. */
@@ -17,29 +18,72 @@ export const CI_ROOM = 3
 
 const RUN_FIELDS = 'databaseId,workflowName,displayTitle,headBranch,headSha,status,conclusion,url,createdAt,updatedAt'
 
-export type CiTrigger = { kind: CiTriggerKind; runId?: number }
+/**
+ * What started the runs: `repo` (`owner/name`) when the command named one with `-R` or printed a run's URL, and `dir`
+ * when it ran in another folder (`cd <dir> &&`, `git -C <dir>`), relative to the session's folder unless absolute.
+ */
+export type CiTrigger = { kind: CiTriggerKind; runId?: number; repo?: string; dir?: string }
 
-const runIdIn = (text: string): number | undefined => {
-  const id = /\/actions\/runs\/(\d+)/.exec(text)?.[1]
+/** One path argument: double-quoted, single-quoted or bare. */
+const PATH_ARG = String.raw`(?:"([^"]+)"|'([^']+)'|([^\s"']+))`
+const CD = new RegExp(String.raw`^cd(?:\s+${PATH_ARG})?\s*$`)
+const GIT_PUSH = new RegExp(String.raw`^git(?:\s+-C\s+${PATH_ARG})?\s+push(?=\s|$)`)
+const REPO_FLAG = /\s(?:-R|--repo)(?:\s+|=)([\w.-]+\/[\w.-]+)(?=\s|$)/
+const RUN_URL = /github\.com\/([\w.-]+\/[\w.-]+)\/actions\/runs\/(\d+)/
 
-  return id === undefined ? undefined : Number(id)
+const pathOf = (match: RegExpExecArray | null): string | undefined => match?.[1] ?? match?.[2] ?? match?.[3]
+
+/** A folder the mod cannot resolve: the home folder, the previous one, or one named by a variable. */
+const isUnknownDir = (dir: string | undefined): boolean => dir === undefined || dir === '-' || /^~|\$/.test(dir)
+
+/** `dir` joined to the folder the command was in: undefined is the session's folder, null one the mod cannot resolve. */
+const enter = (base: string | undefined | null, dir: string | undefined): string | undefined | null => {
+  if (base === null || isUnknownDir(dir)) return null
+
+  return base === undefined ? dir : absolute(base, dir as string)
 }
 
-/** What a shell command did that starts GitHub Actions runs; undefined for any other command. */
-export function ciTrigger(command: string, output: string): CiTrigger | undefined {
-  for (const segment of segments(command)) {
-    if (/^git\s+push(?=\s|$)/.test(segment) && !/\s(?:--dry-run|-n)(?=\s|$)/.test(segment)) return { kind: 'push' }
-    if (/^gh\s+pr\s+create(?=\s|$)/.test(segment)) return { kind: 'pr' }
-    if (/^gh\s+workflow\s+run(?=\s|$)/.test(segment)) {
-      const runId = runIdIn(output)
+/** The trigger with its repository and folder, when it has them. */
+function withPlace(trigger: CiTrigger, segment: string, dir: string | undefined): CiTrigger {
+  const repo = REPO_FLAG.exec(` ${segment}`)?.[1] ?? trigger.repo
 
-      return runId === undefined ? { kind: 'workflow' } : { kind: 'workflow', runId }
+  return { ...trigger, ...(repo === undefined ? {} : { repo }), ...(dir === undefined ? {} : { dir }) }
+}
+
+/**
+ * What a shell command did that starts GitHub Actions runs; undefined for any other command, and for one that ran in
+ * a folder the mod cannot resolve (`cd ~/app`, `cd $DIR`, `cd -`), whose runs it would look for in the wrong repository.
+ */
+export function ciTrigger(command: string, output: string): CiTrigger | undefined {
+  let dir: string | undefined | null
+  for (const segment of segments(command)) {
+    const cd = CD.exec(segment)
+    if (cd !== null) {
+      dir = enter(dir, pathOf(cd))
+      continue
     }
-    const rerun = /^gh\s+run\s+rerun\s+(\d+)/.exec(segment)?.[1]
-    if (rerun !== undefined) return { kind: 'rerun', runId: Number(rerun) }
+    const push = GIT_PUSH.exec(segment)
+    const found = push !== null && !/\s(?:--dry-run|-n)(?=\s|$)/.test(segment) ? { kind: 'push' as const } : triggerOf(segment, output)
+    if (found === undefined) continue
+    const place = push === null || pathOf(push) === undefined ? dir : enter(dir, pathOf(push))
+    if (place === null) return undefined
+
+    return withPlace(found, segment, place)
   }
 
   return undefined
+}
+
+function triggerOf(segment: string, output: string): CiTrigger | undefined {
+  if (/^gh\s+pr\s+create(?=\s|$)/.test(segment)) return { kind: 'pr' }
+  if (/^gh\s+workflow\s+run(?=\s|$)/.test(segment)) {
+    const url = RUN_URL.exec(output)
+
+    return url === null ? { kind: 'workflow' } : { kind: 'workflow', runId: Number(url[2]), repo: url[1] as string }
+  }
+  const rerun = /^gh\s+run\s+rerun\s+(\d+)/.exec(segment)?.[1]
+
+  return rerun === undefined ? undefined : { kind: 'rerun', runId: Number(rerun) }
 }
 
 /** A new watch: a push or a pull request follows the runs of the HEAD commit; a dispatch or a rerun follows its run. */
@@ -49,9 +93,19 @@ export function startWatch(trigger: CiTrigger, head: { sha?: string; branch?: st
     since: now,
     ...(head.sha === undefined ? {} : { sha: head.sha }),
     ...(head.branch === undefined ? {} : { branch: head.branch }),
+    ...(trigger.repo === undefined ? {} : { repo: trigger.repo }),
+    ...(trigger.dir === undefined ? {} : { dir: trigger.dir }),
     runIds: trigger.runId === undefined ? [] : [trigger.runId],
     runs: [],
   }
+}
+
+/** A Git Bash path (`/d/Projetos/app`) as Windows takes it (`D:/Projetos/app`), when the session runs on a drive. */
+export function nativeDir(sessionCwd: string, dir: string): string {
+  const drive = /^\/([a-zA-Z])(?=\/|$)/.exec(dir)?.[1]
+  const resolved = drive !== undefined && /^[a-zA-Z]:[\\/]/.test(sessionCwd) ? `${drive.toUpperCase()}:${dir.slice(2) || '/'}` : dir
+
+  return absolute(sessionCwd, resolved)
 }
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '')
@@ -106,9 +160,11 @@ async function gh(run: Runner, args: string[]): Promise<unknown> {
 export async function pollWatch(run: Runner, watch: CiWatch, now: number): Promise<{ watch: CiWatch; finished: CiRun[] }> {
   try {
     const runs = new Map(watch.runs.map(one => [one.id, one]))
+    // A run lives in the repository the command named; without one, gh reads it from the folder the watch runs in.
+    const repo = watch.repo === undefined ? [] : ['-R', watch.repo]
     if (isDiscovering(watch, now)) {
       const filter = watch.sha === undefined ? ['--event', 'workflow_dispatch', '--limit', '5'] : ['--commit', watch.sha, '--limit', '20']
-      const listed = (await gh(run, ['run', 'list', ...filter, '--json', RUN_FIELDS])) as Record<string, unknown>[]
+      const listed = (await gh(run, ['run', 'list', ...repo, ...filter, '--json', RUN_FIELDS])) as Record<string, unknown>[]
       for (const raw of listed) {
         const found = toRun(raw, runs.get(Number(raw.databaseId)))
         // A dispatch has no commit to match: only a run created after it counts.
@@ -121,7 +177,7 @@ export async function pollWatch(run: Runner, watch: CiWatch, now: number): Promi
     for (const [id, known] of runs) {
       // A run read as completed before keeps its last reading; one first seen completed is read once, for its jobs.
       if (watch.runs.some(one => one.id === id && isDone(one))) continue
-      const raw = (await gh(run, ['run', 'view', String(id), '--json', `${RUN_FIELDS},jobs`])) as Record<string, unknown>
+      const raw = (await gh(run, ['run', 'view', String(id), ...repo, '--json', `${RUN_FIELDS},jobs`])) as Record<string, unknown>
       const read = toRun(raw, known)
       if (isDone(read) && !isDone(known)) finished.push(read)
       runs.set(id, read)

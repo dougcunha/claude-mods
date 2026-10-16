@@ -375,6 +375,8 @@ The section follows the GitHub Actions runs that the session started through a s
 | `gh workflow run` | The run whose URL the command printed; with an older `gh` that prints none, the dispatched runs created after the command |
 | `gh run rerun <id>` | That run |
 
+The section follows the runs in the repository the command used. A `-R owner/name` or `--repo owner/name` flag, or the run URL the command printed, names the repository for `gh`. A command that runs in another folder, after `cd <dir> &&` or with `git -C <dir>`, reads the commit there and asks `gh` from there; a Git Bash path such as `/d/work/app` works on Windows. When the mod cannot resolve the folder (`cd ~/app`, `cd $APP`, `cd -`), or the folder holds no Git repository, the section starts no watch rather than follow the runs of the wrong repository.
+
 Each run shows its workflow, branch, commit and time, a row of its jobs and an `↗ Open on GitHub` button that opens the run in your browser. While a run is open the section asks GitHub every 15 seconds with `gh run view`; when a run ends it raises a native notification with the result. The header shows `⟳ running` while a run is open, else the worst result. A new push replaces the runs of the previous one.
 
 > [!IMPORTANT]

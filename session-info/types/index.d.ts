@@ -165,12 +165,16 @@ export type CiTriggerKind = 'push' | 'pr' | 'workflow' | 'rerun'
 /**
  * The runs the CI section follows: those of the last push, pull request, workflow dispatch or rerun of the session.
  * `sha` finds a push's runs; `runIds` names the runs a dispatch or rerun started; `error` stops the polling.
+ * `repo` (`owner/name`) is the repository the command named, passed to gh as `-R`; `dir` the folder the command ran in,
+ * where git and gh run, when it was not the session's.
  */
 export type CiWatch = {
   trigger: CiTriggerKind
   since: number
   sha?: string
   branch?: string
+  repo?: string
+  dir?: string
   runIds: number[]
   runs: CiRun[]
   error?: string

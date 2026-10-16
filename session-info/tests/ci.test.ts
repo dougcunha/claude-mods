@@ -3,7 +3,7 @@ import type { TestBody } from 'claude-code/testing'
 
 import type { CiRun } from '../types'
 
-import { ciTrigger, isWatching, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from '../hooks/ci'
+import { ciTrigger, isWatching, nativeDir, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from '../hooks/ci'
 import type { Runner } from '../hooks/ci'
 
 const PANE = {
@@ -100,6 +100,38 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
+test('a push from another folder reads that folder\'s commit and asks gh there; a folder with no repository starts no watch', async ($, on) => {
+  const places: string[] = []
+  pane(on)
+  on('process.run', async (_, e) => {
+    const cwd = e.init?.cwd ?? '(session)'
+    places.push(`${cwd}: ${e.argv.slice(0, 3).join(' ')}`)
+
+    return { value: cwd === '/repo/missing' ? ran('', 128) : answer(e.argv) } as never
+  })
+  on('ui.notify', async () => ({ value: { isSent: true } }) as never)
+  on('tool.call', { tool: 'Bash' }, async () => ({ result: { stdout: '', stderr: '', interrupted: false }, text: 'pushed' }) as never)
+
+  await $.tool.call({ tool: 'Bash', command: 'cd ../api && git push' })
+  const ui = await mountPolled($, 'terminal', '✓ success')
+
+  // The pane reads the session's own repository too; only the calls of the CI watch count here.
+  expect(places.filter(place => !place.endsWith('--show-toplevel'))).toEqual([
+    '/repo/../api: git rev-parse HEAD',
+    '/repo/../api: git rev-parse --abbrev-ref',
+    '/repo/../api: gh run list',
+    '/repo/../api: gh run view',
+  ])
+  await ui.unmount()
+
+  places.length = 0
+  await $.tool.call({ tool: 'Bash', command: 'git -C missing push' })
+  // The watch starts after the hook answers: give its git calls time to land, and the gh calls none.
+  for (let tries = 0; tries < 50 && places.filter(place => place.startsWith('/repo/missing')).length < 2; tries++) await later(20)
+  await later(100)
+  expect(places.filter(place => !place.endsWith('--show-toplevel'))).toEqual(['/repo/missing: git rev-parse HEAD', '/repo/missing: git rev-parse --abbrev-ref'])
+})
+
 test('a /clear or a resume drops the watch of the conversation that pushed', async ($, on) => {
   let id = 's1'
   const clock = mock.clock(on)
@@ -132,12 +164,55 @@ test('showCi false leaves the section out', { options: { showCi: false } }, asyn
 
 test('pushes, pull requests, dispatches and reruns start a watch; other commands do not', async () => {
   expect(ciTrigger('rtk git push origin main', '')).toEqual({ kind: 'push' })
-  expect(ciTrigger('cd app && gh pr create --fill', '')).toEqual({ kind: 'pr' })
-  expect(ciTrigger('gh workflow run ci.yml', `Created workflow_dispatch event\n${URL}`)).toEqual({ kind: 'workflow', runId: 42 })
+  expect(ciTrigger('gh pr create --fill', '')).toEqual({ kind: 'pr' })
+  expect(ciTrigger('gh workflow run ci.yml', `Created workflow_dispatch event\n${URL}`)).toEqual({ kind: 'workflow', runId: 42, repo: 'owner/repo' })
   expect(ciTrigger('gh workflow run ci.yml', 'Created workflow_dispatch event')).toEqual({ kind: 'workflow' })
   expect(ciTrigger('gh run rerun 7 --failed', '')).toEqual({ kind: 'rerun', runId: 7 })
   expect(ciTrigger('git push --dry-run', '')).toBeUndefined()
   expect(ciTrigger('git status', '')).toBeUndefined()
+})
+
+const PLACES = [
+  [
+    'a dispatch to another repository, from another folder, as a session ran it',
+    'cd /d/Projetos/pos && grep -iE "vers" POS.yml | head -3; gh workflow run build.yml --ref master -R ColibriAgile/pos && sleep 5 && gh run list -R ColibriAgile/pos --json url',
+    '[{"url":"https://github.com/ColibriAgile/pos/actions/runs/38948684092"}]',
+    { kind: 'workflow', runId: 38948684092, repo: 'ColibriAgile/pos', dir: '/d/Projetos/pos' },
+  ],
+  ['a rerun with --repo=', 'gh run rerun 7 --repo=owner/api', '', { kind: 'rerun', runId: 7, repo: 'owner/api' }],
+  ['the -R flag over the printed URL', `gh workflow run ci.yml --repo owner/api`, URL, { kind: 'workflow', runId: 42, repo: 'owner/api' }],
+  ['a pull request after cd', 'cd app && gh pr create --fill', '', { kind: 'pr', dir: 'app' }],
+  ['a push with git -C', 'git -C "../my api" push', '', { kind: 'push', dir: '../my api' }],
+  ['git -C under two cd', 'cd /d/work && cd repos && rtk git -C api push origin main', '', { kind: 'push', dir: '/d/work/repos/api' }],
+  ['a cd after the push', 'git push && cd ..', '', { kind: 'push' }],
+] as const
+
+for (const [name, command, output, expected] of PLACES) {
+  test(`the watch takes the repository and the folder of ${name}`, async () => {
+    expect(ciTrigger(command, output)).toEqual(expected)
+  })
+}
+
+for (const command of ['cd ~/app && git push', 'cd $APP && git push', 'cd && git push', 'cd - && gh workflow run ci.yml']) {
+  test(`a command in a folder the mod cannot resolve starts no watch: ${command}`, async () => {
+    expect(ciTrigger(command, URL)).toBeUndefined()
+  })
+}
+
+test('a Git Bash folder becomes a drive path on Windows, and a relative one joins the session folder', async () => {
+  expect(nativeDir('D:\\Projetos\\back-office', '/d/Projetos/pos')).toBe('D:/Projetos/pos')
+  expect(nativeDir('D:/Projetos/back-office', '../pos')).toBe('D:/Projetos/back-office/../pos')
+  expect(nativeDir('/home/ana/app', '/d/data')).toBe('/d/data')
+})
+
+test('a watch on a named repository asks gh with -R', async () => {
+  const calls: string[] = []
+  const run: Runner = async argv => (calls.push(argv.join(' ')), answer(argv))
+  const watch = startWatch({ kind: 'workflow', runId: 42, repo: 'owner/api' }, {}, Date.parse('2026-10-12T10:00:00Z'))
+
+  await pollWatch(run, watch, watch.since + 1_000)
+
+  expect(calls.map(call => call.split(' --json')[0])).toEqual(['gh run view 42 -R owner/api'])
 })
 
 test('a poll finds the runs of the commit, reads each open run and reports the ones that completed', async () => {

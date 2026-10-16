@@ -15,7 +15,7 @@ import { openClient } from './client'
 import { clip, detailLines, detailOf } from './detail'
 import { cellWidths, contextText, GLYPH, LEGEND_GAP, legendLines, legendText, SWATCH, toReading } from './context'
 import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, checkWhen, classify, fixSuggestion, NO_CHECKS, toPattern } from './checks'
-import { CI_POLL_MS, CI_ROOM, CI_STATUS, ciTrigger, isWatching, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from './ci'
+import { CI_POLL_MS, CI_ROOM, CI_STATUS, ciTrigger, isWatching, nativeDir, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from './ci'
 import type { CheckView, Patterns } from './checks'
 import { gitStatus } from './git'
 import type { Host } from './host'
@@ -307,7 +307,8 @@ function pollCi($: EngineInterface): Promise<void> {
   polling ??= (async () => {
     const watch = await read($, ciState)
     if (!isWatching(watch, Date.now())) return
-    const { watch: polled, finished } = await pollWatch(argv => $.process.run(argv), watch, Date.now())
+    const cwd = watch.dir
+    const { watch: polled, finished } = await pollWatch(argv => $.process.run(argv, cwd === undefined ? undefined : { cwd }), watch, Date.now())
     // A push made while the poll ran started a new watch: the old poll's answer is dropped.
     await update($, ciState, current => (current?.since === watch.since ? polled : current))
     for (const run of finished) {
@@ -324,16 +325,21 @@ function pollCi($: EngineInterface): Promise<void> {
 
 /** Starts following the runs a push, a pull request, a dispatch or a rerun started. */
 async function watchCi($: EngineInterface, command: string, output: string): Promise<void> {
-  const trigger = ciTrigger(command, output)
-  if (trigger === undefined) return
+  const found = ciTrigger(command, output)
+  if (found === undefined) return
+  // A command run in another folder (`cd <dir> &&`, `git -C <dir>`) pushed that folder's repository.
+  const trigger = found.dir === undefined ? found : { ...found, dir: nativeDir(await $.session.cwd(), found.dir) }
+  const cwd = trigger.dir
   const git = async (args: string[]) => {
-    const done = await $.process.run(['git', ...args]).catch(() => undefined)
+    const done = await $.process.run(['git', ...args], cwd === undefined ? undefined : { cwd }).catch(() => undefined)
 
     return done?.exitCode === 0 ? done.stdout.trim() : undefined
   }
   const isCommit = trigger.kind === 'push' || trigger.kind === 'pr'
   const sha = isCommit ? await git(['rev-parse', 'HEAD']) : undefined
   const branch = await git(['rev-parse', '--abbrev-ref', 'HEAD'])
+  // A folder that is no repository the mod can read gives no commit to follow: no watch beats a wrong one.
+  if (cwd !== undefined && branch === undefined) return
   await update($, ciState, () =>
     startWatch(trigger, { ...(sha === undefined ? {} : { sha }), ...(branch === undefined ? {} : { branch }) }, Date.now()),
   )
