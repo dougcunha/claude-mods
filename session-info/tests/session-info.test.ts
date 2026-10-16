@@ -518,7 +518,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 
   for (const [paneTitleAlign, grows] of [['center', [true, true]], ['right', [true, false]], [undefined, [false, true]]] as const) {
-    test(`paneTitleAlign ${paneTitleAlign ?? 'left by default'} makes ${grows[0] ? 'the left' : 'the right'}${grows[0] && grows[1] ? ' and right' : ''} side of the title rule grow (${surface})`, { options: { paneTitle: 'Work', paneTitleAlign } }, async ($, on) => {
+    test(`paneTitleAlign ${paneTitleAlign ?? 'left by default'} makes ${grows[0] ? 'the left' : 'the right'}${grows[0] && grows[1] ? ' and right' : ''} side of the title rule grow (${surface})`, { options: { paneTitle: 'Work', ...(paneTitleAlign === undefined ? {} : { paneTitleAlign }) } }, async ($, on) => {
       on('session.cwd', async () => ({ value: '/repo' }))
       on('agent.list', async () => ({ value: [] }))
       on('session.usage', async () => usage([]))
