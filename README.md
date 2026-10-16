@@ -17,6 +17,7 @@ Each mod lives in its own folder, and this repository is also a plugin marketpla
 | Mod | What it does | Command |
 | --- | --- | --- |
 | [**session-info**](session-info/) | One pane that shows the state of the session, the repository and the work Claude does. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info`, `/autopick` |
+| [**topic-guard**](topic-guard/) | Before a prompt enters the session, a small model judges whether it starts a separate topic. Enter keeps it here; New session clears the session for it. | — |
 
 <p align="center">
   <img src="session-info/images/overview.png" width="480" alt="The session-info pane: cost and elapsed tiles, then the Session, Usage, Autopick, Todos, Last turn, Skills, Agents, Checks and Changes sections">

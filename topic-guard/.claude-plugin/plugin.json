@@ -1,0 +1,44 @@
+{
+  "name": "topic-guard",
+  "version": "0.1.0",
+  "description": "Before a prompt enters the session, a small model judges whether it belongs to the session's topic. When it starts a separate topic, the mod holds it in the prompt box: press Enter to keep it here, or New session to clear the session and send it there.",
+  "author": {
+    "name": "Douglas Cunha",
+    "url": "https://github.com/dougcunha"
+  },
+  "homepage": "https://github.com/dougcunha/claude-mods/tree/main/topic-guard",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "analyze": {
+      "type": "boolean",
+      "title": "Judge each prompt",
+      "description": "Before a prompt you type enters the session, ask a small model whether it belongs to the session's topic, and hold it when it does not. Off lets every prompt enter.",
+      "default": true
+    },
+    "model": {
+      "type": "string",
+      "title": "Model that judges the prompt",
+      "description": "An alias (haiku) or a full model id. The call goes through the session's own client, and the prompt waits for it, up to 8 seconds.",
+      "default": "haiku"
+    },
+    "minContextPercent": {
+      "type": "number",
+      "title": "Context before the first judgment",
+      "description": "Judge a prompt only when the context window is at least this full, in percent. A small context costs little when topics mix. 0 judges every prompt.",
+      "default": 20
+    },
+    "recheckStep": {
+      "type": "number",
+      "title": "Context growth after you keep a message",
+      "description": "After you send a held message again to keep it here, judge again only when the context grew by this many percentage points. A context below that point, as after a compact, is judged again at once.",
+      "default": 10
+    },
+    "debug": {
+      "type": "boolean",
+      "title": "Write a debug log",
+      "description": "Write one line per judgment and choice to <temp>/claude-topic-guard/<session id>/debug.log: the session id, the context percent and the outcome, never prompt or reply text. Off writes nothing.",
+      "default": false
+    }
+  }
+}
