@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
 
-import type { AgentModel, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, ChangeStatus, Checks, CiRun, CiWatch, ContextReading, Detail, FileChange, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
+import type { AgentModel, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, ChangeStatus, CheckKind, Checks, CiRun, CiWatch, ContextReading, Detail, FileChange, Guard, GuardRun, GuardSkip, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentModelText, agentRows, agentSummary, withAgentModel } from './agents'
 import { crossings } from './alerts'
@@ -18,6 +18,7 @@ import { CHECK_STATUS, checkRowCount, checkRuns, checkSummary, checkViews, check
 import { CI_POLL_MS, CI_ROOM, CI_STATUS, ciTrigger, isWatching, nativeDir, pollWatch, runDetail, startWatch, stateOf, waitingText, watchState } from './ci'
 import type { CheckView, Patterns } from './checks'
 import { gitStatus } from './git'
+import { GUARD_STORE, guardReply, isBypassed, NO_GUARD, passedResults, reusable, savedText, skipText, treeKey, withoutRun, withRun, withSkip } from './guard'
 import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
 import type { IconSet } from './icons'
@@ -52,6 +53,8 @@ const breakdown = atom({ plugin: 'session-info', key: 'breakdown' } as const, fa
 const contextState = atom({ plugin: 'session-info', key: 'context' } as const, null as ContextReading | null)
 const alerted = atom({ plugin: 'session-info', key: 'alerted' } as const, [] as string[])
 const checks = atom({ plugin: 'session-info', key: 'checks' } as const, NO_CHECKS as Checks)
+const guard = atom({ plugin: 'session-info', key: 'guard' } as const, NO_GUARD as Guard)
+const guardOn = atom({ plugin: 'session-info', key: 'guardOn' } as const, false)
 const background = atom({ plugin: 'session-info', key: 'background' } as const, [] as BackgroundTask[])
 const detail = atom({ plugin: 'session-info', key: 'detail' } as const, null as Detail | null)
 const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
@@ -108,12 +111,12 @@ let fix: { key: string; text: string; isOpen: boolean } | undefined
 /** After a session.end the state switches at once, but the session id and its usage only some time later. */
 const SWITCH_POLL_MS = 200
 const SWITCH_LIMIT_MS = 10_000
-const reads = new Set<string>()
-
-/**
 /** The engine swaps the transcript in only after session.compact resolves, so the context is read again until its total moves. */
 const COMPACT_POLL_MS = 250
 const COMPACT_LIMIT_MS = 5_000
+const reads = new Set<string>()
+
+/**
  * The countdowns of one load of the module: the Pick now and Cancel actions of each question whose countdown runs, by
  * tool_use_id, and the one-second tick that redraws them, stopped while none runs.
  */
@@ -207,6 +210,82 @@ async function inspect($: EngineInterface, input: Record<string, unknown>, ran: 
   await update($, checks, current => runs.reduce((all, run) => ({ ...all, [run.kind]: run }), current ?? NO_CHECKS))
 }
 
+/** Reads the build guard switch from the store, which every window shares, into the pane's mirror. */
+async function loadGuard($: EngineInterface): Promise<boolean> {
+  const isOn = (await $.store.get(GUARD_STORE)) === true
+  if ((await read($, guardOn)) !== isOn) await update($, guardOn, () => isOn)
+
+  return isOn
+}
+
+async function switchGuard($: EngineInterface): Promise<void> {
+  const isOn = !(await loadGuard($))
+  await $.store.set(GUARD_STORE, isOn)
+  await update($, guardOn, () => isOn)
+}
+
+/**
+ * A shell call that runs a build or tests, while the guard is on. When the same command passed on the same working
+ * tree less than the TTL ago, the call is answered with that run's result and does not run; otherwise it runs, and a
+ * pass is kept under the tree's fingerprint. The fingerprint is taken before the run: what the run itself writes
+ * (a lock file, generated code) changes the next fingerprint, so the next run is never skipped by mistake.
+ */
+async function guardRun($: EngineInterface, command: string, kinds: CheckKind[], next: () => Promise<ToolCallResult>, onSkip: () => void): Promise<ToolCallResult> {
+  const at = Date.now()
+  let key: string | undefined
+  let reused: GuardRun | undefined
+  try {
+    key = await treeKey(hostOf($), await $.session.cwd(), command)
+    reused = key === undefined || isBypassed(command) ? undefined : reusable(await read($, guard), key, at)
+  } catch {
+    key = undefined
+  }
+  if (key === undefined) return next()
+  if (reused !== undefined) {
+    onSkip()
+    const reply = guardReply(reused, at)
+    const skip: GuardSkip = { kinds: reused.kinds, command: reused.command, reply, at, from: reused.at, ms: reused.ms }
+    const run = reused
+    await update($, guard, current => withSkip(current ?? NO_GUARD, run, skip)).catch(() => undefined)
+
+    // Bash and PowerShell share these fields of their output schema, which core checks an answer against.
+    return { result: { stdout: reply, stderr: '', interrupted: false } } as never
+  }
+
+  const ran = await next()
+  // From here on nothing may throw: the hook's catch would run the command a second time.
+  try {
+    // The general tool.call hook beneath this one has already read the run into Checks; a background run is still running there.
+    const results = ran.deny === undefined && !ran.isError ? passedResults(await read($, checks), kinds, at) : undefined
+    const chars = typeof ran.text === 'string' ? ran.text.length : 0
+    const ended = Date.now()
+    const shown = (command.split('\n')[0] ?? '').trim()
+    await update($, guard, current =>
+      results === undefined
+        ? withoutRun(current ?? NO_GUARD, key)
+        : withRun(current ?? NO_GUARD, key, { kinds, command: shown, results, at: ended, ms: ended - at, chars }))
+  } catch (error) {
+    $.ui.toast(`session-info: ${String(error)}`)
+  }
+
+  return ran
+}
+
+/** A Bash or PowerShell call: a build or test run goes through the guard while it is on; any other command runs as usual. */
+async function guardShell($: EngineInterface, e: { tool: string; agentId?: string }, next: () => Promise<ToolCallResult>, patterns: Patterns, isTurnShown: boolean): Promise<ToolCallResult> {
+  const input = e as Record<string, unknown>
+  const command = typeof input.command === 'string' ? input.command : ''
+  const kinds = classify(command, patterns)
+  // A background run ends after the call returns, so there is no result yet to keep or to reuse.
+  if (kinds.length === 0 || input.run_in_background === true || !(await loadGuard($).catch(() => false))) return next()
+  // The general hook counts the call for the Last turn section; a skipped call never reaches it.
+  const noteSkip = () => {
+    if (isTurnShown && e.agentId === undefined && draft !== undefined) draft = withTool(draft, e.tool)
+  }
+
+  return guardRun($, command, kinds, next, noteSkip)
+}
+
 /** Proposes a fix of the failed check in the empty prompt box, once per failed run; a box still busy gets one more try. */
 async function suggestFix($: EngineInterface): Promise<void> {
   const suggestion = fixSuggestion(await read($, checks))
@@ -275,6 +354,19 @@ async function refreshContext($: EngineInterface): Promise<void> {
   await update($, contextState, () => reading)
   // After a /clear or a resume the pane's reads no longer redraw it on a write: it is drawn again here.
   $.ui.invalidate('ui.render')
+}
+
+/** Reads the context again after a compaction until its total differs from `before`, or the limit passes. */
+function refreshAfterCompact($: EngineInterface, before: number | undefined): void {
+  let waited = 0
+  const poll = async (): Promise<void> => {
+    await refreshContext($)
+    const total = (await read($, contextState))?.total
+    waited += COMPACT_POLL_MS
+    if (total !== before || waited >= COMPACT_LIMIT_MS) return
+    $.clock.after(COMPACT_POLL_MS, () => void poll().catch(() => undefined))
+  }
+  $.clock.after(COMPACT_POLL_MS, () => void poll().catch(() => undefined))
 }
 
 /**
@@ -355,19 +447,6 @@ async function findJiraServer($: EngineInterface): Promise<string | null> {
   if (known !== null) return known
   const server = (await $.tool.list()).map(tool => serverOf(tool.name)).find(name => name !== undefined) ?? null
   if (server !== null) await update($, jiraServer, () => server)
-
-/** Reads the context again after a compaction until its total differs from `before`, or the limit passes. */
-function refreshAfterCompact($: EngineInterface, before: number | undefined): void {
-  let waited = 0
-  const poll = async (): Promise<void> => {
-    await refreshContext($)
-    const total = (await read($, contextState))?.total
-    waited += COMPACT_POLL_MS
-    if (total !== before || waited >= COMPACT_LIMIT_MS) return
-    $.clock.after(COMPACT_POLL_MS, () => void poll().catch(() => undefined))
-  }
-  $.clock.after(COMPACT_POLL_MS, () => void poll().catch(() => undefined))
-}
 
   return server
 }
@@ -666,6 +745,7 @@ export const register: Register = (on, options) => {
       void pollCi($).catch(() => undefined)
     }
     if (shows.jira) void findJiraServer($).catch(() => undefined)
+    if (shows.checks) await loadGuard($).catch(() => undefined)
     if (shows.autopick) {
       await $.command.register({
         name: 'autopick',
@@ -716,6 +796,7 @@ export const register: Register = (on, options) => {
         if (isResume) await seedTurns($).catch(() => undefined)
         if (shows.git) void refreshRepo($)
         if (shows.jira) await findJiraServer($).catch(() => undefined)
+        if (shows.checks) await loadGuard($).catch(() => undefined)
         if (shows.autopick) {
           await loadAutopick($).catch(() => undefined)
           await checkRival($).catch(() => undefined)
@@ -875,6 +956,7 @@ export const register: Register = (on, options) => {
   })
 
   on('session.compact', async ($, e, next) => {
+    const before = shows.session ? (await read($, contextState))?.total : undefined
     const compacted = await next(e)
     if (e.agentId === undefined && e.trigger !== 'precompute' && 'messages' in compacted) {
       await update($, compactions, count => (count ?? 0) + 1)
@@ -883,6 +965,14 @@ export const register: Register = (on, options) => {
 
     return compacted
   })
+
+  if (shows.checks) {
+    // Registered before the general tool.call hook so they sit above it: a skipped run never reaches Checks, Changes or Background.
+    // No .catch fallback here: one that calls next(e) after the command already ran would run it a second time;
+    // guardShell catches its own errors and runs the command once.
+    on('tool.call', { tool: 'Bash' }, async ($, e, next) => guardShell($, e, () => next(e), patterns, shows.turn))
+    on('tool.call', { tool: 'PowerShell' }, async ($, e, next) => guardShell($, e, () => next(e), patterns, shows.turn))
+  }
 
   on('tool.call', async ($, e, next) => {
     if (shows.turn && e.agentId === undefined && draft !== undefined) draft = withTool(draft, e.tool)
@@ -956,7 +1046,6 @@ export const register: Register = (on, options) => {
     const isCards = !isTerminal || isFramed(cols)
     const shownDetail = await read($, detail)
     if (shownDetail !== null) {
-    const before = shows.session ? (await read($, contextState))?.total : undefined
       // No list is on screen: the wheel and the keys belong to the pane.
       scrollTargets = []
       const body = (
@@ -1105,7 +1194,11 @@ export const register: Register = (on, options) => {
       : 0
     const lastChecks = shows.checks ? await read($, checks) : NO_CHECKS
     const views = checkViews(lastChecks)
-    const checksRows = counts('#checks') ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) : 0) : 0
+    const guardState = shows.checks ? await read($, guard) : NO_GUARD
+    const isGuarding = shows.checks && (await read($, guardOn))
+    // The guard adds its switch row and one row per skip it lists.
+    const guardRows = 1 + guardState.skips.length
+    const checksRows = counts('#checks') ? chrome + (isOpen('#checks') ? Math.max(1, checkRowCount(views)) + guardRows : 0) : 0
     const isChangesTree = counts('#changes') && isOpen('#changes')
     const isGitTree = counts('#git') && isOpen('#git') && gitTree.length > 0
     // The room below holds one tree's buttons, hint and overflow row; a second tree adds its own 4.
@@ -1830,10 +1923,45 @@ export const register: Register = (on, options) => {
       )
     }
 
+    const saved = savedText(guardState)
+    const guardSwitch = (
+      <Box flexDirection="row" justifyContent="space-between">
+        <Button plain key="guard-switch" onPress={() => void switchGuard($).catch(toast)}>
+          <Text color={isGuarding ? 'success' : undefined} dimColor={!isGuarding}>
+            {isGuarding ? '[x]' : '[ ]'}
+          </Text>
+          {' Skip unchanged builds and tests'}
+        </Button>
+        {saved !== '' && (
+          <Box flexShrink={0} paddingLeft={1}>
+            <Text dimColor>{saved}</Text>
+          </Box>
+        )}
+      </Box>
+    )
+
+    const skipRow = (skip: GuardSkip) => {
+      const text = skipText(skip)
+      const when = `${duration(Date.now() - skip.at)} ago`
+
+      return (
+        <Box flexDirection="row" justifyContent="space-between">
+          <Box flexDirection="row" flexShrink={1}>
+            <Text color="suggestion">↺ </Text>
+            {expandable(`guard:${skip.at}`, text, detailLines([skip.command, skip.reply]), <Text wrap="truncate-end">{fit(text, 2 + when.length + 1)}</Text>)}
+          </Box>
+          <Text dimColor>{when}</Text>
+        </Box>
+      )
+    }
+
     const checksSection = section('#checks', [
       header('#checks', 'Checks', checkSummary(lastChecks)),
       isOpen('#checks') && views.length === 0 && <Text dimColor>No build or test run in this session yet.</Text>,
       isOpen('#checks') && views.map(checkRows),
+      // The skips read as part of the runs above them; the switch closes the card as its control.
+      isOpen('#checks') && guardState.skips.map(skipRow),
+      isOpen('#checks') && guardSwitch,
     ])
 
     const openGitClient = (root: string) =>

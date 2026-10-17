@@ -30,7 +30,7 @@
 - 📈 [**Usage**](#-how-usage-updates): your plan's rate-limit windows as bars, like `/usage`, updated live.
 - 🤖 [**Agents**](#-what-the-agents-section-shows): the session's subagents and teammates with their status, model and effort, children under the agent that spawned them.
 - 🛰️ [**Background**](#️-what-the-background-section-shows): the shell commands Claude started in the background, such as a dev server or a long build, with their status and how long they ran.
-- 🧪 [**Checks**](#-what-the-checks-section-shows): whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests, and a prompt that asks Claude to fix a failure. .NET, Node, Bun, Rust, Go and Python tools are recognized.
+- 🧪 [**Checks**](#-what-the-checks-section-shows): whether the last build and the last test run the session started passed, with the error lines of a failed build or the names of the failed tests, and a prompt that asks Claude to fix a failure, and a switch that skips a build or test run when nothing changed since the same command passed. .NET, Node, Bun, Rust, Go and Python tools are recognized.
 - 🌿 [**Git**](#-what-the-git-section-shows): the branch and whether it is on the remote, the working-tree counts, the last commit, a merge or rebase in progress, the submodules that changed, and every file `git status` lists, in a treeview like the Changes one. Pressing a file opens its diff against HEAD; pressing the branch name opens your Git client, such as lazygit, in a new terminal window.
 - 📝 [**Changes**](#-how-changes-are-detected): every file the current session created, modified or deleted, in a treeview. Pressing a new file opens it in your editor; pressing a modified or deleted file opens its diff in the diff viewer configured on your machine.
 
@@ -214,6 +214,25 @@ When a turn of the main conversation ends and the last build or test run failed,
 | Test run without names | `Fix the 3 failed tests`, or `Fix the failed test run` |
 
 A failed build comes first, because a build that fails often explains the failed tests. Each failed run gets one proposal: the next turn proposes again only for a new failed run. Until you send the next prompt, the proposal replaces the suggestion that Claude Code makes after a turn. Claude Code shows no proposal while the prompt box holds text. Set `suggestFix` to `false` to turn it off.
+
+### ↺ Build guard
+
+The **Skip unchanged builds and tests** switch, the last row of the section, stops Claude from running the same build or test command again when nothing changed. It starts off; the mod keeps its state in `$.store`, so it stays as you left it in every window and session.
+
+While it is on, each shell command that the section recognizes as a build or test run, in the foreground, gets a fingerprint first: the folder, the command, HEAD, the diff of every tracked change (tracked changes inside submodules included) and the content of every untracked file that `.gitignore` does not hide. The `rtk` wrapper is left out of the command, so `rtk dotnet build` and `dotnet build` share a fingerprint; variable assignments such as `PORT=1` stay in it.
+
+| Situation | What happens |
+| --- | --- |
+| The same command passed on the same fingerprint less than 30 minutes ago | The command does not run. Claude reads a short output in its place: the result of the earlier run, and how to run it anyway |
+| Anything else | The command runs as usual. A run where every check passed is kept under its fingerprint; a failed run forgets it |
+| The command ends in `# rerun` | The command runs even when it is unchanged. `#` starts a comment in bash and in PowerShell, so the shell ignores it |
+| Outside a git repository, on a repository without commits, with more than 200 untracked files, or when git fails or cuts its output | The command runs; the guard does not keep it |
+
+Build output lives in ignored folders (`bin/`, `obj/`, `dist/`, `node_modules/`), so a build leaves the fingerprint as it was. A run that writes tracked or untracked files, such as a lock file, changes the next fingerprint, and the next run goes through. The 30 minutes cover what the fingerprint cannot see: a database, a service or an environment variable that a test reads.
+
+Under the build and test rows, each of the last three skips has a row, `↺ Build skipped, same as 4m 2s earlier`; pressing it shows the command and the text Claude read. The switch is the last row of the section, and beside it the section counts what the skips saved, such as `3 skipped · 2m 5s · ~800 tokens`: the duration of each skipped run as it took the last time, and the output Claude did not read, at about four characters per token.
+
+The fingerprint runs four or five git commands, only for the commands the section recognizes and only while the switch is on. The skips and the kept runs belong to the conversation: `/clear` empties them.
 
 ## 🌿 What the Git section shows
 
@@ -493,6 +512,7 @@ After every shell command, the mod also checks that each listed file still exist
 - **Binary files** are not handled. The snapshot stores text only.
 - **Checks of background commands** end when the task's notification reaches the session, not when the command ends. A newer run of the same kind replaces the row first, and the notification of the older run changes nothing. When the task's output file is gone, the row shows the status alone.
 - **Check details** depend on the tool's output format. When a format is not recognized, the row shows the status and, for a failure, the last lines of the output. `rtk dotnet test` on a Microsoft.Testing.Platform project prints no counts when it passes, so the row says `passed`.
+- **Build guard** sees only what git sees: a change in an ignored file, outside the repository or in an environment variable does not change the fingerprint. The 30-minute limit and `# rerun` cover those cases.
 - **Autopick** depends on Claude Code closing the question when the mod answers the call first. This was measured on Claude Code 2.1.296, for a pick after the wait and for Pick now pressed in the pane while the question was open; the mod API does not document it. Waits longer than 1 minute were not measured live. A question in a language whose word for "recommended" is not on the list waits for you. A copy of ask-autopick loaded under another name is not detected.
 - **Usage** shows only the windows Claude Code exposes to mods. The per-model weekly windows and the `~N tok/turn` total that `/usage` prints come from an endpoint mods cannot reach without your OAuth token, so they are left out.
 
@@ -518,6 +538,7 @@ claude --plugin-dir .
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
 | `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, its rows and the fix prompt |
+| `hooks/guard.ts` | The build guard: the working-tree fingerprint, the runs it keeps and reuses, and the text Claude reads for a skip |
 | `hooks/background.ts` | The list of background commands: starting one from a shell call's result, ending it from its notification, ordering, texts and status glyphs |
 | `hooks/detail.ts` | The detail view's text: joins the parts and cuts a text past its limit |
 | `hooks/tasks.ts` | Reads a background task's end from its notification and finishes the check that waits on it |

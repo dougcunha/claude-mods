@@ -659,7 +659,7 @@ test('the trees fit the window the pane body gets, and a body taller than its wi
   expect(shown).toBeLessThanOrEqual(6)
 
   const wheel = { component: 'Pane', requestId: 'session-info', offset: 0, by: 4, bodyRows: 16, contentRows: 40, origin: { kind: 'person' } } as const
-  const overList = { column: 0, row: 44 }
+  const overList = { column: 0, row: 45 }
   await $.ui.scroll(wheel as never)
   await $.ui.scroll({ ...wheel, pointer: { column: 0, row: 999 } } as never)
   expect(handedToPane).toBe(2)

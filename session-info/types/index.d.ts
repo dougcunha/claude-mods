@@ -33,6 +33,18 @@ export type CheckRun = {
 
 export type Checks = { build: CheckRun | null; test: CheckRun | null }
 
+/**
+ * A build or test command that passed, kept by the fingerprint of the working tree it ran on: the checks it ran and
+ * their result lines, when it ended, how long it took and how long its output was.
+ */
+export type GuardRun = { kinds: CheckKind[]; command: string; results: string[]; at: number; ms: number; chars: number }
+
+/** A run the build guard answered with an earlier passed run of the same command on the same tree: `from` is when that run ended. */
+export type GuardSkip = { kinds: CheckKind[]; command: string; reply: string; at: number; from: number; ms: number }
+
+/** The build guard's record of this conversation: the passed runs it can reuse, the last skips, and what the skips saved. */
+export type Guard = { runs: Record<string, GuardRun>; skips: GuardSkip[]; count: number; savedMs: number; savedChars: number }
+
 export type BackgroundStatus = 'running' | 'completed' | 'failed' | 'killed'
 
 /**
@@ -224,6 +236,10 @@ declare module 'claude-code' {
       alerted: string[]
       /** The last build and the last test run of the session. */
       checks: Checks
+      /** The build guard's reusable runs, its last skips and what they saved. */
+      guard: Guard
+      /** A mirror of the build guard switch in `$.store`, so a change redraws the pane. */
+      guardOn: boolean
       /** The background commands of this conversation, newest first; an empty list before the first one starts. */
       background: BackgroundTask[]
       /** The text the detail view shows in place of the sections; null while the sections show. */
