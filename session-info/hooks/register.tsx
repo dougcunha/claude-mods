@@ -111,6 +111,9 @@ const SWITCH_LIMIT_MS = 10_000
 const reads = new Set<string>()
 
 /**
+/** The engine swaps the transcript in only after session.compact resolves, so the context is read again until its total moves. */
+const COMPACT_POLL_MS = 250
+const COMPACT_LIMIT_MS = 5_000
  * The countdowns of one load of the module: the Pick now and Cancel actions of each question whose countdown runs, by
  * tool_use_id, and the one-second tick that redraws them, stopped while none runs.
  */
@@ -352,6 +355,19 @@ async function findJiraServer($: EngineInterface): Promise<string | null> {
   if (known !== null) return known
   const server = (await $.tool.list()).map(tool => serverOf(tool.name)).find(name => name !== undefined) ?? null
   if (server !== null) await update($, jiraServer, () => server)
+
+/** Reads the context again after a compaction until its total differs from `before`, or the limit passes. */
+function refreshAfterCompact($: EngineInterface, before: number | undefined): void {
+  let waited = 0
+  const poll = async (): Promise<void> => {
+    await refreshContext($)
+    const total = (await read($, contextState))?.total
+    waited += COMPACT_POLL_MS
+    if (total !== before || waited >= COMPACT_LIMIT_MS) return
+    $.clock.after(COMPACT_POLL_MS, () => void poll().catch(() => undefined))
+  }
+  $.clock.after(COMPACT_POLL_MS, () => void poll().catch(() => undefined))
+}
 
   return server
 }
@@ -862,7 +878,7 @@ export const register: Register = (on, options) => {
     const compacted = await next(e)
     if (e.agentId === undefined && e.trigger !== 'precompute' && 'messages' in compacted) {
       await update($, compactions, count => (count ?? 0) + 1)
-      if (shows.session) void refreshContext($).catch(() => undefined)
+      if (shows.session) refreshAfterCompact($, before)
     }
 
     return compacted
@@ -940,6 +956,7 @@ export const register: Register = (on, options) => {
     const isCards = !isTerminal || isFramed(cols)
     const shownDetail = await read($, detail)
     if (shownDetail !== null) {
+    const before = shows.session ? (await read($, contextState))?.total : undefined
       // No list is on screen: the wheel and the keys belong to the pane.
       scrollTargets = []
       const body = (

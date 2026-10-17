@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { SessionMessage } from 'claude-code'
 
 import { agentModelText, agentRows, agentSummary, withAgentModel } from '../hooks/agents'
 import { crossings } from '../hooks/alerts'
@@ -274,6 +275,37 @@ test('a /clear or a resume reads the context once the session id is the next one
   isCleared = true
   await clock.advance(200)
   expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k' })).toBeDefined()
+  await ui.unmount()
+})
+
+const SUMMARY: SessionMessage = { role: 'user', text: 'summary', toolUses: [] }
+
+test('a compaction redraws the context once the engine has swapped the transcript in', async ($, on) => {
+  let isCompacted = false
+  const clock = mock.clock(on)
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.compact', async () => ({ messages: [SUMMARY] }))
+  on('session.usage', async (_, e) =>
+    ({
+      value: {
+        startedAt: Date.now(),
+        rateLimits: [],
+        context: { breakdown: e.breakdown ? (isCompacted ? { ...BREAKDOWN, totalTokens: 30_000 } : BREAKDOWN) : undefined },
+      },
+    }) as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'context' })
+  expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k' })).toBeDefined()
+
+  await $.session.compact({ trigger: 'manual', messages: [SUMMARY] })
+  await clock.advance(500)
+  expect(await ui.find({ type: 'Text', text: '124k / 200k · compacts at 187k · 1 compaction' })).toBeDefined()
+
+  isCompacted = true
+  await clock.advance(250)
+  expect(await ui.find({ type: 'Text', text: '30k / 200k · compacts at 187k · 1 compaction' })).toBeDefined()
   await ui.unmount()
 })
 
