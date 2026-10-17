@@ -136,6 +136,16 @@ export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 /** One task of the list the model writes with the mod's todo_write tool; `activeForm` is the task as it runs. */
 export type Todo = { content: string; status: TodoStatus; activeForm?: string }
 
+/** One continue: when it happened, its place in the row since the person's prompt, the task it named and the text Claude read. */
+export type ContinueRun = { at: number; count: number; next: string; reason: string }
+
+/**
+ * The auto-continue record of this conversation: continues since the person's last prompt, continues in all, the
+ * open tasks of the last continue (null before one, so a stop with the same open tasks ends the turn), and the last
+ * continue's record for the section, absent before the first one.
+ */
+export type AutoContinue = { count: number; total: number; last: string | null; lastRun?: ContinueRun }
+
 /** What a subagent runs on: the model of its last request and that request's effort, absent for a model without effort. */
 export type AgentModel = { model: string; effort?: string }
 
@@ -250,6 +260,10 @@ declare module 'claude-code' {
       lastTurn: TurnRecord | null
       /** The task list of the main conversation, as its last todo_write call sent it. */
       todos: Todo[]
+      /** The auto-continue record of this conversation. */
+      autoContinue: AutoContinue
+      /** A mirror of the auto-continue switch in `$.store`, so a change redraws the pane. */
+      autoContinueOn: boolean
       /** The skills loaded in this conversation, newest first. */
       skills: SkillUse[]
       /** The GitHub Actions runs the session started last; null before the first push or dispatch. */

@@ -22,7 +22,7 @@
 
 - 📊 [**Session**](#-what-the-session-section-shows): the context window's fill, compactions and /clear commands, the session's cost and duration, and turn stats.
 - 🔁 [**Last turn**](#-what-the-last-turn-section-shows): how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, the tools it called, and the calls the permission check refused.
-- ✅ [**Todos**](#-what-the-todos-section-shows): the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it.
+- ✅ [**Todos**](#-what-the-todos-section-shows): the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it, and a switch that keeps Claude working while tasks remain open.
 - ⏳ [**Autopick**](#-what-the-autopick-section-shows): a switch that answers a question Claude asked and you left unanswered with the option Claude marked as recommended, after a wait you set. A countdown shows the time left, with Pick now and Cancel. The switch starts off.
 - 🧠 [**Skills**](#-what-the-skills-section-shows): the skills the conversation loaded, which agent loaded each one, and the ones still active.
 - 🚦 [**CI**](#-what-the-ci-section-shows): the GitHub Actions runs that a push, a pull request, a workflow dispatch or a rerun of the session started, with their jobs, a link and a notification when each run ends.
@@ -342,6 +342,30 @@ The tool and the prompt section use tokens on each request. Set `showTodos` to `
 
 The list belongs to the conversation: `/clear` empties it, a new session starts without one, and `/reload-plugins` keeps it.
 
+### ⏩ Auto-continue
+
+The **Continue while tasks remain** switch, the last row of the section, keeps Claude working when it ends a turn with tasks still open, so you do not have to type `continue`. It starts off; the mod keeps its state in `$.store`, so it stays as you left it in every window and session.
+
+While it is on, the mod hooks the end of each turn of the main conversation (`classic.Stop`, the event of a `Stop` settings hook). When the list has a pending or in-progress task, the mod blocks the stop, and Claude reads a short text that names the next task and tells it to go on. The same text tells Claude to stop and ask instead when the next step needs you: a decision, an approval, a push, a deploy, a message to other people or a change that cannot be undone.
+
+The turn ends as usual when any of these holds:
+
+| Condition | Why |
+| --- | --- |
+| No task is pending or in progress | The work is done |
+| One of the last three lines of the reply ends in `?` | Claude asked you something; a status line after the question does not hide it |
+| A background command or a scheduled wake-up is pending | It starts the next turn by itself |
+| The open tasks are the same as at the last continue | Claude made no progress, so a continue would loop |
+| 5 continues in a row since your last prompt | A limit for any other loop; your next prompt starts the count over |
+| A `Stop` settings hook or another mod already blocked the stop | Its block stays as it is |
+
+Each continue shows in two places, and Claude reads neither:
+
+- **The transcript** gets a line, `session-info: auto-continue 2/5, next: Write the hook`, so you see where the mod sent Claude on, with the pane closed too.
+- **The section** shows the last continue above the switch, `⏩ Continued 2/5 · next: Write the hook`, with its age; pressing it shows the text Claude read. Beside the switch, the section counts the continues of the conversation, such as `3 continues`.
+
+`2/5` is the place of the continue in the row since your last prompt, out of the limit. `/clear` empties the count and the row.
+
 ## ⏳ What the Autopick section shows
 
 You start a long task and walk away, and the session stops on a question Claude asked in the first minute. With autopick on, a question that waits longer than the wait you set gets the option Claude recommended, and the work goes on.
@@ -349,14 +373,14 @@ You start a long task and walk away, and the session stops on a question Claude 
 1. The question shows as usual and waits for you. The Autopick section shows a row with the countdown and the option it will pick: `◷ 7:32 Color? → Blue (Recommended)`.
 2. If you answer before the countdown ends, your answer goes through and autopick does nothing.
 3. If the countdown ends, autopick answers in your place with the recommended option of each question. Claude Code closes the question, and the transcript shows the answer as it would show yours, with a line that says autopick picked it.
-4. Claude also gets a note with the answer: you did not choose the option, so it is a default and not your decision, and its next reply must say what was picked.
+4. Claude also gets a note with the answer: you turned Autopick on and set the wait, so the pick applies your standing instruction. Claude goes on with it as your answer, and its next reply says what was picked, so you can change it.
 5. The section keeps the last pick: `✓ Picked 3m ago: Color? → Blue (Recommended)`.
 
 ![The Autopick section with the switch on, a 3-minute wait and the last pick](images/autopick.png)
 
 On the row of a waiting question:
 
-- **Pick now** answers with the recommended option at once. The note tells Claude that you accepted the default.
+- **Pick now** answers with the recommended option at once. The note tells Claude that you took the recommended option without going through the others.
 - **Cancel** stops the countdown of that question. The row stays, dim, until you answer.
 
 Claude marks the option it recommends by putting it first and ending its label with `(Recommended)`, or with that word in the language of the question. Autopick takes the first option only when it carries that mark and no other option does. It knows the word in English, Portuguese, Spanish, Turkish, German, French, Italian, Dutch, Polish, Russian, Chinese, Japanese and Korean, and full-width parentheses count too. Three kinds of questions always wait for you, and their row says `No recommended option: the question waits for you.`:
@@ -366,6 +390,11 @@ Claude marks the option it recommends by putting it first and ending its label w
 - A question that takes several answers (`multiSelect`).
 
 When a call holds several questions, all of them need a recommended option, or the whole call waits.
+
+While the switch is on, a short section at the end of the system prompt tells Claude the rule before it asks: a question you leave unanswered for the wait gets the option it marked `(Recommended)`, by your standing instruction. The section asks Claude to mark an option only when it can carry it out without you, and to mark none when the step needs your own approval: a change that cannot be undone, a push, a deploy, a message to other people, or a gate that an instruction reserves for you. Such a question has no recommended option, so it waits for you. The section is there only while the switch is on, ask-autopick is not loaded and the request offers the `AskUserQuestion` tool; it adds about 100 tokens to each request.
+
+> [!NOTE]
+> Before the section, the note called a pick "a default, not your decision", and Claude often refused to act on it and left the question open. The note now says who set the rule. Claude can still refuse at a gate that an instruction reserves for you, such as the approval step of an SDD flow; for those, run the flow in its own autonomous mode.
 
 The switch and the wait are kept in the mod's store, so they stay across sessions and every open session uses the same values. The switch starts off, and the wait starts at 10 minutes. The `−` and `+` buttons step through 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90 and 120 minutes. Turning the switch off stops every countdown that runs. A change of the wait applies to the next question.
 
@@ -512,6 +541,8 @@ After every shell command, the mod also checks that each listed file still exist
 - **Binary files** are not handled. The snapshot stores text only.
 - **Checks of background commands** end when the task's notification reaches the session, not when the command ends. A newer run of the same kind replaces the row first, and the notification of the older run changes nothing. When the task's output file is gone, the row shows the status alone.
 - **Check details** depend on the tool's output format. When a format is not recognized, the row shows the status and, for a failure, the last lines of the output. `rtk dotnet test` on a Microsoft.Testing.Platform project prints no counts when it passes, so the row says `passed`.
+- **Auto-continue** needs the `classic.Stop` event, which Claude Code does not send to a plugin you install yourself where an organization manages Claude Code through managed settings. There the switch changes nothing, unless the organization lists the mod in its managed settings.
+- **Auto-continue** reads a question only by its question mark. A reply that waits for you without one, such as `Tell me when you are ready.`, gets a continue; Claude is told to stop and ask before a step that needs you, and the limit of 5 in a row and the progress check bound the rest.
 - **Build guard** sees only what git sees: a change in an ignored file, outside the repository or in an environment variable does not change the fingerprint. The 30-minute limit and `# rerun` cover those cases.
 - **Autopick** depends on Claude Code closing the question when the mod answers the call first. This was measured on Claude Code 2.1.296, for a pick after the wait and for Pick now pressed in the pane while the question was open; the mod API does not document it. Waits longer than 1 minute were not measured live. A question in a language whose word for "recommended" is not on the list waits for you. A copy of ask-autopick loaded under another name is not detected.
 - **Usage** shows only the windows Claude Code exposes to mods. The per-model weekly windows and the `~N tok/turn` total that `/usage` prints come from an endpoint mods cannot reach without your OAuth token, so they are left out.

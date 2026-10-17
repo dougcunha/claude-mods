@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { countdown, hasRival, minutesOf, pickDetail, picksDetail, picksOf, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from '../hooks/autopick'
+import { autopickPrompt, countdown, hasRival, minutesOf, pickDetail, pickedNote, picksDetail, picksOf, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from '../hooks/autopick'
 
 const PANE = {
   plugin: 'session-info',
@@ -239,4 +239,45 @@ test('/autopick reads and changes the settings', async ($, on) => {
   expect(await run('30')).toMatch(/30 min/)
   expect(await run('500')).toMatch(/^Usage/)
   expect(store[STORE_MINUTES]).toBe(30)
+})
+
+test('the note after a pick names it as the standing instruction of the person', () => {
+  const pick = { picks: { 'Color?': 'Blue (Recommended)' }, at: 0, minutes: 3, isByHand: false }
+  expect(pickedNote(pick)).toBe(
+    'session-info autopick: the person turned Autopick on with a 3-minute wait. They told the session to take the option you marked (Recommended) when they do not answer in that time. This answer applies that standing instruction: proceed with it as their answer, and name the pick in your next reply so they can change it.',
+  )
+  expect(pickedNote({ ...pick, isByHand: true })).toBe(
+    'session-info autopick: the person pressed Pick now, which takes the option you marked (Recommended) without going through the others. Proceed with it as their answer, and name the pick in your next reply so they can change it.',
+  )
+})
+
+const COMPOSE = { model: 'm', promptModel: 'm', surfaces: [], outputStyle: null, traits: [] } as const
+
+const autopickSection = async ($: Parameters<TestBody>[0], tools: string[]) =>
+  (await $.prompt.compose({ ...COMPOSE, tools })).sections.find(section => section.id === 'session-info:autopick')
+
+test('while the switch is on the system prompt states the rule before the question', async ($, on) => {
+  world(on, { [STORE_ON]: true, [STORE_MINUTES]: 3 })
+  on('prompt.compose', async () => ({ sections: [] }) as never)
+
+  const section = await autopickSection($, ['AskUserQuestion'])
+  expect(section?.text).toBe(autopickPrompt(3))
+  expect(section?.scope).toBe('session')
+  expect(autopickPrompt(3)).toContain('mark no option (Recommended): Autopick then leaves the question for the person.')
+  expect(autopickPrompt(1)).toContain('unanswered for 1 minute,')
+  expect(await autopickSection($, ['Read'])).toBeUndefined()
+})
+
+test('with the switch off or ask-autopick loaded the system prompt says nothing of Autopick', async ($, on) => {
+  const store: Record<string, unknown> = {}
+  const clock = world(on, store, 5 * MINUTE, [{ name: 'ask-autopick', plugin: 'ask-autopick' }])
+  on('prompt.compose', async () => ({ sections: [] }) as never)
+  expect(await autopickSection($, ['AskUserQuestion'])).toBeUndefined()
+
+  store[STORE_ON] = true
+  // A question checks for the rival, as the session start does after its wait.
+  const call = $.tool.call(ASK)
+  await clock.advance(5 * MINUTE)
+  await call
+  expect(await autopickSection($, ['AskUserQuestion'])).toBeUndefined()
 })

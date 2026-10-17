@@ -1,7 +1,7 @@
 {
   "name": "session-info",
-  "version": "0.29.0",
-  "description": "Session pane: context, cost and turns, the last turn's tokens, cache, tools and refused calls, a task list Claude keeps, an autopick switch that answers a question left unanswered with its recommended option, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents with their model and effort, the shell commands Claude runs in the background, the last build and test run, background runs included, with a prompt that asks Claude to fix a failure and a switch that skips a build or test run when nothing changed since the same command passed, the Git state of the repository and its submodules with a treeview of its changed files, and a treeview of the files this session created, modified or deleted.",
+  "version": "0.31.0",
+  "description": "Session pane: context, cost and turns, the last turn's tokens, cache, tools and refused calls, a task list Claude keeps with a switch that keeps Claude working while tasks remain open, an autopick switch that answers a question left unanswered with its recommended option, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents with their model and effort, the shell commands Claude runs in the background, the last build and test run, background runs included, with a prompt that asks Claude to fix a failure and a switch that skips a build or test run when nothing changed since the same command passed, the Git state of the repository and its submodules with a treeview of its changed files, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",
     "url": "https://github.com/dougcunha"
@@ -31,7 +31,7 @@
     "showTodos": {
       "type": "boolean",
       "title": "Show the Todos section",
-      "description": "Give Claude a todo_write tool and show the task list it keeps for work with several steps. Off removes the tool and its prompt section.",
+      "description": "Give Claude a todo_write tool and show the task list it keeps for work with several steps, with the auto-continue switch, which keeps Claude working while tasks remain open. Off removes the tool, its prompt section and auto-continue.",
       "default": true
     },
     "todoMinSteps": {
@@ -49,7 +49,7 @@
     "showAutopick": {
       "type": "boolean",
       "title": "Show the Autopick section",
-      "description": "A switch that answers a question Claude asked and you left unanswered with the option Claude marked (Recommended), after a wait you set in the section, with a countdown, Pick now and Cancel. The switch starts off. Off here hides the section and the /autopick command, and no question is answered for you.",
+      "description": "A switch that answers a question Claude asked and you left unanswered with the option Claude marked (Recommended), after a wait you set in the section, with a countdown, Pick now and Cancel. While the switch is on, a short system prompt section tells Claude the rule, so it marks (Recommended) only where it may act without you. The switch starts off. Off here hides the section and the /autopick command, and no question is answered for you.",
       "default": true
     },
     "showSkills": {

@@ -1,11 +1,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
 
-import type { AgentModel, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, ChangeStatus, CheckKind, Checks, CiRun, CiWatch, ContextReading, Detail, FileChange, Guard, GuardRun, GuardSkip, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
+import type { AgentModel, AutoContinue, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, ChangeStatus, CheckKind, Checks, CiRun, ContinueRun, CiWatch, ContextReading, Detail, FileChange, Guard, GuardRun, GuardSkip, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentModelText, agentRows, agentSummary, withAgentModel } from './agents'
 import { crossings } from './alerts'
-import { AUTOPICK_USAGE, autopickSummary, countdown, DEFAULT_SETTINGS, hasRival, minutesOf, pickDetail, pickedLog, pickedNote, picksDetail, picksOf, picksText, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from './autopick'
+import { CONTINUE_STORE, continueLog, continueReason, continueText, lastContinueText, NO_CONTINUE, withContinue, withPrompt } from './autocontinue'
+import { AUTOPICK_USAGE, autopickPrompt, autopickSummary, countdown, DEFAULT_SETTINGS, hasRival, minutesOf, pickDetail, pickedLog, pickedNote, picksDetail, picksOf, picksText, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from './autopick'
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
 import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCommandLine, orderedTasks, startedTask, taskLabel, taskRowCount, taskState, withEnd, withTask } from './background'
@@ -60,6 +61,8 @@ const detail = atom({ plugin: 'session-info', key: 'detail' } as const, null as 
 const repoState = atom({ plugin: 'session-info', key: 'repo' } as const, null as Repo | 'outside' | null)
 const lastTurn = atom({ plugin: 'session-info', key: 'lastTurn' } as const, null as TurnRecord | null)
 const todos = atom({ plugin: 'session-info', key: 'todos' } as const, [] as Todo[])
+const autoContinue = atom({ plugin: 'session-info', key: 'autoContinue' } as const, NO_CONTINUE as AutoContinue)
+const autoContinueOn = atom({ plugin: 'session-info', key: 'autoContinueOn' } as const, false)
 const skills = atom({ plugin: 'session-info', key: 'skills' } as const, [] as SkillUse[])
 const ciState = atom({ plugin: 'session-info', key: 'ci' } as const, null as CiWatch | null)
 const jiraServer = atom({ plugin: 'session-info', key: 'jiraServer' } as const, null as string | null)
@@ -208,6 +211,44 @@ async function inspect($: EngineInterface, input: Record<string, unknown>, ran: 
     persistedPath: typeof result.persistedOutputPath === 'string' ? result.persistedOutputPath : undefined,
   }, Date.now())
   await update($, checks, current => runs.reduce((all, run) => ({ ...all, [run.kind]: run }), current ?? NO_CHECKS))
+}
+
+/** Reads the auto-continue switch from the store, which every window shares, into the pane's mirror. */
+async function loadContinue($: EngineInterface): Promise<boolean> {
+  const isOn = (await $.store.get(CONTINUE_STORE)) === true
+  if ((await read($, autoContinueOn)) !== isOn) await update($, autoContinueOn, () => isOn)
+
+  return isOn
+}
+
+async function switchContinue($: EngineInterface): Promise<void> {
+  const isOn = !(await loadContinue($))
+  await $.store.set(CONTINUE_STORE, isOn)
+  await update($, autoContinueOn, () => isOn)
+}
+
+/**
+ * The end of a main-loop turn: while the switch is on and the task list has open tasks, the stop is blocked with a
+ * text that sends Claude on with the next task. A block from a hook beneath stays as it is.
+ */
+async function continueOnStop($: EngineInterface, stop: { last_assistant_message?: string; background_tasks?: unknown[]; session_crons?: unknown[] }, stopped: { block?: string; preventContinuation?: true }): Promise<string | undefined> {
+  if (stopped.block !== undefined || stopped.preventContinuation === true) return undefined
+  const list = await read($, todos)
+  const state = await read($, autoContinue)
+  const reason = continueReason({
+    isOn: await loadContinue($),
+    todos: list,
+    lastMessage: stop.last_assistant_message ?? '',
+    // Background work or a scheduled wake-up starts the next turn by itself; a continue now would only wait for it.
+    hasPendingWork: (stop.background_tasks?.length ?? 0) > 0 || (stop.session_crons?.length ?? 0) > 0,
+    state,
+  })
+  if (reason === undefined) return undefined
+  const next = await update($, autoContinue, current => withContinue(current ?? NO_CONTINUE, list, Date.now(), reason))
+  // A line in the transcript marks where the mod sent Claude on, even with the pane closed; the model does not read it.
+  if (next.lastRun !== undefined) $.ui.log(continueLog(next.lastRun))
+
+  return reason
 }
 
 /** Reads the build guard switch from the store, which every window shares, into the pane's mirror. */
@@ -746,6 +787,7 @@ export const register: Register = (on, options) => {
     }
     if (shows.jira) void findJiraServer($).catch(() => undefined)
     if (shows.checks) await loadGuard($).catch(() => undefined)
+    if (shows.todos) await loadContinue($).catch(() => undefined)
     if (shows.autopick) {
       await $.command.register({
         name: 'autopick',
@@ -769,6 +811,7 @@ export const register: Register = (on, options) => {
     if (e.source === 'clear') {
       draft = undefined
       if (shows.todos) await update($, todos, () => [])
+      if (shows.todos) await update($, autoContinue, () => NO_CONTINUE)
       if (shows.turn) await update($, lastTurn, () => null)
       if (shows.skills) await update($, skills, () => [])
       if (shows.jira) await update($, jiraIssues, () => [])
@@ -797,6 +840,7 @@ export const register: Register = (on, options) => {
         if (shows.git) void refreshRepo($)
         if (shows.jira) await findJiraServer($).catch(() => undefined)
         if (shows.checks) await loadGuard($).catch(() => undefined)
+        if (shows.todos) await loadContinue($).catch(() => undefined)
         if (shows.autopick) {
           await loadAutopick($).catch(() => undefined)
           await checkRival($).catch(() => undefined)
@@ -821,6 +865,9 @@ export const register: Register = (on, options) => {
   on('prompt.submit', async ($, e, next) => {
     if (shows.git) void refreshRepo($)
     if (fix) fix.isOpen = false
+    // The continues in a row count from the person's last prompt; a notification or a plugin's prompt is not one.
+    if (shows.todos && (e.origin?.kind === 'composer' || e.origin?.kind === 'bridge'))
+      await update($, autoContinue, state => withPrompt(state ?? NO_CONTINUE)).catch(() => undefined)
     // A background command's end reaches the session as a notification prompt, the one place its exit status shows.
     if ((shows.checks || shows.background) && e.origin?.kind === 'task-notification')
       void finishTasks($, e.text, { isBackground: shows.background, isChecks: shows.checks }).catch(error => $.ui.toast(`session-info: ${String(error)}`))
@@ -833,16 +880,22 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  if (shows.todos) {
+  if (shows.todos || shows.autopick) {
     const instruction = todoPrompt(minSteps(options.todoMinSteps), options.todoInstruction)
-    // The section rides after the engine's own, on the session side of the cache boundary.
+    // The sections ride after the engine's own, on the session side of the cache boundary.
     on('prompt.compose', async ($, e, next) => {
       const composed = await next(e)
-      if (!e.tools.includes(TODO_TOOL)) return composed
+      const sections = [...composed.sections]
+      if (shows.todos && e.tools.includes(TODO_TOOL)) sections.push({ id: 'session-info:todos', text: instruction, scope: 'session' })
+      // Only while the switch is on and no rival answers the questions: off, the model reads nothing about Autopick.
+      const pick = shows.autopick && e.tools.includes('AskUserQuestion') ? await loadAutopick($).catch(() => DEFAULT_SETTINGS) : DEFAULT_SETTINGS
+      if (pick.isOn && !(await read($, autopickConflict))) sections.push({ id: 'session-info:autopick', text: autopickPrompt(pick.minutes), scope: 'session' })
 
-      return { sections: [...composed.sections, { id: 'session-info:todos', text: instruction, scope: 'session' }] }
+      return sections.length === composed.sections.length ? composed : { sections }
     })
+  }
 
+  if (shows.todos) {
     on('tool.call', { tool: TODO_TOOL }, async ($, e) => {
       if (e.agentId !== undefined) return { result: 'Ignored: only the main conversation keeps the task list.' }
       // This hook answers the call itself, so the general tool.call hook never counts it for the Last turn section.
@@ -852,6 +905,14 @@ export const register: Register = (on, options) => {
       await update($, todos, () => parsed)
 
       return { result: todoReply(parsed) }
+    })
+
+    // A hook that fails here is skipped without a .catch: the turn then ends as it would without the mod, which is safe.
+    on('classic.Stop', async ($, e, next) => {
+      const stopped = await next(e)
+      const reason = await continueOnStop($, e, stopped)
+
+      return reason === undefined ? stopped : { ...stopped, block: reason }
     })
   }
 
@@ -1177,7 +1238,11 @@ export const register: Register = (on, options) => {
     const ciRows = counts('#ci') ? chrome + (isOpen('#ci') ? Math.max(1, ciBody + (ciWatch?.error === undefined ? 0 : 1)) : 0) : 0
     const jiraRows = counts('#jira') ? chrome + (isOpen('#jira') ? Math.max(1, issues.length * 2 + issues.filter(needsAllow).length) : 0) : 0
     const todoRoom = Math.min(taskList.length, TODO_ROOM)
-    const todosRows = counts('#todos') ? chrome + (isOpen('#todos') ? Math.max(1, todoRoom + (taskList.length > todoRoom ? 1 : 0)) : 0) : 0
+    const continueState = shows.todos ? await read($, autoContinue) : NO_CONTINUE
+    const isContinuing = shows.todos && (await read($, autoContinueOn))
+    // Auto-continue adds its switch row under the list, and the last continue's row once there is one.
+    const continueRows = 1 + (continueState.lastRun === undefined ? 0 : 1)
+    const todosRows = counts('#todos') ? chrome + (isOpen('#todos') ? Math.max(1, todoRoom + (taskList.length > todoRoom ? 1 : 0)) + continueRows : 0) : 0
     const autopickBody = 1 + (isPickBlocked ? 1 : 0) + waits.length + (lastPick ? 1 : 0)
     const autopickRows = counts('#autopick') ? chrome + (isOpen('#autopick') ? autopickBody : 0) : 0
     const usageRows = counts('#usage') ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
@@ -1613,11 +1678,46 @@ export const register: Register = (on, options) => {
       )
     }
 
+    const continued = continueText(continueState)
+    const continueSwitch = (
+      <Box flexDirection="row" justifyContent="space-between">
+        <Button plain key="continue-switch" onPress={() => void switchContinue($).catch(toast)}>
+          <Text color={isContinuing ? 'success' : undefined} dimColor={!isContinuing}>
+            {isContinuing ? '[x]' : '[ ]'}
+          </Text>
+          {' Continue while tasks remain'}
+        </Button>
+        {continued !== '' && (
+          <Box flexShrink={0} paddingLeft={1}>
+            <Text dimColor>{continued}</Text>
+          </Box>
+        )}
+      </Box>
+    )
+
+    const lastContinue = continueState.lastRun
+    const lastContinueRow = (run: ContinueRun) => {
+      const text = lastContinueText(run)
+      const when = `${duration(Date.now() - run.at)} ago`
+
+      return (
+        <Box flexDirection="row" justifyContent="space-between">
+          <Box flexDirection="row" flexShrink={1}>
+            <Text color="suggestion">⏩ </Text>
+            {expandable('continue:last', text, run.reason, <Text wrap="truncate-end">{fit(text, 2 + when.length + 1)}</Text>)}
+          </Box>
+          <Text dimColor>{when}</Text>
+        </Box>
+      )
+    }
+
     const todosSection = section('#todos', [
       header('#todos', 'Todos', todoSummary(taskList)),
       isOpen('#todos') && taskList.length === 0 && <Text dimColor>No task list yet. Claude writes one for work with several steps.</Text>,
       isOpen('#todos') && taskList.slice(0, todoRoom).map(todoLine),
       isOpen('#todos') && taskList.length > todoRoom && <Text dimColor>{`… ${taskList.length - todoRoom} more`}</Text>,
+      isOpen('#todos') && lastContinue !== undefined && lastContinueRow(lastContinue),
+      isOpen('#todos') && continueSwitch,
     ])
 
     const autopickSwitch = (

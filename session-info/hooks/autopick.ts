@@ -120,11 +120,29 @@ export function pickedLog(pick: AutopickPick): string {
   return `session-info: ${why}, picked the recommended option: ${picksText(pick.picks)}`
 }
 
-/** What the model reads after the picked answer, so it does not take the pick for the person's choice. */
+/**
+ * What the model reads after the picked answer. It says who set the rule: the person turned Autopick on and chose the
+ * wait, so the pick applies their standing instruction. A text that called it "not their decision" made the model
+ * refuse to act on it and leave the question open, which defeats the switch the person turned on.
+ */
 export function pickedNote(pick: AutopickPick): string {
   return pick.isByHand
-    ? 'session-info autopick: the person pressed Pick now, so the recommended option was picked without reading the options. Treat it as a default they accepted, not as a choice they weighed.'
-    : `session-info autopick: the person did not answer within ${pick.minutes} minutes, so the recommended option was picked for them. Treat it as a default, not as their decision, and name the pick in your next reply.`
+    ? 'session-info autopick: the person pressed Pick now, which takes the option you marked (Recommended) without going through the others. Proceed with it as their answer, and name the pick in your next reply so they can change it.'
+    : `session-info autopick: the person turned Autopick on with a ${pick.minutes}-minute wait. They told the session to take the option you marked (Recommended) when they do not answer in that time. This answer applies that standing instruction: proceed with it as their answer, and name the pick in your next reply so they can change it.`
+}
+
+/**
+ * The system prompt section while Autopick is on: the rule, said before the question, so the model marks
+ * (Recommended) only where it may act without the person. A question with no marked option is never picked
+ * (`picksOf`), so this keeps the questions that need the person waiting for them.
+ */
+export function autopickPrompt(minutes: number): string {
+  return [
+    '# Autopick',
+    `The person turned Autopick on: when they leave an AskUserQuestion question unanswered for ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}, the option you marked (Recommended) is picked as their answer, by their standing instruction.`,
+    'Mark an option (Recommended) only when you can carry it out without the person.',
+    "When the step needs the person's own approval (a change that cannot be undone, a push, a deploy, a message to other people, or a gate an instruction reserves for the person), mark no option (Recommended): Autopick then leaves the question for the person.",
+  ].join('\n')
 }
 
 /** The `/autopick` answer. */
