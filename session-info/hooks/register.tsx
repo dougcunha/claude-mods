@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
 
-import type { AgentModel, AutoContinue, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, ChangeStatus, CheckKind, Checks, CiRun, ContinueRun, CiWatch, ContextReading, Detail, FileChange, Guard, GuardRun, GuardSkip, InlineDiff, JiraIssue, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
+import type { AgentModel, AutoContinue, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, CacheHold, CacheState, ChangeStatus, CheckKind, Checks, CiRun, ContinueRun, CiWatch, ContextReading, Detail, FileChange, Guard, GuardRun, GuardSkip, InlineDiff, JiraIssue, KeepWarm, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentModelText, agentRows, agentSummary, withAgentModel } from './agents'
 import { crossings } from './alerts'
@@ -10,6 +10,8 @@ import { AUTOPICK_USAGE, autopickPrompt, autopickSummary, countdown, DEFAULT_SET
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
 import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCommandLine, orderedTasks, startedTask, taskLabel, taskRowCount, taskState, withEnd, withTask } from './background'
+import { CACHE_STATUS, cacheParts, cacheStatus, holdText, isPingDue, isSameMessage, KEEP_WARM_PROMPT, moveToNewSession, NO_CACHE, pingVerdict, shouldHold, span, ttlOf, ttlSetting, withCompact, withPing, withRequest, withResume, withSeed, withSwitch } from './cache'
+import type { TtlSetting } from './cache'
 import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
 import { openClient } from './client'
@@ -76,6 +78,10 @@ const autopickConflict = atom({ plugin: 'session-info', key: 'autopickConflict' 
 const layout = atom({ plugin: 'session-info', key: 'layout' } as const, false)
 const changesTop = atom({ plugin: 'session-info', key: 'changesTop' } as const, 0)
 const gitTop = atom({ plugin: 'session-info', key: 'gitTop' } as const, 0)
+const cache = atom({ plugin: 'session-info', key: 'cache' } as const, NO_CACHE as CacheState)
+const keepWarm = atom({ plugin: 'session-info', key: 'keepWarm' } as const, null as KeepWarm | null)
+const cacheHold = atom({ plugin: 'session-info', key: 'cacheHold' } as const, null as CacheHold | null)
+const cacheMove = atom({ plugin: 'session-info', key: 'cacheMove' } as const, null as 'compact' | 'clear' | null)
 
 const PANE = 'session-info'
 /** Why the Autopick switch stays off while the ask-autopick mod answers the same questions. */
@@ -118,6 +124,11 @@ const SWITCH_LIMIT_MS = 10_000
 const COMPACT_POLL_MS = 250
 const COMPACT_LIMIT_MS = 5_000
 const reads = new Set<string>()
+/** How often keep warm looks whether the cache cools; a short TTL cools over its last minute. */
+const KEEP_WARM_TICK_MS = 30_000
+const HOUR = 60 * MINUTE
+/** The keep-warm ping that runs now; a tick while it runs is skipped. */
+let pinging: Promise<void> | undefined
 
 /**
  * The countdowns of one load of the module: the Pick now and Cancel actions of each question whose countdown runs, by
@@ -160,6 +171,10 @@ function hostOf($: EngineInterface): Host {
     files: () => read($, files),
     updateFiles: async fn => void (await update($, files, all => fn(all ?? {}))),
     showInline: async diff => void (await update($, inline, () => diff)),
+    sleep: ms => $.clock.sleep(ms),
+    clear: async () => void (await $.command.run({ command: 'clear' })),
+    readBox: async () => (await $.prompt.read()).text,
+    fill: async text => void (await $.prompt.fill({ text })),
   }
 }
 
@@ -341,6 +356,14 @@ async function suggestFix($: EngineInterface): Promise<void> {
 }
 
 /** A conversation the mod joins with turns behind it, by a resume or an install, counts them from the prompts in its transcript. */
+/** A load with a last turn on record and no request seen yet dates the cache from that turn's end. */
+async function seedCache($: EngineInterface): Promise<void> {
+  const last = await read($, lastTurn)
+  if (last === null || (await read($, cache)).touchedAt !== undefined) return
+  const context = (await $.session.usage()).context.tokens ?? 0
+  await update($, cache, state => withSeed(state ?? NO_CACHE, last.at, context))
+}
+
 async function seedTurns($: EngineInterface): Promise<void> {
   const sent = await $.session.turns()
   await update($, turns, stats => ((stats ?? NO_TURNS).count > 0 ? (stats ?? NO_TURNS) : { ...(stats ?? NO_TURNS), count: sent }))
@@ -705,6 +728,125 @@ async function answerOrPick($: EngineInterface, live: Countdowns, input: { tool_
   }
 }
 
+/** The cache guard's and keep warm's settings, read once per load. */
+type CacheOptions = { ttl: TtlSetting; isGuarded: boolean; minTokens: number; keepWarmHours: number }
+
+/** A main-thread request reached the cache: the cache's state takes its usage, and the plan limits decide the default TTL. */
+async function noteRequest($: EngineInterface, usage: { input_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }, startedAt: number): Promise<void> {
+  const limits = await $.session.usage().then(read => read.rateLimits, () => [])
+  const endedAt = await $.clock.now()
+  await update($, cache, state => withRequest(state ?? NO_CACHE, { usage, startedAt, endedAt, hasPlanLimits: limits.length > 0 }))
+}
+
+/** Starts keep warm for the configured hours, or stops it. */
+async function switchKeepWarm($: EngineInterface, hours: number): Promise<void> {
+  const at = await $.clock.now()
+  const isOn = (await read($, keepWarm)) === null
+  await update($, keepWarm, () => (isOn ? { until: at + hours * HOUR, pings: 0 } : null))
+  $.ui.toast(isOn ? `session-info: keep warm runs for ${span(hours * HOUR)}. A ping reads the cache shortly before it expires.` : 'session-info: keep warm is off.')
+  $.ui.invalidate('ui.render')
+}
+
+const stopKeepWarm = async ($: EngineInterface, why: string): Promise<void> => {
+  await update($, keepWarm, () => null)
+  $.ui.toast(`session-info: keep warm stopped: ${why}.`)
+  $.ui.invalidate('ui.render')
+}
+
+/**
+ * While keep warm runs and the cache cools, one fork of the conversation reads the cache, so its entry lives a full
+ * TTL again. A ping that misses the cache, or gets no answer, stops keep warm: pinging on would pay for writes.
+ */
+function keepWarmTick($: EngineInterface, setting: TtlSetting): Promise<void> {
+  pinging ??= (async () => {
+    const keep = await read($, keepWarm)
+    if (keep === null) return
+    const at = await $.clock.now()
+    if (keep.until <= at) return stopKeepWarm($, 'its time ran out')
+    const state = await read($, cache)
+    const ttl = ttlOf(state, setting)
+    // A ping now would write the whole context, the cost keep warm is there to avoid.
+    if (cacheStatus(state, keep, ttl, at).kind === 'cold') return stopKeepWarm($, 'the cache had already expired')
+    if (!isPingDue(state, keep, ttl, at)) return
+    const reply = await $.model.fork({ prompt: KEEP_WARM_PROMPT }).catch(() => undefined)
+    const verdict = pingVerdict(reply !== undefined && 'usage' in reply ? reply.usage : undefined)
+    if (verdict === 'none') return stopKeepWarm($, 'the ping got no answer')
+    if (verdict === 'miss') return stopKeepWarm($, 'the ping wrote the cache instead of reading it')
+    const pinged = await $.clock.now()
+    await update($, cache, current => withPing(current ?? NO_CACHE, pinged))
+    await update($, keepWarm, current => (current === null ? null : { ...current, pings: current.pings + 1 }))
+    $.ui.invalidate('ui.render')
+  })().finally(() => {
+    pinging = undefined
+  })
+
+  return pinging
+}
+
+/** Claims the band for one move and returns true, or returns false when a move already runs. */
+async function claimMove($: EngineInterface, move: 'compact' | 'clear'): Promise<boolean> {
+  let isClaimed = false
+  await update($, cacheMove, current => {
+    isClaimed = current === null
+
+    return current ?? move
+  })
+  $.ui.invalidate('ui.render')
+
+  return isClaimed
+}
+
+/** Compacts the conversation and leaves the held prompt in the box, where Enter sends it over the shorter context. */
+async function compactHeld($: EngineInterface): Promise<void> {
+  if (!(await claimMove($, 'compact'))) return
+  try {
+    await $.command.run({ command: 'compact' })
+    await update($, cacheHold, () => null)
+  } catch {
+    $.ui.toast('session-info: the conversation was not compacted. The prompt is still in the box.')
+  } finally {
+    await update($, cacheMove, () => null).catch(() => undefined)
+    $.ui.invalidate('ui.render')
+  }
+}
+
+/** Clears the session and leaves the held prompt in the new session's box; a failure keeps this session. */
+async function newSessionHeld($: EngineInterface): Promise<void> {
+  if (!(await claimMove($, 'clear'))) return
+  try {
+    const hold = await read($, cacheHold)
+    if (hold !== null) await moveToNewSession(hostOf($), hold.text)
+  } catch {
+    $.ui.toast('session-info: the session was not cleared. The prompt is still in the box.')
+  } finally {
+    await update($, cacheMove, () => null).catch(() => undefined)
+    $.ui.invalidate('ui.render')
+  }
+}
+
+/**
+ * The cache guard: a prompt typed at an idle session over a cold cache and a big context is held, and the engine
+ * puts it back in the box. Sending it again lets it through; another prompt replaces it and is checked.
+ */
+async function guardPrompt($: EngineInterface, e: { text: string; origin: { kind: string }; turnId?: string; command?: unknown; isMeta?: true }, minTokens: number, setting: TtlSetting): Promise<{ drop: string } | undefined> {
+  const standing = e.origin.kind === 'composer' ? await read($, cacheHold) : null
+  if (standing !== null) {
+    await update($, cacheHold, () => null)
+    $.ui.invalidate('ui.render')
+    if (isSameMessage(e.text, standing.text)) return undefined
+  }
+  const state = await read($, cache)
+  if (state.touchedAt === undefined) return undefined
+  const status = cacheStatus(state, await read($, keepWarm), ttlOf(state, setting), await $.clock.now())
+  const context = (await $.session.usage()).context.tokens ?? state.tokens
+  if (!shouldHold(e, { status, tokens: context, minTokens })) return undefined
+  const hold: CacheHold = { text: e.text, tokens: context, coldMs: status.kind === 'cold' ? status.ms : 0 }
+  await update($, cacheHold, () => hold)
+  $.ui.invalidate('ui.render')
+
+  return { drop: holdText(hold) }
+}
+
 type OpenPaneArgs = { title: string; isGitShown: boolean; isSessionShown: boolean }
 
 async function openPane($: EngineInterface, { title, isGitShown, isSessionShown }: OpenPaneArgs): Promise<{ text: string }> {
@@ -754,6 +896,15 @@ export const register: Register = (on, options) => {
   const foldOf = (key: SectionKey): string => groupOf.get(key)?.key ?? key
   const isLive = shows.session || shows.usage || shows.agents || shows.checks || shows.background
   const isOpenOnStart = options.openOnStart === true
+  const positive = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback)
+  const cacheOptions: CacheOptions = {
+    ttl: ttlSetting(options.cacheTtl),
+    isGuarded: options.cacheGuard !== false,
+    minTokens: positive(options.cacheGuardMinTokens, 150_000),
+    keepWarmHours: positive(options.keepWarmHours, 4),
+  }
+  /** The Session section draws the cache, and the guard reads it: either one needs the requests followed. */
+  const isCacheTracked = shows.session || cacheOptions.isGuarded
 
   /** The pane's layout mode toggles the sections, so /config leaves out their thirteen show* rows. */
   on('config.describe', { key: ORDER.map(key => `session-info.${showOption(key)}`) }, async ($, e, next) => ({ ...(await next(e)), isHidden: true }))
@@ -779,7 +930,9 @@ export const register: Register = (on, options) => {
       })
     if (shows.git) void refreshRepo($)
     if (shows.session) void refreshContext($).catch(() => undefined)
+    if (isCacheTracked) $.clock.every(KEEP_WARM_TICK_MS, () => void keepWarmTick($, cacheOptions.ttl).catch(() => undefined))
     void seedTurns($).catch(() => undefined)
+    if (isCacheTracked && shows.turn) void seedCache($).catch(() => undefined)
     if (shows.ci) {
       $.clock.every(CI_POLL_MS, () => void pollCi($).catch(() => undefined))
       // A reload during a run picks the watch up again from the state.
@@ -820,9 +973,84 @@ export const register: Register = (on, options) => {
       await update($, detail, () => null)
       if (shows.autopick) await update($, autopickLast, () => null)
     }
+    // A resume at launch says how long ago the last response came, so the cache's age is known before the first request.
+    const secondsSince = e.seconds_since_last_response
+    if (isCacheTracked && (e.source === 'resume' || e.source === 'fork') && secondsSince !== undefined) {
+      const at = await $.clock.now()
+      await update($, cache, state => withResume(state ?? NO_CACHE, secondsSince, at))
+    }
 
     return started
   })
+
+  if (isCacheTracked) {
+    // The engine reports the TTL only here; a new model starts with no cache, and a resume restores the same one.
+    on('classic.PostModelSwitch', async ($, e, next) => {
+      const switched = await next(e)
+      await update($, cache, state => withSwitch(state ?? NO_CACHE, e.cache_ttl, e.from_model !== e.to_model))
+
+      return switched
+    }).catch(($, e, next) => next(e))
+  }
+
+  if (cacheOptions.isGuarded) {
+    on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+      if (e.props.hasSurvey) return next(e)
+      const move = await read($, cacheMove)
+      const hold = await read($, cacheHold)
+      if (move === null && hold === null) return next(e)
+      const below = await next(e)
+      const { Box, Button, Text } = $.ui.resolve(e)
+      const isTerminal = e.surface === 'terminal'
+
+      // The same quiet frame as topic-guard's band: dim at rest, full under the pointer.
+      const band = (
+        <Box
+          key="session-info-cache"
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="suggestion"
+          borderDimColor
+          paddingX={1}
+          {...(isTerminal ? {} : { paddingY: 1, rowGap: 1 })}
+          hover={{ borderDimColor: false }}
+        >
+          {move !== null || hold === null ? (
+            <Text dimColor>
+              <Text color="suggestion">◌ session-info</Text>
+              {move === 'compact' ? ' · compacting the conversation…' : ' · clearing the session…'}
+            </Text>
+          ) : (
+            <>
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text>
+                  <Text color="suggestion" bold>
+                    ◇ session-info
+                  </Text>
+                  <Text dimColor> · the prompt cache expired</Text>
+                </Text>
+                <Text dimColor>{`${span(hold.coldMs)} ago`}</Text>
+              </Box>
+              <Text>{`Sending this prompt writes ${tokens(hold.tokens)} tokens of context to the cache again.`}</Text>
+              <Box flexDirection="row">
+                <Button key="cache-compact" label="Compact" variant="primary" onPress={() => void compactHeld($).catch(() => undefined)} />
+                <Text>  </Text>
+                <Button key="cache-new" label="New session" onPress={() => void newSessionHeld($).catch(() => undefined)} />
+                <Text dimColor>  or press Enter to send it here</Text>
+              </Box>
+            </>
+          )}
+        </Box>
+      )
+
+      return below ? (
+        <Box flexDirection="column">
+          {band}
+          {below}
+        </Box>
+      ) : band
+    })
+  }
 
   // A /clear ends the session as session.end with reason clear; the module and its count go on.
   on('session.end', async ($, e, next) => {
@@ -863,6 +1091,9 @@ export const register: Register = (on, options) => {
 
   // A commit made outside the session, in the Git client for example, shows by the next prompt.
   on('prompt.submit', async ($, e, next) => {
+    // A held prompt goes no further, so the rest of the hook never counts it. A guard that fails lets the prompt in.
+    const held = cacheOptions.isGuarded ? await guardPrompt($, e, cacheOptions.minTokens, cacheOptions.ttl).catch(() => undefined) : undefined
+    if (held !== undefined) return held
     if (shows.git) void refreshRepo($)
     if (fix) fix.isOpen = false
     // The continues in a row count from the person's last prompt; a notification or a plugin's prompt is not one.
@@ -962,13 +1193,19 @@ export const register: Register = (on, options) => {
     }).catch(($, e, next) => next(e))
   }
 
-  if (shows.turn || shows.agents) {
+  if (shows.turn || shows.agents || isCacheTracked) {
     // The step only notes the request; it leaves the stream to the hooks beneath it.
     on('turn.step', async function* ($, e, next) {
       if (shows.turn && e.agentId === undefined && draft !== undefined) draft = withStep(draft, e)
       if (shows.agents && e.agentId !== undefined) await noteAgentModel($, e.agentId, e.model, e.effort)
+      // Only the main thread's requests read the conversation's cache; a subagent's have their own.
+      if (!isCacheTracked || e.agentId !== undefined) return yield* next(e)
+      // A clock that fails leaves the request unnoted, never the step.
+      const startedAt = await $.clock.now().catch(() => undefined)
+      const result = yield* next(e)
+      if (result.usage !== null && startedAt !== undefined) await noteRequest($, result.usage, startedAt).catch(() => undefined)
 
-      return yield* next(e)
+      return result
     })
   }
 
@@ -1021,6 +1258,7 @@ export const register: Register = (on, options) => {
     const compacted = await next(e)
     if (e.agentId === undefined && e.trigger !== 'precompute' && 'messages' in compacted) {
       await update($, compactions, count => (count ?? 0) + 1)
+      if (isCacheTracked) await update($, cache, state => withCompact(state ?? NO_CACHE))
       if (shows.session) refreshAfterCompact($, before)
     }
 
@@ -1247,7 +1485,13 @@ export const register: Register = (on, options) => {
     const autopickRows = counts('#autopick') ? chrome + (isOpen('#autopick') ? autopickBody : 0) : 0
     const usageRows = counts('#usage') ? chrome + (isOpen('#usage') ? Math.max(1, limits.length * 2) : 0) : 0
     const legend = isDetailed && reading ? legendLines(reading, inner) : []
-    const sessionRows = counts('#session') ? chrome + (isOpen('#session') ? 3 + legend.length : 0) : 0
+    const cacheState = shows.session ? await read($, cache) : NO_CACHE
+    const keep = shows.session ? await read($, keepWarm) : null
+    const cacheTtl = ttlOf(cacheState, cacheOptions.ttl)
+    // Before the first request there is no age to read the clock for.
+    const cacheNow = shows.session && cacheState.touchedAt !== undefined ? cacheStatus(cacheState, keep, cacheTtl, await $.clock.now()) : { kind: 'unknown' as const }
+    const cacheRow = cacheParts(cacheNow, cacheState, keep, cacheTtl)
+    const sessionRows = counts('#session') ? chrome + (isOpen('#session') ? 4 + legend.length : 0) : 0
     const agentLines = agentRows(agents)
     const models = shows.agents ? await read($, agentModels) : {}
     const agentRoom = Math.min(agentLines.length, 8)
@@ -1634,6 +1878,24 @@ export const register: Register = (on, options) => {
             </Box>
             {reading ? stackedBar(reading, context?.percent ?? 0) : meter(context?.percent ?? 0)}
             {reading && legendRows(reading)}
+            {/* Laid out as the Context row: the label and the state on the left, the quiet figures on the right. */}
+            <Box flexDirection="row" justifyContent="space-between">
+              <Text wrap="truncate-end">
+                <Text color={CACHE_STATUS[cacheNow.kind].color}>{`${CACHE_STATUS[cacheNow.kind].glyph} `}</Text>
+                Cache
+                {cacheRow.state !== '' && (
+                  <Text color={CACHE_STATUS[cacheNow.kind].color} bold={cacheNow.kind === 'cooling' || cacheNow.kind === 'cold'}>{` ${cacheRow.state}`}</Text>
+                )}
+              </Text>
+              <Box flexDirection="row">
+                <Text dimColor wrap="truncate-end">{cacheRow.detail}</Text>
+                {cacheNow.kind !== 'unknown' && cacheNow.kind !== 'cold' && (
+                  <Button plain key="keep-warm" onPress={() => void switchKeepWarm($, cacheOptions.keepWarmHours).catch(() => undefined)}>
+                    <Text color="suggestion">{keep === null ? '  Keep warm' : '  Stop'}</Text>
+                  </Button>
+                )}
+              </Box>
+            </Box>
             <Text dimColor wrap="truncate-end">{turnLine(stats ?? NO_TURNS)}</Text>
           </Box>
         ),

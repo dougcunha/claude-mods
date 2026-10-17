@@ -14,4 +14,8 @@ export type Host = {
   files: () => Promise<Record<string, FileChange>>
   updateFiles: (fn: (all: Record<string, FileChange>) => Record<string, FileChange>) => Promise<void>
   showInline: (diff: InlineDiff) => Promise<void>
+  sleep: (ms: number) => Promise<void>
+  clear: () => Promise<void>
+  readBox: () => Promise<string>
+  fill: (text: string) => Promise<void>
 }

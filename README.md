@@ -26,6 +26,7 @@ Each mod lives in its own folder, and this repository is also a plugin marketpla
 The **session-info** pane shows:
 
 - 📊 The context window, cost and turn stats, plus usage and context alerts.
+- 🔥 The prompt cache with the time until it expires, a Keep warm button, and a guard that holds a prompt that would write an expired cache again.
 - 🔁 The last turn's result, tokens, cache, tools and refused calls.
 - ✅ A task list Claude keeps, like OpenCode's todos.
 - ⏱️ An autopick switch that answers a question you left unanswered with its recommended option after a countdown.

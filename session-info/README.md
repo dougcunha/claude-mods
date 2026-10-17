@@ -20,7 +20,7 @@
 
 ## ✨ Sections
 
-- 📊 [**Session**](#-what-the-session-section-shows): the context window's fill, compactions and /clear commands, the session's cost and duration, and turn stats.
+- 📊 [**Session**](#-what-the-session-section-shows): the context window's fill, compactions and /clear commands, the prompt cache with the time until it expires and a Keep warm button, the session's cost and duration, and turn stats. A [cache guard](#-cache-guard) holds a prompt that would write an expired cache again.
 - 🔁 [**Last turn**](#-what-the-last-turn-section-shows): how the last turn ended, how long it took and what it cost, its model, effort and request count, its token and cache counts, the tools it called, and the calls the permission check refused.
 - ✅ [**Todos**](#-what-the-todos-section-shows): the task list Claude keeps for work with several steps, like OpenCode's todo list. The mod gives Claude a `todo_write` tool for it, and a switch that keeps Claude working while tasks remain open.
 - ⏳ [**Autopick**](#-what-the-autopick-section-shows): a switch that answers a question Claude asked and you left unanswered with the option Claude marked as recommended, after a wait you set. A countdown shows the time left, with Pick now and Cancel. The switch starts off.
@@ -91,6 +91,8 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | Fold or unfold a section | Press its header, for example `▾ Session` or `▾ Changes` |
 | Open the Git client | Press the branch name in the `▾ Git` header, or press `g` while the pane has the focus |
 | Show the legend of the context bar | Press `▸ Context` |
+| Keep the prompt cache warm, or stop | Press `Keep warm` or `Stop` on the cache row of the Session section |
+| Send a prompt the cache guard held | Press Enter again, or press `Compact` or `New session` on the band above the prompt |
 | Open a file | Click the file in the fullscreen terminal, or move to it with Tab or the arrow keys and press Enter. A new file (`A`, or `??` in the Git tree) opens in the editor; a modified (`M`) or deleted (`D`) file opens as a diff. In the Git tree, the diff is against HEAD |
 | Collapse or expand a folder | Press the folder |
 | Scroll a long tree | A tree taller than the room the terminal leaves draws a window of rows with a scrollbar (`┃` on the track `│`) at its right edge, and under it `▲` and `▼` with the rows above and below. Press `▲` or `▼`, or `u` and `d`, to move a page; press the track to jump to that place. The wheel over a list moves that list, a page at most per turn of the wheel; elsewhere on a pane taller than its window it scrolls the whole pane, and so does the wheel over a list that has reached its end. A list always shows at least 6 rows. The arrow keys move the first tree on screen while the pane fits its window. In the Git tree `u` and `d` work while the Changes tree is not on screen |
@@ -106,7 +108,7 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 
 ## 📊 What the Session section shows
 
-![The Session section with the context legend unfolded: each category's tokens and share, the free space, the compact buffer and the turn stats](images/session.png)
+![The Session section with the context legend unfolded: each category's tokens and share, the free space, the compact buffer, the cache row with the time left, the TTL and Keep warm, and the turn stats](images/session.png)
 
 | Row | Source |
 | --- | --- |
@@ -114,11 +116,45 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 | Context bar | The live context window: tokens used, the window size, where auto-compaction runs (`compacts at 967k`) and the percentage. The bar is stacked, one color per category (system prompt, tools, memory files, skills, messages), then the free space as a thin line and the compaction buffer shaded. Pressing `▸ Context` unfolds a legend with each category's tokens and share. The categories are estimated locally after each turn and compaction; before the first reading the bar has one color |
 | Compactions | Compactions that went through in the main conversation |
 | Clears | `/clear` commands run since the mod loaded, by hand or by another mod (`· 3 clears`); it shows after the first reply that follows a `/clear` |
+| Cache | The prompt cache of the main conversation: the state in its color on the left, `● Cache warm · 42m left`, `◐ Cache cools in 3m` in bold in the last 5 minutes (the last minute of a 5-minute TTL), `○ Cache cold for 12m` in bold, or `◆ Cache kept warm · 3h 55m left` while [keep warm](#-keep-warm) runs; and the details on the right, dim: the TTL, `next prompt re-caches 412k` when cold, the pings of keep warm, and `2 re-caches (380k)`, which counts the requests that wrote most of the context to the cache again. Before the first reply it shows the TTL alone |
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
 
 The compaction and clear counts start when the mod loads, so a newly installed mod starts them at zero. When the mod joins a conversation that already has turns, after a resume or an install, the turn count starts from the prompts in its transcript.
 
 After a `/clear` or a `/resume` in the same process, Claude Code starts the next conversation with empty pane state and raises no start event for it. The mod waits until the session id changes, then reads the context, the repository, the Autopick switch and the Jira server again and, on a resume, the task list from the transcript.
+
+### ⏱ How the cache time is found
+
+Each request of the main conversation reads the cache, writes it, or both. The mod notes when the last one ended and how much context it sent. The cache expires one TTL after that request.
+
+The TTL comes from these sources, the first one that applies:
+
+1. The `cacheTtl` setting, when you set `5m` or `1h`.
+2. The TTL Claude Code reports when you switch the model.
+3. The session's own requests. A request that writes most of a 30k+ context to the cache again after 5.5 to 60 idle minutes shows a 5-minute TTL. A request that reads most of it from the cache after more than 5.5 idle minutes shows a 1-hour TTL.
+4. The account: 1 hour when Claude Code reports plan rate limits, 5 minutes on an API key. The first reply of a session keeps 1 hour, because the limits can come after it.
+
+A switch to another model starts the cache over, so the row waits for the next reply. After a reload or an install in a session with a finished turn, the mod dates the cache from the end of that turn until the next request. The first request after a compaction writes the shorter context and does not count as a re-cache.
+
+### ✋ Cache guard
+
+When the cache expired and the context has at least `cacheGuardMinTokens` tokens (150k by default), the prompt you type does not go in. Claude Code puts it back in the prompt box, and a band above the prompt shows how long ago the cache expired and how many tokens the prompt would write to the cache again:
+
+- **Enter** sends the prompt here, as typed.
+- **Compact** runs `/compact`. The prompt stays in the box, and Enter sends it over the shorter context.
+- **New session** runs `/clear` and leaves the prompt in the box of the new session.
+
+The mod never sends the prompt for you, so it goes in as your own, with its images and `@` mentions. The guard checks only a prompt you type at an idle session: slash commands, prompts typed during a turn and prompts from Remote Control, a plugin or a background task go in at once. Set `cacheGuard` to `false` to turn it off.
+
+### 🔥 Keep warm
+
+`Keep warm` on the cache row sends one small request shortly before the cache expires, so the cache lives a full TTL again. The request forks the conversation as the main thread last sent it, with the text `session-info keep-warm ping. Reply with only: ok`; its reply is thrown away. Each ping costs a cache read of the whole context, about a tenth of a write. Keep warm runs for `keepWarmHours` (4 by default) and stops by itself when:
+
+- a ping writes to the cache instead of reading it, or gets no answer;
+- the cache had already expired;
+- the time runs out.
+
+A toast says why it stopped. `/clear` stops it too.
 
 ## 🔁 What the Last turn section shows
 
@@ -485,6 +521,10 @@ Change these in `/config`, or move and hide the cards in [layout mode](#-arrange
 | --- | --- | --- |
 | `session-info.openOnStart` | `true`, `false` | `false` |
 | `session-info.showSession` | `true`, `false` | `true` |
+| `session-info.cacheTtl` | `auto`, `5m`, `1h`: the prompt cache TTL. `auto` follows the account and the session's requests | `auto` |
+| `session-info.cacheGuard` | `true`, `false`: hold a prompt that would write an expired cache again | `true` |
+| `session-info.cacheGuardMinTokens` | The context, in tokens, from which the cache guard holds a prompt | `150000` |
+| `session-info.keepWarmHours` | How many hours Keep warm runs | `4` |
 | `session-info.showLastTurn` | `true`, `false` | `true` |
 | `session-info.showTodos` | `true`, `false` | `true` |
 | `session-info.todoMinSteps` | A whole number from 1: the steps that call for a task list | `3` |
@@ -545,6 +585,12 @@ After every shell command, the mod also checks that each listed file still exist
 - **Auto-continue** reads a question only by its question mark. A reply that waits for you without one, such as `Tell me when you are ready.`, gets a continue; Claude is told to stop and ask before a step that needs you, and the limit of 5 in a row and the progress check bound the rest.
 - **Build guard** sees only what git sees: a change in an ignored file, outside the repository or in an environment variable does not change the fingerprint. The 30-minute limit and `# rerun` cover those cases.
 - **Autopick** depends on Claude Code closing the question when the mod answers the call first. This was measured on Claude Code 2.1.296, for a pick after the wait and for Pick now pressed in the pane while the question was open; the mod API does not document it. Waits longer than 1 minute were not measured live. A question in a language whose word for "recommended" is not on the list waits for you. A copy of ask-autopick loaded under another name is not detected.
+- **Cache TTL** is not in the mod API, except when you switch the model. The `auto` TTL is a guess from the account until a request shows it. A request after 5.5 to 60 idle minutes corrects it, so the first cold prompt after a wrong guess can be held too early or not at all. Set `cacheTtl` when you know your TTL.
+- **Cache age after a resume** comes only from a `classic.SessionStart` event with `seconds_since_last_response`, which Claude Code documents for a resume or a fork; this was not measured live. A `/resume` inside a running session raises no such event for a mod (measured on 2.1.296), so the cache row and the guard wait for the next reply.
+- **Model switch and resume** need the `classic.PostModelSwitch` and `classic.SessionStart` events, which Claude Code does not send to a plugin you install yourself where an organization manages Claude Code. There the TTL comes from the account and the requests only.
+- **Cache guard and topic-guard** both hold a prompt at the same Enter. With both mods on, a prompt can be held twice in a row, once by each band.
+- **Compact** in the cache guard's band runs `/compact` as you would type it. That the prompt box keeps the held prompt through it was not measured live. If the box is empty after it, type the prompt again.
+- **Keep warm** costs a cache read of the whole context per ping, added to the session's cost. A turn that runs while it pings is not interrupted.
 - **Usage** shows only the windows Claude Code exposes to mods. The per-model weekly windows and the `~N tok/turn` total that `/usage` prints come from an endpoint mods cannot reach without your OAuth token, so they are left out.
 
 ## 🔨 Development
@@ -560,11 +606,12 @@ claude --plugin-dir .
 
 | File | Role |
 | --- | --- |
-| `hooks/register.tsx` | The commands, the `tool.call`, `tool.check`, `prompt.submit`, `prompt.suggest`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh timer and the pane |
+| `hooks/register.tsx` | The commands, the `tool.call`, `tool.check`, `prompt.submit`, `prompt.suggest`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh and keep-warm timers, the pane and the cache guard's band |
 | `hooks/cards.tsx` | Framed cards, the tiles row and how the tiles wrap |
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
 | `hooks/context.ts` | The stacked context bar: slices, cell widths, legend lines |
+| `hooks/cache.ts` | The prompt cache: the TTL it finds from the requests, the status and its row, when the guard holds a prompt, when keep warm pings and what a ping found, and the move to a new session |
 | `hooks/autopick.ts` | Which option autopick picks, its settings, the minute steps, the countdown and its texts |
 | `hooks/agents.ts` | Agent ordering, nesting and status glyphs |
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |

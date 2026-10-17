@@ -164,6 +164,33 @@ export type AutopickWait = { id: string; picks: Record<string, string> | null; a
 /** The last question autopick answered: what it picked, when, and whether the person pressed Pick now. */
 export type AutopickPick = { picks: Record<string, string>; at: number; minutes: number; isByHand: boolean }
 
+/** How long a prompt cache entry lives after the last request that read or wrote it. */
+export type CacheTtl = '5m' | '1h'
+
+/** Where the TTL came from: the plan's default, the session's own requests, or a model switch the engine reported. */
+export type CacheTtlSource = 'plan' | 'measured' | 'switch'
+
+/**
+ * The prompt cache of the main conversation, as its requests show it. `touchedAt` is when the last request or
+ * keep-warm ping reached the cache, in `$.clock.now()` milliseconds, absent before the first one and after a model
+ * switch; `tokens` is that request's input; `restarts` counts the requests that wrote most of the context again.
+ */
+export type CacheState = {
+  touchedAt?: number
+  ttl: CacheTtl
+  ttlSource: CacheTtlSource
+  tokens: number
+  restarts: number
+  restartTokens: number
+  isAfterCompact: boolean
+}
+
+/** Keep warm while it runs: when it stops, and the pings it sent. */
+export type KeepWarm = { until: number; pings: number }
+
+/** A prompt the cache guard held: its text, the context it would write to the cache again, and how long the cache was cold. */
+export type CacheHold = { text: string; tokens: number; coldMs: number }
+
 /** A GitHub Actions job as `gh run view --json jobs` reports it; `conclusion` is '' until the job completes. */
 export type CiJob = { name: string; status: string; conclusion: string }
 
@@ -286,6 +313,14 @@ declare module 'claude-code' {
       autopickConflict: boolean
       /** Whether the pane is in layout mode: each card header shows its move and hide buttons. */
       layout: boolean
+      /** The prompt cache of the main conversation. */
+      cache: CacheState
+      /** Keep warm while it runs; null while it is off. */
+      keepWarm: KeepWarm | null
+      /** The prompt the cache guard holds; null while it holds none. */
+      cacheHold: CacheHold | null
+      /** What the cache guard's band runs now: a compaction or a new session; null while it runs nothing. */
+      cacheMove: 'compact' | 'clear' | null
     }
   }
 }
