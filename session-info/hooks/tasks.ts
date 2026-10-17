@@ -23,7 +23,20 @@ export function taskEnds(text: string): TaskEnd[] {
   })
 }
 
-const isWaiting = (run: CheckRun | null, taskId: string): run is CheckRun => run?.status === 'running' && run.taskId === taskId
+/** The text blocks of a row, joined: where a queued notification carries its `<task-notification>` blocks. */
+export const blocksText = (content: readonly unknown[]): string =>
+  content
+    .flatMap(block => {
+      const text = typeof block === 'object' && block !== null ? (block as { type?: unknown; text?: unknown }) : {}
+
+      return text.type === 'text' && typeof text.text === 'string' ? [text.text] : []
+    })
+    .join('\n')
+
+/** Whether a person sent the row: their prompt can quote a notification, which ends no task. */
+export const isPersonOrigin = (kind: string): boolean => kind === 'composer' || kind === 'bridge'
+
+const isWaiting =(run: CheckRun | null, taskId: string): run is CheckRun => run?.status === 'running' && run.taskId === taskId
 
 /** The checks a background command ran, read from its output file now that its task ended; empty when no check waits on it. */
 export async function finishedRuns(host: Host, checks: Checks, end: TaskEnd, at: number): Promise<CheckRun[]> {

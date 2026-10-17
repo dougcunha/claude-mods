@@ -189,6 +189,33 @@ test('a failed notification marks the task failed, and a command run in the fore
   await ui.unmount()
 })
 
+/** A queue record as the engine raises it: a notification absorbed into a running turn reaches no prompt.submit. */
+const queued = (text: string, kind: string) =>
+  ({ message: { type: 'user', content: [{ type: 'text', text }] }, door: 'queue', origin: { kind }, uuid: `q-${kind}` }) as never
+
+test('a notification absorbed into a running turn ends the task from its queue record', async ($, on) => {
+  stub(on)
+
+  await $.tool.call({ tool: 'Bash', command: 'npm run dev', run_in_background: true })
+  await $.session.append(queued(notification('b1', 'completed'), 'task-notification'))
+  const ui = await mountUntil($, 'terminal', '1 done')
+
+  expect(await ui.find({ type: 'Text', text: '1 done' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a queued prompt the person typed is no task end', async ($, on) => {
+  stub(on)
+
+  await $.tool.call({ tool: 'Bash', command: 'npm run dev', run_in_background: true })
+  await $.session.append(queued(notification('b1', 'completed'), 'composer'))
+  await later(100)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+
+  expect(await ui.find({ type: 'Text', text: '1 running' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('a notification typed by the person is no task end', async ($, on) => {
   stub(on)
 

@@ -32,7 +32,7 @@ import { moveCard, ORDER, orderText, parseSectionOrder, parseTabGroups, showOpti
 import type { SectionKey, TabGroup } from './tabs'
 import { clampOffset, MIN_LIST_ROWS, movedTo, offsetAt, POINTER_SLACK, scrollbar, targetAt, targetNear } from './scrollbar'
 import type { ScrollTarget, ScrollView } from './scrollbar'
-import { finishedRuns, taskEnds, withFinished } from './tasks'
+import { blocksText, finishedRuns, isPersonOrigin, taskEnds, withFinished } from './tasks'
 import { SHELLS, track } from './track'
 import { cost, countText, duration, NO_TURNS, tokens, turnLine } from './session'
 import { latestTodos, minSteps, parseTodos, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoPrompt, todoReply, todoSummary, todoText } from './todos'
@@ -1110,6 +1110,17 @@ export const register: Register = (on, options) => {
 
     return next(e)
   })
+
+  if (shows.checks || shows.background)
+    // A notification that lands in a running turn is absorbed into it, or delivered to an agent, and never reaches
+    // prompt.submit; its queue record passes here either way. A task already ended stays as it is.
+    on('session.append', { door: 'queue' }, async ($, e, next) => {
+      const kept = await next(e)
+      if (!isPersonOrigin(e.origin.kind))
+        void finishTasks($, blocksText(e.message.content), { isBackground: shows.background, isChecks: shows.checks }).catch(error => $.ui.toast(`session-info: ${String(error)}`))
+
+      return kept
+    }).catch(($, e, next) => next(e))
 
   if (shows.todos || shows.autopick) {
     const instruction = todoPrompt(minSteps(options.todoMinSteps), options.todoInstruction)
