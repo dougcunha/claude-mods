@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 import type { SessionMessage } from 'claude-code'
 
 import { agentModelText, agentRows, agentSummary, withAgentModel } from '../hooks/agents'
@@ -128,6 +129,57 @@ test('a new file opens in the editor; a deleted one with unknown content opens n
   expect(spawned.length).toBe(1)
   expect(toasts).toEqual([])
   await ui.unmount()
+})
+
+/** Presses the new files `docs/notes.md` and `src/new.ts` in the Changes tree; `isEditorFound` answers the PATH lookup of the Markdown editor. */
+async function pressNewFiles($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], isEditorFound: boolean) {
+  const spawned: string[][] = []
+  const toasts: string[] = []
+  on('session.cwd', async () => ({ value: '/repo' }))
+  on('agent.list', async () => ({ value: [] }))
+  on('session.id', async () => ({ value: 'sid' }))
+  on('session.usage', async () => usage([]))
+  on('env.get', async () => ({ value: undefined }))
+  on('fs.write', async () => ({ value: undefined }))
+  on('fs.exists', async () => ({ value: true }))
+  on('process.run', async (_, e) => ({ value: ran('', e.argv[0] === 'sh' && e.argv[3] === 'sh' && !isEditorFound ? 1 : 0) }))
+  on('process.spawn', async function* (_, e) {
+    spawned.push([...e.argv])
+    return { value: { code: 0, signal: null } }
+  })
+  on('ui.toast', async (_, e) => (toasts.push(String(e.text)), { value: undefined }))
+  on('tool.call', { tool: 'Write' }, async (_, e) =>
+    ({ result: { type: 'create', filePath: e.file_path, content: '', structuredPatch: [], originalFile: null } }) as never)
+
+  await $.tool.call({ tool: 'Write', file_path: '/repo/docs/notes.md', content: 'x' })
+  await $.tool.call({ tool: 'Write', file_path: '/repo/src/new.ts', content: 'x' })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'f:docs/notes.md' })
+  await ui.press({ key: 'f:src/new.ts' })
+  await ui.unmount()
+
+  return { spawned, toasts }
+}
+
+test('a new Markdown file opens in the Markdown editor and any other new file in the editor', { options: { editor: 'system', markdownEditor: 'marktext' } }, async ($, on) => {
+  const { spawned, toasts } = await pressNewFiles($, on, true)
+
+  expect(spawned).toEqual([['marktext', '/repo/docs/notes.md'], ['xdg-open', '/repo/src/new.ts']])
+  expect(toasts).toEqual([])
+})
+
+test('a Markdown editor that is not on the PATH says so and the file opens in the editor', { options: { editor: 'system', markdownEditor: 'marktext' } }, async ($, on) => {
+  const { spawned, toasts } = await pressNewFiles($, on, false)
+
+  expect(spawned).toEqual([['xdg-open', '/repo/docs/notes.md'], ['xdg-open', '/repo/src/new.ts']])
+  expect(toasts).toEqual(['session-info: marktext is not on the PATH. Set the Markdown editor in /config; a full path works.'])
+})
+
+test('without a Markdown editor a new Markdown file opens in the editor', { options: { editor: 'system' } }, async ($, on) => {
+  const { spawned } = await pressNewFiles($, on, true)
+
+  expect(spawned).toEqual([['xdg-open', '/repo/docs/notes.md'], ['xdg-open', '/repo/src/new.ts']])
 })
 
 test('the usage section draws one labelled bar per rate-limit window and folds', async ($, on) => {

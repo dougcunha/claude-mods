@@ -344,6 +344,8 @@ The section shows each window Claude Code reports: the current session (`five_ho
 
 A **new file** opens in your editor. With the `auto` editor that is VS Code when `code` is on the `PATH`, else the app the system associates with the file (`explorer.exe` on Windows, `open` on macOS, `xdg-open` on Linux). Terminal editors such as `$EDITOR` cannot open from the pane.
 
+A **new Markdown file** (`.md` or `.markdown`) can open in an editor of its own. Set `markdownEditor` to the command, for example `marktext`, `notepad++` or `code`. It applies to a new file pressed in the Changes or Git section; a modified Markdown file still opens as a diff. A path with spaces goes in double quotes, and arguments may follow (`"C:\Program Files\Notepad++\notepad++.exe" -multiInst`). The mod looks the program up on the `PATH` (`where` on Windows, `command -v` elsewhere), or checks that the path exists. When it is missing, a toast says so and the file opens in the `editor` instead. Empty (the default) opens a Markdown file like any other new file.
+
 A **modified or deleted file** opens as a diff. A deleted file whose previous content is unknown (outside git and never captured) opens nothing.
 
 The diff compares the file **as it was before the session first touched it** with the file as it is now, not with `HEAD`. The original content is saved under `%TEMP%` (or `$TMPDIR`) in `claude-session-info/<session id>/`.
@@ -551,6 +553,7 @@ Change these in `/config`, or move and hide the cards in [layout mode](#-arrange
 | `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
+| `session-info.markdownEditor` | A command that opens a new `.md` or `.markdown` file, for example `marktext`, `notepad++` or `code`. Put a path with spaces in double quotes. Empty uses `editor` | empty |
 | `session-info.paneBackground` | A color for the body of the pane in the terminal: hex such as `#2e3440`, or a color name. Empty keeps the color Claude Code draws. The frame and the close row keep Claude Code's color | empty |
 | `session-info.paneTitle` | A name for this pane, up to 40 characters, for example `Personal` or `Work`, to tell accounts apart. It becomes the pane's tab title and a one-row rule at the top of the pane, `─── Title ───`. Empty keeps the title `Session info` and draws no rule | empty |
 | `session-info.paneTitleColor` | The color of the rule and the title: hex such as `#ff8700`, a color name or a theme key such as `success`. Needs a pane title. Empty keeps the default text color | empty |

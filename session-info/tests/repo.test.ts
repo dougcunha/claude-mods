@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import { clientArgv, linuxTerminal, splitCommand } from '../hooks/client'
 import type { Host } from '../hooks/host'
 import { age, branchText, codeParts, countParts, fileStatus, mergeSubmodules, operationText, parseCommit, parseStatus, parseSubmoduleStatus, readOperation, repoRowCount } from '../hooks/repo'
-import { lookupArgv } from '../hooks/viewer'
+import { lookupArgv, markdownArgv } from '../hooks/viewer'
 import type { Repo } from '../types'
 
 const IN_FOLDER = ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh']
@@ -158,6 +158,14 @@ test('builds the argv that opens the Git client in a new terminal window', async
   expect(clientArgv('linux', '/my repo', ['tig', '--all'], ['xterm', '-e'])).toEqual(['xterm', '-e', ...IN_FOLDER, '/my repo', 'tig', '--all'])
   expect(clientArgv('linux', '/repo', ['lazygit'], ['foot'])).toEqual(['foot', ...IN_FOLDER, '/repo', 'lazygit'])
   expect(clientArgv('linux', '/repo', ['lazygit'])).toBe(undefined)
+})
+
+test('builds the argv that opens a Markdown file in the configured editor', async () => {
+  expect(markdownArgv('windows', ['marktext'], 'D:/My Docs/notes.md')).toEqual(['cmd', '/c', 'start', 'Markdown editor', 'marktext', 'D:\\My Docs\\notes.md'])
+  expect(markdownArgv('windows', ['C:\\Program Files\\Notepad++\\notepad++.exe', '-multiInst'], 'D:/a.md')).toEqual([
+    'cmd', '/c', 'start', 'Markdown editor', 'C:\\Program Files\\Notepad++\\notepad++.exe', '-multiInst', 'D:\\a.md',
+  ])
+  expect(markdownArgv('linux', ['code', '-n'], '/repo/a.md')).toEqual(['code', '-n', '/repo/a.md'])
 })
 
 test('looks a program up with where on Windows and with command -v through sh elsewhere', async () => {

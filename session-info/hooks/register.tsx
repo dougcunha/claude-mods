@@ -861,6 +861,7 @@ export const register: Register = (on, options) => {
   const prefs: Prefs = {
     viewer: (options.viewer as Viewer | undefined) ?? 'auto',
     editor: (options.editor as Editor | undefined) ?? 'auto',
+    markdownEditor: typeof options.markdownEditor === 'string' ? options.markdownEditor.trim() : '',
   }
   const icons = (options.icons as IconSet | undefined) ?? 'unicode'
   const shows = {

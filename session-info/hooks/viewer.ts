@@ -9,7 +9,16 @@ export type Viewer = 'auto' | 'git' | 'vscode' | 'inline'
 
 export type Editor = 'auto' | 'vscode' | 'system'
 
-export type Prefs = { viewer: Viewer; editor: Editor }
+/** `markdownEditor` is a command line for a new Markdown file; empty falls back to `editor`. */
+export type Prefs = { viewer: Viewer; editor: Editor; markdownEditor: string }
+
+/** A Markdown file by its extension, which a new file opens in `markdownEditor`. */
+const MARKDOWN_FILE = /\.(md|markdown)$/i
+
+/** Splits a command line on spaces; double quotes keep a path with spaces in one piece. */
+export function splitCommand(line: string): string[] {
+  return [...line.matchAll(/"([^"]*)"|(\S+)/g)].map(match => match[1] ?? match[2] ?? '')
+}
 
 export type Platform = 'windows' | 'mac' | 'linux'
 
@@ -90,6 +99,34 @@ async function openInEditor(host: Host, path: string, editor: Editor): Promise<v
   launch(host, [os === 'mac' ? 'open' : 'xdg-open', path])
 }
 
+/**
+ * The argv that opens a file in the Markdown editor command.
+ * Windows: `start` finds a .cmd or .exe on the PATH and keeps a quoted path with spaces whole; its quoted title comes first.
+ */
+export function markdownArgv(platform: Platform, command: readonly string[], path: string): string[] {
+  if (platform === 'windows') return ['cmd', '/c', 'start', 'Markdown editor', ...command, path.replace(/\//g, '\\')]
+
+  return [...command, path]
+}
+
+/** Opens a new Markdown file in the configured editor; false when the editor is not found, so the caller falls back to `editor`. */
+async function openInMarkdownEditor(host: Host, path: string, line: string): Promise<boolean> {
+  const command = splitCommand(line)
+  const program = command[0]
+  if (program === undefined) return false
+
+  const isFound = /[\\/]/.test(program) ? await host.exists(program) : await onPath(host, program)
+  if (!isFound) {
+    host.toast(`session-info: ${program} is not on the PATH. Set the Markdown editor in /config; a full path works.`)
+
+    return false
+  }
+
+  launch(host, markdownArgv(await platformOf(host), command, path))
+
+  return true
+}
+
 async function showInline(host: Host, change: FileChange, left: string, right: string): Promise<void> {
   const run = await host.run(['git', 'diff', '--no-index', '--no-color', '--', left, right])
   const at = run.stdout.indexOf('@@')
@@ -97,12 +134,20 @@ async function showInline(host: Host, change: FileChange, left: string, right: s
   await host.showInline({ path: change.path, source })
 }
 
+/** A new Markdown file opens in `markdownEditor` when one is set; any other new file, or one whose Markdown editor is missing, in `editor`. */
+async function openNewFile(host: Host, path: string, prefs: Prefs): Promise<void> {
+  const isMarkdown = prefs.markdownEditor !== '' && MARKDOWN_FILE.test(path)
+  if (isMarkdown && (await openInMarkdownEditor(host, path, prefs.markdownEditor))) return
+
+  return openInEditor(host, path, prefs.editor)
+}
+
 /**
  * Opens a change: a created file in the editor; a modified or deleted one as a diff of what
  * it was before the session against what it is now. A deleted file whose content is unknown opens nothing.
  */
 export async function openChange(host: Host, change: FileChange, prefs: Prefs): Promise<void> {
-  if (change.status === 'created') return openInEditor(host, change.path, prefs.editor)
+  if (change.status === 'created') return openNewFile(host, change.path, prefs)
 
   const head = change.base === null ? await headText(host, change.path) : undefined
   const left = change.base ?? (head === undefined ? undefined : await snapshot(host, change.path, head))

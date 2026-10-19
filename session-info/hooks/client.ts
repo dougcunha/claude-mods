@@ -1,6 +1,8 @@
 import type { Host } from './host'
-import { launch, lookupArgv, onPath, platformOf, succeeds } from './viewer'
+import { launch, lookupArgv, onPath, platformOf, splitCommand, succeeds } from './viewer'
 import type { Platform } from './viewer'
+
+export { splitCommand }
 
 /** Terminal emulators tried in order on Linux, each with the arguments that come before the command it runs. */
 const TERMINALS: readonly (readonly string[])[] = [
@@ -17,11 +19,6 @@ const TERMINALS: readonly (readonly string[])[] = [
 
 /** Runs the command from the folder in its first argument, as not every terminal starts in its own working directory. */
 const IN_FOLDER = ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh']
-
-/** Splits a command line on spaces; double quotes keep a path with spaces in one piece. */
-export function splitCommand(line: string): string[] {
-  return [...line.matchAll(/"([^"]*)"|(\S+)/g)].map(match => match[1] ?? match[2] ?? '')
-}
 
 const shellQuote = (text: string): string => `'${text.replace(/'/g, `'\\''`)}'`
 
