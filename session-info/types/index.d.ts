@@ -3,6 +3,9 @@ export type ChangeStatus = 'created' | 'modified' | 'deleted'
 /** One file the session touched; `base` is the snapshot of its content before the first touch, null when unknown. */
 export type FileChange = { path: string; status: ChangeStatus; base: string | null; at: number }
 
+/** The version this copy of the mod runs, and the newer one GitHub publishes; null while unknown or not newer. */
+export type VersionInfo = { current: string | null; latest: string | null }
+
 /** A diff drawn inside the pane, for the inline viewer or when no external one is found. */
 export type InlineDiff = { path: string; source: string }
 
@@ -262,6 +265,8 @@ declare module 'claude-code' {
       inline: InlineDiff | null
       /** When the usage section last had reason to redraw: a new measurement or the minute tick. */
       now: number
+      /** The version in the pane's footer and the newer one to offer. */
+      version: VersionInfo
       /** Main-thread turns: how many, their summed output tokens, and the last one's duration. */
       turns: { count: number; outputTokens: number; lastMs: number }
       /** Compactions that went through this session. */

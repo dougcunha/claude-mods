@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
 
-import type { AgentModel, AutoContinue, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, CacheHold, CacheState, ChangeStatus, CheckKind, Checks, CiRun, ContinueRun, CiWatch, ContextReading, Detail, FileChange, Guard, GuardRun, GuardSkip, InlineDiff, JiraIssue, KeepWarm, Repo, RepoFile, SkillUse, Todo, TurnRecord } from '../types'
+import type { AgentModel, AutoContinue, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, CacheHold, CacheState, ChangeStatus, CheckKind, Checks, CiRun, ContinueRun, CiWatch, ContextReading, Detail, FileChange, Guard, GuardRun, GuardSkip, InlineDiff, JiraIssue, KeepWarm, Repo, RepoFile, SkillUse, Todo, TurnRecord, VersionInfo } from '../types'
 
 import { AGENT_STATUS, agentLabel, agentModelText, agentRows, agentSummary, withAgentModel } from './agents'
 import { crossings } from './alerts'
@@ -37,6 +37,7 @@ import { SHELLS, track } from './track'
 import { cost, countText, duration, NO_TURNS, tokens, turnLine } from './session'
 import { latestTodos, minSteps, parseTodos, TODO_ROOM, TODO_SPEC, TODO_STATUS, TODO_TOOL, todoPrompt, todoReply, todoSummary, todoText } from './todos'
 import { buildTree, flatten } from './tree'
+import { checkUpdate, installedVersion, newerVersion, NO_VERSION, readRecord, UPDATE_COMMAND, UPDATE_STORE, UPDATE_TICK_MS, updateToast } from './update'
 import { modelText, refusedText, RESULT, resultText, startDraft, toolsText, tokensText, toRecord, turnLines, withRefusal, withSpawn, withStep, withSubagentUsage, withTool } from './turn'
 import type { TurnDraft } from './turn'
 import type { Row } from './tree'
@@ -50,6 +51,7 @@ const files = atom({ plugin: 'session-info', key: 'files' } as const, {} as Reco
 const collapsed = atom({ plugin: 'session-info', key: 'collapsed' } as const, [] as string[])
 const inline = atom({ plugin: 'session-info', key: 'inline' } as const, null as InlineDiff | null)
 const now = atom({ plugin: 'session-info', key: 'now' } as const, 0)
+const version = atom({ plugin: 'session-info', key: 'version' } as const, NO_VERSION as VersionInfo)
 const turns = atom({ plugin: 'session-info', key: 'turns' } as const, NO_TURNS)
 const compactions = atom({ plugin: 'session-info', key: 'compactions' } as const, 0)
 const breakdown = atom({ plugin: 'session-info', key: 'breakdown' } as const, false)
@@ -175,7 +177,42 @@ function hostOf($: EngineInterface): Host {
     clear: async () => void (await $.command.run({ command: 'clear' })),
     readBox: async () => (await $.prompt.read()).text,
     fill: async text => void (await $.prompt.fill({ text })),
+    fetchText: async url => {
+      const { ok, text } = await $.http.fetch(url)
+
+      return { ok, text }
+    },
   }
+}
+
+/**
+ * Reads the version this copy runs and, when checks are on, asks GitHub whether a newer one is published (at most once a day).
+ * A new version is told once in a toast and stays in the footer as a button.
+ */
+async function refreshVersion($: EngineInterface, isChecked: boolean): Promise<void> {
+  const current = await installedVersion(hostOf($), $.plugin.root)
+  if (current === undefined) return
+  await update($, version, shown => ({ current, latest: shown?.latest ?? null }))
+  if (!isChecked) return
+
+  const stored = readRecord(await $.store.get(UPDATE_STORE))
+  const checked = await checkUpdate(hostOf($), stored, await $.clock.now())
+  const latest = newerVersion(checked, current)
+  const record = latest !== null && checked.notified !== latest ? { ...checked, notified: latest } : checked
+  if (record !== stored) await $.store.set(UPDATE_STORE, record)
+  await update($, version, () => ({ current, latest }))
+  if (latest !== null && record.notified !== stored.notified) $.ui.toast(updateToast(latest, current))
+}
+
+/** Puts the marketplace update command in an empty prompt for the person to send, so nothing is installed unasked; a draft is never replaced. */
+async function offerUpdate($: EngineInterface): Promise<void> {
+  const isDraft = (await $.prompt.read()).text.trim() !== ''
+  const filled = isDraft ? { isFilled: false } : await $.prompt.fill({ text: UPDATE_COMMAND }).catch(() => ({ isFilled: false }))
+  $.ui.toast(
+    filled.isFilled
+      ? 'session-info: send the command in the prompt to update, then reload the plugins.'
+      : `session-info: to update, send ${UPDATE_COMMAND} and then reload the plugins.`,
+  )
 }
 
 /** A folder folds or unfolds; a file opens in the editor or as a diff. */
@@ -897,6 +934,7 @@ export const register: Register = (on, options) => {
   const foldOf = (key: SectionKey): string => groupOf.get(key)?.key ?? key
   const isLive = shows.session || shows.usage || shows.agents || shows.checks || shows.background
   const isOpenOnStart = options.openOnStart === true
+  const isUpdateChecked = options.checkUpdates !== false
   const positive = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback)
   const cacheOptions: CacheOptions = {
     ttl: ttlSetting(options.cacheTtl),
@@ -940,6 +978,8 @@ export const register: Register = (on, options) => {
       void pollCi($).catch(() => undefined)
     }
     if (shows.jira) void findJiraServer($).catch(() => undefined)
+    void refreshVersion($, isUpdateChecked).catch(() => undefined)
+    if (isUpdateChecked) $.clock.every(UPDATE_TICK_MS, () => void refreshVersion($, true).catch(() => undefined))
     if (shows.checks) await loadGuard($).catch(() => undefined)
     if (shows.todos) await loadContinue($).catch(() => undefined)
     if (shows.autopick) {
@@ -2531,11 +2571,18 @@ export const register: Register = (on, options) => {
     )
 
     // A one-cell glyph: an emoji one such as a gear draws two cells in some terminals and eats the space after it.
+    const versions = await read($, version)
     const footer = (
       <Box flexDirection="row" gap={2} paddingX={isCards ? 1 : 0}>
         <Button plain key="layout" hotkey="l" onPress={() => void toggleLayout()}>
           <Text {...(isEditing ? { bold: true, color: 'claude' } : { dimColor: true })}>{isEditing ? '≡ Done' : '≡ Layout'}</Text>
         </Button>
+        {versions.current !== null && <Text dimColor>{`v${versions.current}`}</Text>}
+        {versions.latest !== null && (
+          <Button plain key="update" onPress={() => void offerUpdate($).catch(toast)}>
+            <Text color="suggestion">{`↑ ${versions.latest}`}</Text>
+          </Button>
+        )}
         {!isEditing && hidden.length > 0 && (
           <Box flexDirection="row" gap={1} flexShrink={1}>
             <Text dimColor>Hidden:</Text>

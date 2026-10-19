@@ -332,6 +332,19 @@ The mod notifies once per threshold through your Claude Code notification channe
 
 A usage window alerts again after it resets; the context alert re-arms once the context drops under 85%, for example after a compaction. When notifications are off or the terminal has no channel, the alert shows as a toast instead. Turn alerts off with the `alerts` setting.
 
+## ⬆️ Version and updates
+
+The footer of the pane shows the version you run, `v0.34.0`, in dim text beside `≡ Layout`. The mod reads it from its own `plugin.json`.
+
+With `checkUpdates` on (the default), the mod asks GitHub once a day which version is published: one `GET` of `https://raw.githubusercontent.com/dougcunha/claude-mods/main/session-info/.claude-plugin/plugin.json` through the host (`$.http.fetch`), with no data from your session. When the published version is higher than yours:
+
+- a toast tells you once per version;
+- the footer shows a button, `↑ 0.35.0`.
+
+Pressing the button puts `/plugin marketplace update claude-mods` in the prompt. The mod does not send it and never installs anything itself: the Claude Code plugin API has no call that updates a plugin. Send the command, then run `/reload-plugins`. If the prompt already holds a draft, the draft stays and a toast names the command instead.
+
+Nothing shows when the request fails: you are offline, the organization's web-fetch policy refuses it, or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is set. The next try comes an hour later. Set `checkUpdates` to `false` to make no request; the footer still shows your version.
+
 ## 📈 How usage updates
 
 ![The Usage section with the current session and current week bars and their reset countdowns](images/usage.png)
@@ -550,6 +563,7 @@ Change these in `/config`, or move and hide the cards in [layout mode](#-arrange
 | `session-info.showChanges` | `true`, `false` | `true` |
 | `session-info.tabGroups` | Sections that share one card as tabs: groups split by commas, sections by `+`, for example `changes+git, ci+jira+skills`. Names: `session`, `lastTurn`, `todos`, `autopick`, `skills`, `ci`, `jira`, `usage`, `agents`, `background`, `checks`, `git`, `changes`. The first section of a group is the tab it opens on. Empty gives each section its own card | `changes+git` |
 | `session-info.sectionOrder` | The sections in order, top to bottom, split by commas, for example `changes, git, session`. Same names as `tabGroups`. The sections not named follow in the default order; a tab group card sits where its first shown section sits. Empty keeps the default order | `session, lastTurn, todos, autopick, skills, ci, jira, usage, agents, background, checks, git, changes` |
+| `session-info.checkUpdates` | `true`, `false`: ask GitHub once a day for a newer version, tell you and offer the update command | `true` |
 | `session-info.alerts` | `true`, `false` | `true` |
 | `session-info.viewer` | `auto`, `git`, `vscode`, `inline` | `auto` |
 | `session-info.editor` | `auto`, `vscode`, `system` | `auto` |
@@ -615,6 +629,7 @@ claude --plugin-dir .
 | --- | --- |
 | `hooks/register.tsx` | The commands, the `tool.call`, `tool.check`, `prompt.submit`, `prompt.suggest`, `turn.complete`, `agent.spawn` and `session.compact` hooks, the refresh and keep-warm timers, the pane and the cache guard's band |
 | `hooks/cards.tsx` | Framed cards, the tiles row and how the tiles wrap |
+| `hooks/update.ts` | Reads the installed version, checks the published one once a day and decides when to offer the update |
 | `hooks/usage.ts` | Window labels, bars and reset countdowns |
 | `hooks/session.ts` | Token, duration, cost and turn formatting |
 | `hooks/context.ts` | The stacked context bar: slices, cell widths, legend lines |

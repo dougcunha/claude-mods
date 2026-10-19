@@ -18,4 +18,5 @@ export type Host = {
   clear: () => Promise<void>
   readBox: () => Promise<string>
   fill: (text: string) => Promise<void>
+  fetchText: (url: string) => Promise<{ ok: boolean; text: string }>
 }
