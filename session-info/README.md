@@ -201,11 +201,14 @@ The shell commands that Claude started with `run_in_background`, in a `Bash` or 
 | `⟳` | `running · 3m 2s` | The command runs, and the time counts up |
 | `✓` | `done · 12s` | The task ended with the status `completed` |
 | `✖` | `failed · 4s` | The task ended with any other status than `completed` or `killed` |
-| `⊘` | `stopped · 1m 1s` | The task was killed |
+| `⊘` | `stopped · 1m 1s` | The task was killed, or Claude stopped it with `TaskStop` |
+| `•` | `ended · 2m 5s` | Claude Code no longer lists the task as running, and no notification gave its status |
 
 The name is the description Claude wrote for the call, with the command on a dim line under it; with no description, the command's first line is the name (the detail view shows the whole command). Running tasks come first, then the ended ones, newest first. The header counts them by state, and a tab that is not active shows how many run. Up to 8 rows are shown, then a count of the rest, and the section keeps the last 30 commands.
 
-A command is `running` until its task notification reaches the session: Claude Code sends one when a background task ends, and the mod marks the task ended then, not at the moment the command exits. The mod reads the notification from the session's message queue, so a notification that lands in a running turn, or goes to a subagent, ends the task too. The time of an ended task is the time the notification took to arrive. A foreground command is not listed, and neither is a task that Claude Code started without a shell call, such as a background subagent (the Agents section has those). The section keeps only the command, the description and the state: it never keeps a command's output. `/clear` empties it. Commands that the Checks section recognizes as a build or test run show in both sections.
+A command is `running` until its task notification reaches the session: Claude Code sends one when a background task ends, and the mod marks the task ended then, not at the moment the command exits. The mod reads the notification from the session's message queue, so a notification that lands in a running turn, or goes to a subagent, ends the task too. The time of an ended task is the time the notification took to arrive.
+
+A task that Claude stops with `TaskStop` sends no notification, so the mod marks it `stopped` when the call succeeds. A task that ends in another way with no notification, for example one you stop from the tasks dialog, stays `running` until the end of the next turn: the mod then compares the list with the background tasks that Claude Code reports as in flight, and marks each task that is not there `ended`. A notification that arrives later replaces `ended` with the real status. A foreground command is not listed, and neither is a task that Claude Code started without a shell call, such as a background subagent (the Agents section has those). The section keeps only the command, the description and the state: it never keeps a command's output. `/clear` empties it. Commands that the Checks section recognizes as a build or test run show in both sections.
 
 ## 🧪 What the Checks section shows
 
@@ -581,6 +584,7 @@ After every shell command, the mod also checks that each listed file still exist
 - **Binary files** are not handled. The snapshot stores text only.
 - **Checks of background commands** end when the task's notification reaches the session, not when the command ends. A newer run of the same kind replaces the row first, and the notification of the older run changes nothing. When the task's output file is gone, the row shows the status alone.
 - **Check details** depend on the tool's output format. When a format is not recognized, the row shows the status and, for a failure, the last lines of the output. `rtk dotnet test` on a Microsoft.Testing.Platform project prints no counts when it passes, so the row says `passed`.
+- **Background tasks that end with no notification** are found at the end of a turn through the `classic.Stop` event, which Claude Code does not send to a plugin you install yourself where an organization manages Claude Code through managed settings. There a task stopped with `TaskStop` still shows `stopped`, but a task stopped in another way stays `running` until `/clear`.
 - **Auto-continue** needs the `classic.Stop` event, which Claude Code does not send to a plugin you install yourself where an organization manages Claude Code through managed settings. There the switch changes nothing, unless the organization lists the mod in its managed settings.
 - **Auto-continue** reads a question only by its question mark. A reply that waits for you without one, such as `Tell me when you are ready.`, gets a continue; Claude is told to stop and ask before a step that needs you, and the limit of 5 in a row and the progress check bound the rest.
 - **Build guard** sees only what git sees: a change in an ignored file, outside the repository or in an environment variable does not change the fingerprint. The 30-minute limit and `# rerun` cover those cases.
@@ -617,7 +621,7 @@ claude --plugin-dir .
 | `hooks/alerts.ts` | Which thresholds a measurement crosses, once per window |
 | `hooks/checks.ts` | Which commands are builds or test runs, the record of each run, its rows and the fix prompt |
 | `hooks/guard.ts` | The build guard: the working-tree fingerprint, the runs it keeps and reuses, and the text Claude reads for a skip |
-| `hooks/background.ts` | The list of background commands: starting one from a shell call's result, ending it from its notification, ordering, texts and status glyphs |
+| `hooks/background.ts` | The list of background commands: starting one from a shell call's result, ending it from its notification, a `TaskStop` call or its absence from the in-flight list at a stop, ordering, texts and status glyphs |
 | `hooks/detail.ts` | The detail view's text: joins the parts and cuts a text past its limit |
 | `hooks/tasks.ts` | Reads a background task's end from its notification and finishes the check that waits on it |
 | `hooks/parse.ts` | Reads error lines, error counts, test counts and failed test names from build and test output |

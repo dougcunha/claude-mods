@@ -45,7 +45,8 @@ export type GuardSkip = { kinds: CheckKind[]; command: string; reply: string; at
 /** The build guard's record of this conversation: the passed runs it can reuse, the last skips, and what the skips saved. */
 export type Guard = { runs: Record<string, GuardRun>; skips: GuardSkip[]; count: number; savedMs: number; savedChars: number }
 
-export type BackgroundStatus = 'running' | 'completed' | 'failed' | 'killed'
+/** `ended` is a task the engine no longer lists in flight and whose notification has not come: its status is not known. */
+export type BackgroundStatus = 'running' | 'completed' | 'failed' | 'killed' | 'ended'
 
 /**
  * A shell command the session started in the background: the task id the engine gave it, the command's first line,

@@ -1,6 +1,6 @@
 {
   "name": "session-info",
-  "version": "0.32.1",
+  "version": "0.32.2",
   "description": "Session pane: context, cost and turns, the prompt cache with the time until it expires, keep warm and a guard that holds a prompt that would write an expired cache again, the last turn's tokens, cache, tools and refused calls, a task list Claude keeps with a switch that keeps Claude working while tasks remain open, an autopick switch that answers a question left unanswered with its recommended option, the skills in use, GitHub Actions runs, mentioned Jira issues, live plan usage bars, running agents with their model and effort, the shell commands Claude runs in the background, the last build and test run, background runs included, with a prompt that asks Claude to fix a failure and a switch that skips a build or test run when nothing changed since the same command passed, the Git state of the repository and its submodules with a treeview of its changed files, and a treeview of the files this session created, modified or deleted.",
   "author": {
     "name": "Douglas Cunha",

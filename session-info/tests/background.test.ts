@@ -6,14 +6,18 @@ import {
   backgroundSummary,
   firstLine,
   hasCommandLine,
+  inFlightIds,
   orderedTasks,
   startedTask,
   statusOf,
+  stoppedTaskId,
   taskLabel,
   taskRowCount,
   taskState,
   TEXT_LIMIT,
   withEnd,
+  withInFlight,
+  withStopped,
   withTask,
 } from '../hooks/background'
 import type { BackgroundTask } from '../types'
@@ -84,6 +88,38 @@ test('a task end marks the running task it names and leaves the rest, and a seco
   expect(withEnd(tasks, { taskId: 'b9', status: 'completed' }, NOW)).toBe(tasks)
 })
 
+test('a TaskStop call that succeeded names the task in its input, and a refused or failed one names none', () => {
+  expect(stoppedTaskId({ task_id: 'b1' }, { result: 'stopped' })).toBe('b1')
+  expect(stoppedTaskId({ task_id: 'b1' }, { deny: 'no' })).toBeUndefined()
+  expect(stoppedTaskId({ task_id: 'b1' }, { isError: true })).toBeUndefined()
+  expect(stoppedTaskId({ task_id: '' }, { result: 'stopped' })).toBeUndefined()
+  expect(stoppedTaskId({}, { result: 'stopped' })).toBeUndefined()
+})
+
+test('a stopped task is marked killed, and an id that names no running task changes nothing', () => {
+  const tasks = [task('b2'), task('b1')]
+  expect(withStopped(tasks, 'b1', NOW + 5_000)).toEqual([task('b2'), task('b1', { status: 'killed', endedAt: NOW + 5_000 })])
+  expect(withStopped(tasks, 'agent-1', NOW)).toBe(tasks)
+})
+
+test('a running task the stop no longer lists in flight is ended with no status, and the rest stay', () => {
+  const tasks = [task('b3'), task('b2'), task('b1', { status: 'completed', endedAt: NOW })]
+  expect(withInFlight(tasks, ['b3'], NOW + 5_000)).toEqual([task('b3'), task('b2', { status: 'ended', endedAt: NOW + 5_000 }), tasks[2]])
+  expect(withInFlight(tasks, ['b3', 'b2'], NOW)).toBe(tasks)
+})
+
+test('a notification after the stop gives an ended task its status and keeps the time it ended', () => {
+  const tasks = [task('b1', { status: 'ended', endedAt: NOW + 5_000 })]
+  expect(withEnd(tasks, { taskId: 'b1', status: 'completed' }, NOW + 9_000)).toEqual([task('b1', { status: 'completed', endedAt: NOW + 5_000 })])
+})
+
+test('the ids in flight come from the list of the stop, and a stop with no list gives none', () => {
+  expect(inFlightIds({ background_tasks: [{ id: 'b1', type: 'shell' }, { id: 7 }, null, { id: 'a1', type: 'subagent' }] })).toEqual(['b1', 'a1'])
+  expect(inFlightIds({ background_tasks: [] })).toEqual([])
+  expect(inFlightIds({})).toBeUndefined()
+  expect(inFlightIds({ background_tasks: 'b1' })).toBeUndefined()
+})
+
 test('running tasks list first and each group keeps its newest-first order', () => {
   const tasks = [task('c', { status: 'completed' }), task('b'), task('a', { status: 'failed' }), task('d')]
   expect(orderedTasks(tasks).map(one => one.id)).toEqual(['b', 'd', 'c', 'a'])
@@ -107,12 +143,13 @@ test('the state reads running and ended times in words, so color is no more than
   expect(taskState(task('b1', { status: 'completed', endedAt: NOW + 12_000 }), NOW + 999_000)).toBe('done · 12s')
   expect(taskState(task('b1', { status: 'failed', endedAt: NOW + 1_000 }), NOW)).toBe('failed · 1s')
   expect(taskState(task('b1', { status: 'killed', endedAt: NOW + 1_000 }), NOW)).toBe('stopped · 1s')
+  expect(taskState(task('b1', { status: 'ended', endedAt: NOW + 1_000 }), NOW)).toBe('ended · 1s')
 })
 
 test('the summary counts the tasks by status and says none for an empty list', () => {
   expect(backgroundSummary([])).toBe('none')
-  const tasks = [task('a'), task('b'), task('c', { status: 'completed' }), task('d', { status: 'failed' }), task('e', { status: 'killed' })]
-  expect(backgroundSummary(tasks)).toBe('2 running · 1 done · 1 failed · 1 stopped')
+  const tasks = [task('a'), task('b'), task('c', { status: 'completed' }), task('d', { status: 'failed' }), task('e', { status: 'killed' }), task('f', { status: 'ended' })]
+  expect(backgroundSummary(tasks)).toBe('2 running · 1 done · 1 failed · 1 stopped · 1 ended')
 })
 
 const notification = (taskId: string, status: string) => `<task-notification>
@@ -142,7 +179,13 @@ function stub(on: Parameters<TestBody>[1], taskIds: Record<string, string> = { '
 
     return { result: { stdout: '', stderr: '', interrupted: false, ...(id === undefined ? {} : { backgroundTaskId: id }) }, text: 'ok' } as never
   })
+  on('tool.call', { tool: 'TaskStop' }, async () => ({ result: '{"message":"Successfully stopped task"}', text: 'stopped' }) as never)
+  // The settings hooks beneath the mod: none blocks.
+  on('classic.Stop', async () => ({}))
 }
+
+const stop = (inFlight?: string[]) =>
+  ({ stop_hook_active: false, last_assistant_message: 'Done.', ...(inFlight === undefined ? {} : { background_tasks: inFlight.map(id => ({ id, type: 'shell', status: 'running', description: '' })) }) }) as never
 
 /** The task ends are handled after the hook returns: the pane is mounted again until the summary shows. */
 async function mountUntil($: Parameters<TestBody>[0], surface: 'terminal' | 'desktop', done: string) {
@@ -224,6 +267,55 @@ test('a notification typed by the person is no task end', async ($, on) => {
   await later(100)
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: '1 running' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a task that TaskStop ended is marked stopped at once', async ($, on) => {
+  stub(on)
+
+  await $.tool.call({ tool: 'Bash', command: 'npm run dev', run_in_background: true })
+  await $.tool.call({ tool: 'TaskStop', task_id: 'b1' } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+
+  expect(await ui.find({ type: 'Text', text: '1 stopped' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a stop marks ended a task the engine no longer lists, and a later notification gives it its status', async ($, on) => {
+  stub(on, { 'npm run dev': 'b1', 'npm run api': 'b2' })
+
+  await $.tool.call({ tool: 'Bash', command: 'npm run dev', run_in_background: true })
+  await $.tool.call({ tool: 'Bash', command: 'npm run api', run_in_background: true })
+  await $.classic.Stop(stop(['b2']))
+  const ended = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ended.find({ type: 'Text', text: '1 running · 1 ended' })).toBeDefined()
+  await ended.unmount()
+
+  await $.prompt.submit({ text: notification('b1', 'completed'), origin: { kind: 'task-notification' }, wait: false } as never)
+  const done = await mountUntil($, 'terminal', '1 running · 1 done')
+  expect(await done.find({ type: 'Text', text: '1 running · 1 done' })).toBeDefined()
+  await done.unmount()
+})
+
+test('a stop with no list of tasks in flight ends none', async ($, on) => {
+  stub(on)
+
+  await $.tool.call({ tool: 'Bash', command: 'npm run dev', run_in_background: true })
+  await $.classic.Stop(stop())
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+
+  expect(await ui.find({ type: 'Text', text: '1 running' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('with showTodos false a stop still ends the tasks no longer in flight', { options: { showTodos: false } }, async ($, on) => {
+  stub(on)
+
+  await $.tool.call({ tool: 'Bash', command: 'npm run dev', run_in_background: true })
+  await $.classic.Stop(stop([]))
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+
+  expect(await ui.find({ type: 'Text', text: '1 ended' })).toBeDefined()
   await ui.unmount()
 })
 

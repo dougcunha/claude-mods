@@ -9,6 +9,8 @@ export const BACKGROUND_LIMIT = 30
 export const BACKGROUND_ROOM = 8
 /** The longest command or description the state keeps; a longer one is cut. */
 export const TEXT_LIMIT = 1_000
+/** The tool that stops a background task; the task it stops sends no notification. */
+export const STOP_TOOL = 'TaskStop'
 
 /** Glyph, word and theme color of each status; the word is what a color-blind reader goes by. */
 export const BACKGROUND_STATUS = {
@@ -16,6 +18,7 @@ export const BACKGROUND_STATUS = {
   completed: { glyph: '✓', word: 'done', color: 'success' },
   failed: { glyph: '✖', word: 'failed', color: 'error' },
   killed: { glyph: '⊘', word: 'stopped', color: 'warning' },
+  ended: { glyph: '•', word: 'ended', color: 'inactive' },
 } as const satisfies Record<BackgroundStatus, { glyph: string; word: string; color: string }>
 
 /** The first line of a text that has any, trimmed: what a row draws of a command that spans lines. */
@@ -46,11 +49,51 @@ export const withTask = (tasks: readonly BackgroundTask[], task: BackgroundTask)
 /** A notification's status as a task status; anything but completed or killed counts as failed. */
 export const statusOf = (status: string): BackgroundStatus => (status === 'completed' || status === 'killed' ? status : 'failed')
 
-/** The tasks with the one the notification names marked as ended; the same array when it names none that runs. */
-export function withEnd(tasks: BackgroundTask[], end: TaskEnd, at: number): BackgroundTask[] {
-  if (!tasks.some(task => task.id === end.taskId && task.status === 'running')) return tasks
+/** Whether a notification can still set the task's status: it runs, or it ended with no status known. */
+const isOpen = (task: BackgroundTask): boolean => task.status === 'running' || task.status === 'ended'
 
-  return tasks.map(task => (task.id === end.taskId && task.status === 'running' ? { ...task, status: statusOf(end.status), endedAt: at } : task))
+/**
+ * The tasks with the one the notification names marked as ended; the same array when it names none open. A task the
+ * stop already took as ended gets the notification's status and keeps the time it ended.
+ */
+export function withEnd(tasks: BackgroundTask[], end: TaskEnd, at: number): BackgroundTask[] {
+  if (!tasks.some(task => task.id === end.taskId && isOpen(task))) return tasks
+
+  return tasks.map(task => (task.id === end.taskId && isOpen(task) ? { ...task, status: statusOf(end.status), endedAt: task.endedAt ?? at } : task))
+}
+
+/** The task a `TaskStop` call stopped: the id in its input once the call succeeded; a refused or failed call stops none. */
+export function stoppedTaskId(input: Record<string, unknown>, ran: Record<string, unknown>): string | undefined {
+  if (ran.deny !== undefined || ran.isError === true) return undefined
+  const id = input.task_id
+
+  return typeof id === 'string' && id !== '' ? id : undefined
+}
+
+/** The tasks with the stopped one marked killed; the same array when it names none that runs. */
+export const withStopped = (tasks: BackgroundTask[], taskId: string, at: number): BackgroundTask[] => withEnd(tasks, { taskId, status: 'killed' }, at)
+
+/**
+ * The tasks with each running one that the engine no longer lists in flight marked ended with no status known: a task
+ * that ends with no notification, such as one stopped from the tasks dialog, leaves the list this way. The same array
+ * when every running task is still in flight.
+ */
+export function withInFlight(tasks: BackgroundTask[], inFlight: readonly string[], at: number): BackgroundTask[] {
+  const isGone = (task: BackgroundTask) => task.status === 'running' && !inFlight.includes(task.id)
+  if (!tasks.some(isGone)) return tasks
+
+  return tasks.map(task => (isGone(task) ? { ...task, status: 'ended', endedAt: at } : task))
+}
+
+/** The ids of the tasks a stop lists in flight; undefined when the stop has no such list, so nothing is taken as ended. */
+export function inFlightIds(stop: { background_tasks?: unknown }): string[] | undefined {
+  if (!Array.isArray(stop.background_tasks)) return undefined
+
+  return stop.background_tasks.flatMap(task => {
+    const id = typeof task === 'object' && task !== null ? (task as { id?: unknown }).id : undefined
+
+    return typeof id === 'string' ? [id] : []
+  })
 }
 
 /** Running tasks first, then the ended ones; each group keeps its newest-first order. */
@@ -77,7 +120,7 @@ export function taskState(task: BackgroundTask, now: number): string {
 export function backgroundSummary(tasks: readonly BackgroundTask[]): string {
   if (tasks.length === 0) return 'none'
   const count = (status: BackgroundStatus) => tasks.filter(task => task.status === status).length
-  const parts = (['running', 'completed', 'failed', 'killed'] as const).map(status => [count(status), BACKGROUND_STATUS[status].word] as const)
+  const parts = (Object.keys(BACKGROUND_STATUS) as BackgroundStatus[]).map(status => [count(status), BACKGROUND_STATUS[status].word] as const)
 
   return parts.filter(([total]) => total > 0).map(([total, word]) => `${total} ${word}`).join(' · ')
 }

@@ -9,7 +9,7 @@ import { CONTINUE_STORE, continueLog, continueReason, continueText, lastContinue
 import { AUTOPICK_USAGE, autopickPrompt, autopickSummary, countdown, DEFAULT_SETTINGS, hasRival, minutesOf, pickDetail, pickedLog, pickedNote, picksDetail, picksOf, picksText, settingsOf, statusText, stepMinutes, STORE_MINUTES, STORE_ON } from './autopick'
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
-import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCommandLine, orderedTasks, startedTask, taskLabel, taskRowCount, taskState, withEnd, withTask } from './background'
+import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCommandLine, inFlightIds, orderedTasks, startedTask, STOP_TOOL, stoppedTaskId, taskLabel, taskRowCount, taskState, withEnd, withInFlight, withStopped, withTask } from './background'
 import { CACHE_STATUS, cacheParts, cacheStatus, holdText, isPingDue, isSameMessage, KEEP_WARM_PROMPT, moveToNewSession, NO_CACHE, pingVerdict, shouldHold, span, ttlOf, ttlSetting, withCompact, withPing, withRequest, withResume, withSeed, withSwitch } from './cache'
 import type { TtlSetting } from './cache'
 import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
@@ -1149,14 +1149,20 @@ export const register: Register = (on, options) => {
       return { result: todoReply(parsed) }
     })
 
+  }
+
+  if (shows.todos || shows.background)
     // A hook that fails here is skipped without a .catch: the turn then ends as it would without the mod, which is safe.
     on('classic.Stop', async ($, e, next) => {
       const stopped = await next(e)
-      const reason = await continueOnStop($, e, stopped)
+      // A task that ended with no notification, such as one stopped from the tasks dialog, leaves the engine's list.
+      const inFlight = shows.background ? inFlightIds(e) : undefined
+      if (inFlight !== undefined)
+        await update($, background, tasks => withInFlight(tasks ?? [], inFlight, Date.now())).catch(error => $.ui.toast(`session-info: ${String(error)}`))
+      const reason = shows.todos ? await continueOnStop($, e, stopped) : undefined
 
       return reason === undefined ? stopped : { ...stopped, block: reason }
     })
-  }
 
   if (shows.skills) {
     // The Skill tool's call raises skill.prompt while it runs; a slash command raises it alone, in the main conversation.
@@ -1290,13 +1296,14 @@ export const register: Register = (on, options) => {
     const isShell = (SHELLS as readonly string[]).includes(e.tool)
     const isChecked = shows.checks && isShell
     const isBackgrounded = shows.background && isShell
+    const isStopCall = shows.background && e.tool === STOP_TOOL
     const isRepoTool = shows.git && FILE_TOOLS.includes(e.tool)
     const isCiTool = shows.ci && isShell
     // The model's own read of an issue names it as clearly as a mention, and its answer is the read the section needs.
     const input = e as Record<string, unknown>
     const asked = typeof input.issueIdOrKey === 'string' ? input.issueIdOrKey.toUpperCase() : ''
     const isJiraRead = shows.jira && serverOf(e.tool) !== undefined && isIssueKey(asked)
-    if (!shows.changes && !isChecked && !isBackgrounded && !isRepoTool && !isCiTool && !isJiraRead) return next(e)
+    if (!shows.changes && !isChecked && !isBackgrounded && !isStopCall && !isRepoTool && !isCiTool && !isJiraRead) return next(e)
     const before = shows.changes && isShell ? await gitStatus(hostOf($)).catch(() => undefined) : undefined
     const ran = await next(e)
     const toast = (error: unknown) => $.ui.toast(`session-info: ${String(error)}`)
@@ -1306,6 +1313,9 @@ export const register: Register = (on, options) => {
       const started = startedTask(input, ran as Record<string, unknown>, Date.now())
       if (started !== undefined) await update($, background, tasks => withTask(tasks ?? [], started)).catch(toast)
     }
+    // A task that TaskStop ends sends no notification: its call is the one sign that it ended.
+    const stopped = isStopCall ? stoppedTaskId(input, ran as Record<string, unknown>) : undefined
+    if (stopped !== undefined) await update($, background, tasks => withStopped(tasks ?? [], stopped, Date.now())).catch(toast)
     if (isRepoTool && ran.deny === undefined) void refreshRepo($)
     if (isCiTool && ran.deny === undefined && !ran.isError) {
       const command = typeof (e as Record<string, unknown>).command === 'string' ? String((e as Record<string, unknown>).command) : ''
