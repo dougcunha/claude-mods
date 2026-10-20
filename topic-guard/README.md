@@ -39,6 +39,8 @@ The band holds three lines in a quiet rounded frame, which lights up under the p
 
 The mod never sends your message for you, so it enters as your own prompt, with its images and `@` mentions. A `related` message enters at once, as typed. The new session gets no handoff: a separate topic needs nothing from this conversation. To carry the work itself to a fresh session, use a tool made for it, such as ContextBrake.
 
+The mod pins a **status line** under the prompt, so you can see that it is active and who judges, for example `haiku · related at 45%` or `Jev down, haiku judging · related at 45%`. Claude Code draws it as a yellow notice headed by the mod's name, and the mod cannot change that. It reads `off` when `analyze` is off, and `showStatus` turns it off.
+
 The mod stands alone: it needs no other mod, skill or tool.
 
 ## 🚀 Install
@@ -83,6 +85,7 @@ Set them in `/config`, under the mod's name.
 | `model` | `haiku` | The model that judges a prompt: an alias or a full model id. The call goes through the session's own client. With `judge` on `jev`, it judges only when Jev cannot. |
 | `minContextPercent` | `20` | Judge a prompt only when the context window is at least this full. `0` judges every prompt. |
 | `recheckStep` | `10` | After you keep a held message here, judge again only when the context grew by this many points. A context that drops below that point, as after a compact, is judged again at once. |
+| `showStatus` | `true` | Pin the status line under the prompt: who judges (the model, or Jev, and whether Jev is down) and the last thing the mod did (`held a new topic at 62%`, `related at 45%`, `kept here at 62%`, `skipped at 12%, judging from 20%`, `no judgment at 0%`). It never holds prompt or reply text. Off pins nothing. |
 | `debug` | `false` | Write one line per judgment and choice to `<temp>/claude-topic-guard/<session id>/debug.log`: the time, the session id, the context percent and the outcome (`judge: related at 45%`, `judge: none at 0%`, `judge: related at 45% (Jev MCP is not connected)`, `keep here at 7%`, `new session: done`). It never holds prompt or reply text. `<temp>` is `TEMP`, else `TMPDIR`, else `/tmp`. |
 
 ## 🧪 The Jev judge
@@ -100,6 +103,7 @@ Set `judge` to `jev` to have the Jev MCP decide instead of the model. [Jev](http
 - **Cost:** each judged prompt is one call to the judging model, with up to 12,000 characters of the conversation and 4,000 of the new message.
 - **Wrong judgments:** the model can take a short follow-up for a new topic. Press Enter again to send it on, and the mod stops asking until the context grows.
 - **The new session:** the prompt box keeps its draft through `/clear`. After `/clear` the engine reports the old session id for about a second, so the mod waits up to 3 seconds for the new id, then puts the message back in the box only if the box is empty. An image pasted in a box that `/clear` emptied does not come back.
+- **The status line** is plain text, one line, drawn at the session start and after each judgment; the engine gives a mod no color for it. The text it shows after a `/clear` is the one from before, until the next judgment.
 - **The band's state** lives in the session: `/clear`, a resume and a restart reset it. After a `/clear` the engine no longer redraws the band when the state changes, so the mod asks for a redraw after each change.
 - **No automatic move:** the mod never clears a session without your press.
 
@@ -120,6 +124,7 @@ Run the manual check in a session you can lose: **New session** clears it.
 | --- | --- |
 | `hooks/register.tsx` | The `prompt.submit` hook and the band |
 | `hooks/judge.ts` | Which prompts to judge, the judging prompt, the transcript excerpt, the reply parser and the Jev-then-model fallback |
+| `hooks/status.ts` | The text of the status line |
 | `hooks/jev.ts` | The `jev_classify` request, the reader of its result and the server names |
 | `hooks/session.ts` | The move to a new session and the debug log path |
 | `hooks/host.ts` | The engine calls the helper modules use |

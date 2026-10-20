@@ -1,6 +1,6 @@
 {
   "name": "topic-guard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Before a prompt enters the session, a small model judges whether it belongs to the session's topic. When it starts a separate topic, the mod holds it in the prompt box: press Enter to keep it here, or New session to clear the session and send it there.",
   "author": {
     "name": "Douglas Cunha",
@@ -43,6 +43,12 @@
       "title": "Context growth after you keep a message",
       "description": "After you send a held message again to keep it here, judge again only when the context grew by this many percentage points. A context below that point, as after a compact, is judged again at once.",
       "default": 10
+    },
+    "showStatus": {
+      "type": "boolean",
+      "title": "Show the status line",
+      "description": "Pin a line under the prompt that says who judges (the model, or Jev and whether it is down) and the last thing the mod did, such as related at 45%. It never holds prompt text. Off shows nothing there.",
+      "default": true
     },
     "debug": {
       "type": "boolean",

@@ -8,6 +8,7 @@ import { JEV_TOOL, serverNames, serverOf } from './jev'
 import { isSameMessage, judge, shouldJudge, skipReason } from './judge'
 import type { JudgeEngine } from './judge'
 import { debugLogPath, moveToNewSession } from './session'
+import { judgedText, keptText, skippedText, statusText } from './status'
 
 /** The reply cap and the time limit of one judgment; a judgment is one short JSON object, and the person waits for it. */
 const JUDGE_MAX_TOKENS = 300
@@ -22,12 +23,13 @@ const LOG_LINES = 200
 /** What the person reads where the held message would have entered; the engine puts the message back in the box. */
 const HELD_TEXT = 'topic-guard: held as a new topic. Press Enter to keep it here, or choose New session.'
 
-const DEFAULTS = { analyze: true, judge: 'model' as JudgeEngine, model: 'haiku', minContextPercent: 20, recheckStep: 10, debug: false }
+const DEFAULTS = { analyze: true, judge: 'model' as JudgeEngine, model: 'haiku', minContextPercent: 20, recheckStep: 10, showStatus: true, debug: false }
 
 const held = atom({ plugin: 'topic-guard', key: 'held' } as const, null)
 const keptAt = atom({ plugin: 'topic-guard', key: 'keptAt' } as const, null)
 const isBusy = atom({ plugin: 'topic-guard', key: 'isBusy' } as const, false)
 const isJevDown = atom({ plugin: 'topic-guard', key: 'isJevDown' } as const, false)
+const lastJudgment = atom({ plugin: 'topic-guard', key: 'lastJudgment' } as const, null)
 
 type Settings = typeof DEFAULTS
 
@@ -41,6 +43,7 @@ function readSettings(options: Record<string, unknown>): Settings {
     model,
     minContextPercent: number(options.minContextPercent, DEFAULTS.minContextPercent),
     recheckStep: number(options.recheckStep, DEFAULTS.recheckStep),
+    showStatus: typeof options.showStatus === 'boolean' ? options.showStatus : DEFAULTS.showStatus,
     debug: options.debug === true,
   }
 }
@@ -163,6 +166,27 @@ async function reportJev($: EngineInterface, settings: Settings, fallback: strin
   $.ui.toast(`topic-guard: the Jev MCP ${fallback}. Judging with ${settings.model} instead.`)
 }
 
+/**
+ * Draws the status line: who judges and the last thing the mod did. It is best effort and never rejects, and it clears
+ * the line when the showStatus option is off, so a reload that turned it off does not leave the old line behind.
+ */
+async function refreshStatus($: EngineInterface, settings: Settings): Promise<void> {
+  try {
+    if (!settings.showStatus) return $.ui.status(undefined)
+    $.ui.status(
+      statusText({ analyze: settings.analyze, judge: settings.judge, model: settings.model, isJevDown: await read($, isJevDown), last: await read($, lastJudgment) }),
+    )
+  } catch {
+    // The line is a convenience: a failed draw changes nothing the person asked for.
+  }
+}
+
+/** Records the last thing the mod did for the status line and redraws it; it never rejects. */
+async function note($: EngineInterface, settings: Settings, text: string): Promise<void> {
+  await update($, lastJudgment, () => text).catch(() => undefined)
+  await refreshStatus($, settings)
+}
+
 /** Judges a prompt the person typed; returns it as held when it starts a new topic, else null. */
 async function guard($: EngineInterface, settings: Settings, text: string): Promise<Held | null> {
   // The engine reports no percent until the first response of a fresh or just compacted window, which holds little.
@@ -170,11 +194,13 @@ async function guard($: EngineInterface, settings: Settings, text: string): Prom
   const kept = await read($, keptAt)
   if (!shouldJudge({ percent, minPercent: settings.minContextPercent, keptAt: kept, recheckStep: settings.recheckStep })) {
     await log($, settings, `judge: skipped at ${percent}% (minimum ${settings.minContextPercent}%, kept at ${kept ?? '-'}%)`)
+    await note($, settings, skippedText({ percent, minPercent: settings.minContextPercent, keptAt: kept, recheckStep: settings.recheckStep }))
 
     return null
   }
   const judgment = await judge(hostOf($), { model: settings.model, percent, message: text, judge: settings.judge })
   await reportJev($, settings, judgment.fallback)
+  await note($, settings, judgedText(judgment.outcome, percent))
   const via = judgment.fallback === undefined ? '' : ` (Jev MCP ${judgment.fallback})`
   if (judgment.outcome !== 'new-topic') {
     await log($, settings, `judge: ${judgment.outcome} at ${percent}%${via}`)
@@ -189,6 +215,13 @@ async function guard($: EngineInterface, settings: Settings, text: string): Prom
 export const register: Register = (on, options) => {
   const settings = readSettings(options as Record<string, unknown>)
 
+  // An observer: the line is drawn at the session's start, and a failure costs the person nothing.
+  on('session.start', async ($, e, next) => {
+    await refreshStatus($, settings)
+
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
   // A failure lets the prompt enter as typed: the mod only holds a message back when the judgment says so.
   on('prompt.submit', async ($, e, next) => {
     const standing = e.origin.kind === 'composer' ? await read($, held) : null
@@ -199,6 +232,7 @@ export const register: Register = (on, options) => {
       if (isSameMessage(e.text, standing.text)) {
         await update($, keptAt, () => standing.percent)
         await log($, settings, `keep here at ${standing.percent}%`)
+        await note($, settings, keptText(standing.percent))
 
         return next(e)
       }

@@ -14,7 +14,7 @@ const RELATED = '{"decision": "related", "reason": "Same task."}'
 const MESSAGE = 'Add a dark theme to the docs site.'
 const USAGE = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
 
-type World = { judged: string[]; ran: string[]; entered: string[]; filled: string[]; toasts: string[]; logged: string[]; logFiles: string[] }
+type World = { judged: string[]; ran: string[]; entered: string[]; filled: string[]; toasts: string[]; statuses: (string | undefined)[]; logged: string[]; logFiles: string[] }
 
 /**
  * The engine beneath the mod: a session at 62% context with one exchange, whose judging model answers `replies` in
@@ -26,7 +26,7 @@ function world(
   replies: readonly (string | null)[] = [NEW_TOPIC],
   { isClearFailing = false, isBoxCleared = false } = {},
 ): World & { clock: ReturnType<typeof mock.clock> } {
-  const state: World = { judged: [], ran: [], entered: [], filled: [], toasts: [], logged: [], logFiles: [] }
+  const state: World = { judged: [], ran: [], entered: [], filled: [], toasts: [], statuses: [], logged: [], logFiles: [] }
   let sessionId = 's-1'
   let box = MESSAGE
   const clock = mock.clock(on)
@@ -56,6 +56,8 @@ function world(
   on('prompt.submit', async (_, e) => (state.entered.push(e.text), { text: e.text }) as never)
   on('ui.render', async ($, e) => h($.ui.resolve(e).Box, {}) as never)
   on('ui.toast', async (_, e) => (state.toasts.push(e.text), { value: undefined }) as never)
+  on('ui.status', async (_, e) => (state.statuses.push(e.text), { value: undefined }) as never)
+  on('session.start', async (_, e) => ({ cwd: e.cwd }))
 
   return { ...state, clock }
 }
@@ -270,4 +272,63 @@ test('the default judge asks the model and never calls the MCP tools', async ($,
 
   expect(judged).toEqual(['haiku'])
   expect(calls).toEqual([])
+})
+
+const START = { cwd: '/repo', surface: 'terminal', isInteractive: true } as const
+
+test('the status line names who judges when the session starts, before any judgment', async ($, on) => {
+  const { statuses } = world(on)
+
+  await $.session.start(START)
+
+  expect(statuses.at(-1)).toBe('haiku')
+})
+
+test('the status line follows the last thing the mod did: a held topic, a kept message, a related prompt', async ($, on) => {
+  const { statuses } = world(on, [NEW_TOPIC, RELATED])
+
+  await $.prompt.submit(typed())
+  expect(statuses.at(-1)).toBe('haiku · held a new topic at 62%')
+  await $.prompt.submit(typed())
+  expect(statuses.at(-1)).toBe('haiku · kept here at 62%')
+  await $.prompt.submit(typed('Now the footer.'))
+  expect(statuses.at(-1)).toBe('haiku · skipped at 62%, judging from 72%')
+})
+
+test('the status line says a prompt was skipped below the minimum context', { options: { minContextPercent: 70 } }, async ($, on) => {
+  const { statuses } = world(on)
+
+  await $.prompt.submit(typed())
+
+  expect(statuses.at(-1)).toBe('haiku · skipped at 62%, judging from 70%')
+})
+
+test('with the Jev judge, the status line shows Jev, then that it is down while the model judges, then Jev again', JEV_OPTIONS, async ($, on) => {
+  const { statuses } = world(on, [RELATED])
+  jevServer(on, [JEV_RELATED, 'down', JEV_RELATED])
+
+  await $.prompt.submit(typed('One.'))
+  expect(statuses.at(-1)).toBe('Jev · related at 62%')
+  await $.prompt.submit(typed('Two.'))
+  expect(statuses.at(-1)).toBe('Jev down, haiku judging · related at 62%')
+  await $.prompt.submit(typed('Three.'))
+  expect(statuses.at(-1)).toBe('Jev · related at 62%')
+})
+
+test('analyze false shows the mod as off', { options: { analyze: false } }, async ($, on) => {
+  const { statuses } = world(on)
+
+  await $.session.start(START)
+
+  expect(statuses.at(-1)).toBe('off')
+})
+
+test('showStatus false pins no line and clears an old one', { options: { showStatus: false } }, async ($, on) => {
+  const { statuses } = world(on)
+
+  await $.session.start(START)
+  await $.prompt.submit(typed())
+
+  expect(statuses.filter(text => text !== undefined)).toEqual([])
+  expect(statuses.length).toBeGreaterThan(0)
 })

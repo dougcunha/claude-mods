@@ -15,6 +15,8 @@ declare module 'claude-code' {
       isBusy: boolean
       /** True after the toast that says the Jev MCP could not judge; it clears when Jev judges again, so one outage warns once. */
       isJevDown: boolean
+      /** The last thing the mod did, in words for the status line (`related at 45%`), or null before the first. */
+      lastJudgment: string | null
     }
   }
 }
