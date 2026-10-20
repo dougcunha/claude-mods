@@ -4,12 +4,17 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Held } from '../types'
 
 import type { Host } from './host'
+import { JEV_TOOL, serverNames, serverOf } from './jev'
 import { isSameMessage, judge, shouldJudge, skipReason } from './judge'
+import type { JudgeEngine } from './judge'
 import { debugLogPath, moveToNewSession } from './session'
 
 /** The reply cap and the time limit of one judgment; a judgment is one short JSON object, and the person waits for it. */
 const JUDGE_MAX_TOKENS = 300
 const JUDGE_TIMEOUT_MS = 8_000
+
+/** The time limit of the Jev MCP; past it the model judges, so the person waits at most this plus the model's limit. */
+const JEV_TIMEOUT_MS = 4_000
 
 /** The most lines the debug log keeps; older lines drop off its start. */
 const LOG_LINES = 200
@@ -17,11 +22,12 @@ const LOG_LINES = 200
 /** What the person reads where the held message would have entered; the engine puts the message back in the box. */
 const HELD_TEXT = 'topic-guard: held as a new topic. Press Enter to keep it here, or choose New session.'
 
-const DEFAULTS = { analyze: true, model: 'haiku', minContextPercent: 20, recheckStep: 10, debug: false }
+const DEFAULTS = { analyze: true, judge: 'model' as JudgeEngine, model: 'haiku', minContextPercent: 20, recheckStep: 10, debug: false }
 
 const held = atom({ plugin: 'topic-guard', key: 'held' } as const, null)
 const keptAt = atom({ plugin: 'topic-guard', key: 'keptAt' } as const, null)
 const isBusy = atom({ plugin: 'topic-guard', key: 'isBusy' } as const, false)
+const isJevDown = atom({ plugin: 'topic-guard', key: 'isJevDown' } as const, false)
 
 type Settings = typeof DEFAULTS
 
@@ -31,11 +37,25 @@ function readSettings(options: Record<string, unknown>): Settings {
 
   return {
     analyze: typeof options.analyze === 'boolean' ? options.analyze : DEFAULTS.analyze,
+    judge: options.judge === 'jev' ? 'jev' : DEFAULTS.judge,
     model,
     minContextPercent: number(options.minContextPercent, DEFAULTS.minContextPercent),
     recheckStep: number(options.recheckStep, DEFAULTS.recheckStep),
     debug: options.debug === true,
   }
+}
+
+/** Calls `jev_classify` by each name its server may go by until one goes through; all failing, the first error stands. */
+async function callJev($: EngineInterface, spelled: string, args: Record<string, unknown>): Promise<unknown> {
+  let first: unknown
+  for (const name of serverNames(spelled)) {
+    try {
+      return await $.mcp.call(name, JEV_TOOL, args)
+    } catch (error) {
+      first ??= error
+    }
+  }
+  throw first
 }
 
 function hostOf($: EngineInterface): Host {
@@ -46,6 +66,17 @@ function hostOf($: EngineInterface): Host {
       const reply = await $.model.complete({ ...request, maxTokens: JUDGE_MAX_TOKENS, timeoutMs: JUDGE_TIMEOUT_MS })
 
       return reply.isAnswered ? reply.text : null
+    },
+    classify: async args => {
+      const spelled = (await $.tool.list()).map(tool => serverOf(tool.name)).find(name => name !== undefined)
+      if (spelled === undefined) return null
+
+      return Promise.race([
+        callJev($, spelled, args),
+        $.clock.sleep(JEV_TIMEOUT_MS).then(() => {
+          throw new Error('the Jev MCP did not answer in time')
+        }),
+      ])
     },
     sessionId: () => $.session.id(),
     clear: async () => void (await $.command.run({ command: 'clear' })),
@@ -115,6 +146,23 @@ async function newSession($: EngineInterface, settings: Settings): Promise<void>
   }
 }
 
+/**
+ * Says once, in a toast, that the Jev MCP could not judge and the model did, and clears that when Jev judges again, so a
+ * new outage warns again. `fallback` is the reason the judgment carries, if any.
+ */
+async function reportJev($: EngineInterface, settings: Settings, fallback: string | undefined): Promise<void> {
+  if (settings.judge !== 'jev') return
+  const wasDown = await read($, isJevDown)
+  if (fallback === undefined) {
+    if (wasDown) await update($, isJevDown, () => false)
+
+    return
+  }
+  if (wasDown) return
+  await update($, isJevDown, () => true)
+  $.ui.toast(`topic-guard: the Jev MCP ${fallback}. Judging with ${settings.model} instead.`)
+}
+
 /** Judges a prompt the person typed; returns it as held when it starts a new topic, else null. */
 async function guard($: EngineInterface, settings: Settings, text: string): Promise<Held | null> {
   // The engine reports no percent until the first response of a fresh or just compacted window, which holds little.
@@ -125,13 +173,15 @@ async function guard($: EngineInterface, settings: Settings, text: string): Prom
 
     return null
   }
-  const judgment = await judge(hostOf($), { model: settings.model, percent, message: text })
+  const judgment = await judge(hostOf($), { model: settings.model, percent, message: text, judge: settings.judge })
+  await reportJev($, settings, judgment.fallback)
+  const via = judgment.fallback === undefined ? '' : ` (Jev MCP ${judgment.fallback})`
   if (judgment.outcome !== 'new-topic') {
-    await log($, settings, `judge: ${judgment.outcome} at ${percent}%`)
+    await log($, settings, `judge: ${judgment.outcome} at ${percent}%${via}`)
 
     return null
   }
-  await log($, settings, `judge: new topic at ${percent}%`)
+  await log($, settings, `judge: new topic at ${percent}%${via}`)
 
   return { ...judgment.verdict, text }
 }

@@ -183,3 +183,91 @@ test('debug false, the default, writes no log', async ($, on) => {
 
   expect(logged).toEqual([])
 })
+
+const jevResult = (classification: string, newTopic: number) => ({
+  isError: false,
+  content: [{ type: 'text', text: JSON.stringify({ results: [{ classification, probabilities: { related: 1 - newTopic, 'new-topic': newTopic }, decision: 'auto' }] }) }],
+})
+const JEV_NEW_TOPIC = jevResult('new-topic', 0.96)
+const JEV_RELATED = jevResult('related', 0.01)
+const JEV_OPTIONS = { options: { judge: 'jev' } }
+const JEV_DOWN_TOAST = 'topic-guard: the Jev MCP failed or did not answer in time. Judging with haiku instead.'
+
+/** The Jev MCP beside `world`: the `tools` it lists, and the `answers` it gives in turn (the last repeats; 'down' fails, 'hang' never answers). */
+function jevServer(on: On, answers: readonly unknown[], tools: readonly string[] = ['mcp__jev__jev_classify']): { calls: { server: string; tool: string }[] } {
+  const calls: { server: string; tool: string }[] = []
+  on('tool.list', async () => ({ value: tools.map(name => ({ name, description: '', mcp: true })) }))
+  on('mcp.call', async (_, e) => {
+    const answer = answers[Math.min(calls.length, answers.length - 1)]
+    calls.push({ server: e.server, tool: e.tool })
+    if (answer === 'down') throw new Error('connection closed')
+    if (answer === 'hang') return await new Promise<never>(() => undefined)
+
+    return { value: answer } as never
+  })
+
+  return { calls }
+}
+
+test('with the Jev judge, a new topic is held on Jev alone, with its probability as the reason', JEV_OPTIONS, async ($, on) => {
+  const { judged } = world(on)
+  const { calls } = jevServer(on, [JEV_NEW_TOPIC])
+
+  const result = await $.prompt.submit(typed())
+
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(result).toEqual({ drop: expect.stringContaining('Press Enter to keep it here') })
+  expect(calls).toEqual([{ server: 'jev', tool: 'jev_classify' }])
+  expect(judged).toEqual([])
+  expect(await band.find({ type: 'Text', text: /Jev is 96% sure/ })).toBeDefined()
+  await band.unmount()
+})
+
+test('a Jev MCP that fails hands the judgment to the model and warns once per outage', JEV_OPTIONS, async ($, on) => {
+  const { entered, judged, toasts } = world(on, [RELATED])
+  jevServer(on, ['down', 'down', JEV_RELATED, 'down'])
+
+  await $.prompt.submit(typed('One.'))
+  await $.prompt.submit(typed('Two.'))
+  expect(toasts).toEqual([JEV_DOWN_TOAST])
+  await $.prompt.submit(typed('Three.'))
+  await $.prompt.submit(typed('Four.'))
+
+  expect(entered).toEqual(['One.', 'Two.', 'Three.', 'Four.'])
+  expect(judged).toEqual(['haiku', 'haiku', 'haiku'])
+  expect(toasts).toEqual([JEV_DOWN_TOAST, JEV_DOWN_TOAST])
+})
+
+test('a missing Jev MCP is named in the toast, and the model holds a new topic', JEV_OPTIONS, async ($, on) => {
+  const { judged, toasts } = world(on, [NEW_TOPIC])
+  const { calls } = jevServer(on, [JEV_NEW_TOPIC], [])
+
+  const result = await $.prompt.submit(typed())
+
+  expect(result).toEqual({ drop: expect.stringContaining('Press Enter to keep it here') })
+  expect(calls).toEqual([])
+  expect(judged).toEqual(['haiku'])
+  expect(toasts).toEqual(['topic-guard: the Jev MCP is not connected. Judging with haiku instead.'])
+})
+
+test('a Jev MCP that does not answer in 4 seconds hands the judgment to the model', JEV_OPTIONS, async ($, on) => {
+  const { clock, entered, toasts } = world(on, [RELATED])
+  jevServer(on, ['hang'])
+
+  const submitted = $.prompt.submit(typed())
+  await clock.advance(4_000)
+  await submitted
+
+  expect(entered).toEqual([MESSAGE])
+  expect(toasts).toEqual([JEV_DOWN_TOAST])
+})
+
+test('the default judge asks the model and never calls the MCP tools', async ($, on) => {
+  const { judged } = world(on, [RELATED])
+  const { calls } = jevServer(on, [JEV_NEW_TOPIC])
+
+  await $.prompt.submit(typed())
+
+  expect(judged).toEqual(['haiku'])
+  expect(calls).toEqual([])
+})

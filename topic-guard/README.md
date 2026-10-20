@@ -14,6 +14,7 @@
   <a href="#-install">Install</a> ·
   <a href="#-use">Use</a> ·
   <a href="#-settings">Settings</a> ·
+  <a href="#-the-jev-judge">The Jev judge</a> ·
   <a href="#-limitations">Limitations</a> ·
   <a href="#-development">Development</a>
 </p>
@@ -22,7 +23,7 @@
 
 A session that mixes topics carries context the next message does not need. This mod checks each message you type before it enters the session:
 
-1. 🔎 **Judge:** a small model (Haiku by default) reads the end of the conversation and your new message, and decides `related` or `new-topic`. When it is not sure, it answers `related`.
+1. 🔎 **Judge:** a small model (Haiku by default) reads the end of the conversation and your new message, and decides `related` or `new-topic`. When it is not sure, it answers `related`. With the `judge` setting on `jev`, the [Jev MCP](#-the-jev-judge) judges instead, and the model stays as its fallback.
 2. ✋ **Hold:** a `new-topic` message does not enter the session, and Claude Code puts it back in the prompt box. A band above the prompt shows the reason, with a **New session** button.
 3. 🔁 **Move or keep:** **New session** runs `/clear` and leaves your message in the prompt box of the new session: press Enter to send it there. Press Enter in this session instead to keep the message here.
 
@@ -78,14 +79,24 @@ Set them in `/config`, under the mod's name.
 | Option | Default | What it does |
 | --- | --- | --- |
 | `analyze` | `true` | Judge each prompt and hold a new topic. Off lets every prompt enter. |
-| `model` | `haiku` | The model that judges a prompt: an alias or a full model id. The call goes through the session's own client. |
+| `judge` | `model` | Who judges a prompt: `model` (the model below) or `jev` (the Jev MCP, with the model as its fallback). See [The Jev judge](#-the-jev-judge). |
+| `model` | `haiku` | The model that judges a prompt: an alias or a full model id. The call goes through the session's own client. With `judge` on `jev`, it judges only when Jev cannot. |
 | `minContextPercent` | `20` | Judge a prompt only when the context window is at least this full. `0` judges every prompt. |
 | `recheckStep` | `10` | After you keep a held message here, judge again only when the context grew by this many points. A context that drops below that point, as after a compact, is judged again at once. |
-| `debug` | `false` | Write one line per judgment and choice to `<temp>/claude-topic-guard/<session id>/debug.log`: the time, the session id, the context percent and the outcome (`judge: related at 45%`, `judge: none at 0%`, `keep here at 7%`, `new session: done`). It never holds prompt or reply text. `<temp>` is `TEMP`, else `TMPDIR`, else `/tmp`. |
+| `debug` | `false` | Write one line per judgment and choice to `<temp>/claude-topic-guard/<session id>/debug.log`: the time, the session id, the context percent and the outcome (`judge: related at 45%`, `judge: none at 0%`, `judge: related at 45% (Jev MCP is not connected)`, `keep here at 7%`, `new session: done`). It never holds prompt or reply text. `<temp>` is `TEMP`, else `TMPDIR`, else `/tmp`. |
+
+## 🧪 The Jev judge
+
+Set `judge` to `jev` to have the Jev MCP decide instead of the model. [Jev](https://docs.typesafe.ai) is TypeSafe's judging model; it returns calibrated probabilities and usually answers in under a second.
+
+- **What it needs:** a connected MCP server with a `jev_classify` tool, such as the community package [`@jkudish/jev-mcp`](https://github.com/jkudish/jev-mcp) (`claude mcp add jev -- npx -y @jkudish/jev-mcp`) and a provider key such as `TYPESAFE_API_KEY`. It is not an official TypeSafe package, and the mod does not install it. The mod finds the server by the tool's name, whatever the server is called.
+- **What it sends:** the same excerpt the model reads (the end of the conversation, up to 12,000 characters) and your prompt (up to 2,000 characters), to the MCP server and from there to its provider. With `judge` on `model`, nothing leaves the session's own client.
+- **When Jev decides:** when it settles the answer itself. It then shows `Jev is 96% sure it needs nothing from this conversation.` as the reason.
+- **When the model decides:** when Jev is not connected, fails, reports an error, sends an answer the mod cannot read, does not answer in 4 seconds, or leaves the answer to review (low confidence). For the first five, a toast says so once: `topic-guard: the Jev MCP failed or did not answer in time. Judging with haiku instead.` It warns again only after Jev has judged and then failed again. A review answer is Jev being unsure, not an outage, and warns of nothing.
 
 ## 🚧 Limitations
 
-- **Wait:** a judged prompt waits for the judging model, usually 1 to 3 seconds and at most 8. When the model fails or does not answer in time, the prompt enters as typed.
+- **Wait:** a judged prompt waits for the judging model, usually 1 to 3 seconds and at most 8. When the model fails or does not answer in time, the prompt enters as typed. With the Jev judge the wait is usually under a second; when Jev fails, the prompt waits for Jev's limit of 4 seconds and then for the model, so at most 12.
 - **Cost:** each judged prompt is one call to the judging model, with up to 12,000 characters of the conversation and 4,000 of the new message.
 - **Wrong judgments:** the model can take a short follow-up for a new topic. Press Enter again to send it on, and the mod stops asking until the context grows.
 - **The new session:** the prompt box keeps its draft through `/clear`. After `/clear` the engine reports the old session id for about a second, so the mod waits up to 3 seconds for the new id, then puts the message back in the box only if the box is empty. An image pasted in a box that `/clear` emptied does not come back.
@@ -108,7 +119,8 @@ Run the manual check in a session you can lose: **New session** clears it.
 | File | Role |
 | --- | --- |
 | `hooks/register.tsx` | The `prompt.submit` hook and the band |
-| `hooks/judge.ts` | Which prompts to judge, the judging prompt, the transcript excerpt and the reply parser |
+| `hooks/judge.ts` | Which prompts to judge, the judging prompt, the transcript excerpt, the reply parser and the Jev-then-model fallback |
+| `hooks/jev.ts` | The `jev_classify` request, the reader of its result and the server names |
 | `hooks/session.ts` | The move to a new session and the debug log path |
 | `hooks/host.ts` | The engine calls the helper modules use |
 | `types/index.d.ts` | The `$.state` contract |

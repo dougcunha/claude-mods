@@ -7,6 +7,11 @@ export type Host = {
   messages: () => Promise<Message[]>
   /** One completion with no history; null when the model gave no text. */
   complete: (request: { model: string; system: string; prompt: string }) => Promise<string | null>
+  /**
+   * One `jev_classify` call, whose result comes back as MCP sends it; null when no Jev MCP is connected. It rejects when
+   * the call fails or does not answer in time.
+   */
+  classify: (args: Record<string, unknown>) => Promise<unknown>
   sessionId: () => Promise<string>
   clear: () => Promise<void>
   /** The draft in the prompt box. */

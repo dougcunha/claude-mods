@@ -1,6 +1,7 @@
 import type { Verdict } from '../types'
 
 import type { Host, Message } from './host'
+import { jevArguments, readJev } from './jev'
 
 /** The most characters of the conversation the judging model reads, taken from its end. */
 export const TRANSCRIPT_LIMIT = 12_000
@@ -136,21 +137,65 @@ function decisionOf(json: string): Decision | null {
   return { decision, reason: typeof reason === 'string' ? clip(reason.trim(), FIELD_LIMIT) : '' }
 }
 
-/** What a judgment found: `new-topic` with its verdict, `related`, or `none` when there was no topic yet or no answer. */
-export type Judgment = { outcome: 'new-topic'; verdict: Verdict } | { outcome: 'related' | 'none' }
-
 /**
- * Judges whether `message` belongs to the conversation so far. A conversation with no answer of the model has no topic
- * yet: after a /clear it holds only local commands, such as /clear and /reload-plugins.
+ * What a judgment found: `new-topic` with its verdict, `related`, or `none` when there was no topic yet or no answer.
+ * `fallback` says why the Jev MCP could not judge, so the model did; it is absent when Jev judged, or was not asked.
  */
-export async function judge(host: Host, settings: { model: string; percent: number; message: string }): Promise<Judgment> {
-  const messages = await host.messages()
-  if (!messages.some(message => message.role === 'assistant' && messageText(message).trim() !== '')) return { outcome: 'none' }
-  const transcript = transcriptText(messages)
-  const reply = await host.complete({ model: settings.model, system: JUDGE_SYSTEM, prompt: judgePrompt(settings.percent, transcript, settings.message) })
-  const decision = reply === null ? null : parseDecision(reply)
+export type Judgment = ({ outcome: 'new-topic'; verdict: Verdict } | { outcome: 'related' | 'none' }) & { fallback?: string }
+
+/** Which judge decides: the `model` through the session's client, or the `jev` MCP with the model as its fallback. */
+export type JudgeEngine = 'model' | 'jev'
+
+/** Why the Jev MCP could not judge, as the toast words it after "the Jev MCP". */
+const JEV_FAILURES = {
+  absent: 'is not connected',
+  failed: 'failed or did not answer in time',
+  error: 'reported an error',
+  unreadable: 'sent an answer the mod cannot read',
+} as const
+
+/** The Jev MCP's decision, `unsure` when it left the message to review, or the reason it could not judge. */
+type JevOutcome = { kind: 'decided'; decision: Decision } | { kind: 'unsure' } | { kind: 'failed'; reason: string }
+
+async function askJev(host: Host, settings: { percent: number; message: string }, transcript: string): Promise<JevOutcome> {
+  let result: unknown
+  try {
+    result = await host.classify(jevArguments(settings.percent, transcript, settings.message))
+  } catch {
+    return { kind: 'failed', reason: JEV_FAILURES.failed }
+  }
+  if (result === null) return { kind: 'failed', reason: JEV_FAILURES.absent }
+  const reading = readJev(result)
+  if (reading.kind !== 'answer') return { kind: 'failed', reason: JEV_FAILURES[reading.kind] }
+  if (!reading.isConfident) return { kind: 'unsure' }
+  const reason = reading.decision === 'new-topic' ? `Jev is ${Math.round(reading.newTopic * 100)}% sure it needs nothing from this conversation.` : ''
+
+  return { kind: 'decided', decision: { decision: reading.decision, reason } }
+}
+
+const judgmentOf = (decision: Decision | null, percent: number): Judgment => {
   if (decision === null) return { outcome: 'none' }
   if (decision.decision === 'related') return { outcome: 'related' }
 
-  return { outcome: 'new-topic', verdict: { reason: decision.reason, percent: settings.percent } }
+  return { outcome: 'new-topic', verdict: { reason: decision.reason, percent } }
+}
+
+/**
+ * Judges whether `message` belongs to the conversation so far. A conversation with no answer of the model has no topic
+ * yet: after a /clear it holds only local commands, such as /clear and /reload-plugins. With the `jev` engine the Jev MCP
+ * decides when it is sure; when it is missing, fails or is unsure, the model decides, and a failure is named in `fallback`.
+ */
+export async function judge(
+  host: Host,
+  settings: { model: string; percent: number; message: string; judge?: JudgeEngine },
+): Promise<Judgment> {
+  const messages = await host.messages()
+  if (!messages.some(message => message.role === 'assistant' && messageText(message).trim() !== '')) return { outcome: 'none' }
+  const transcript = transcriptText(messages)
+  const jev = settings.judge === 'jev' ? await askJev(host, settings, transcript) : null
+  if (jev?.kind === 'decided') return judgmentOf(jev.decision, settings.percent)
+  const reply = await host.complete({ model: settings.model, system: JUDGE_SYSTEM, prompt: judgePrompt(settings.percent, transcript, settings.message) })
+  const judgment = judgmentOf(reply === null ? null : parseDecision(reply), settings.percent)
+
+  return jev?.kind === 'failed' ? { ...judgment, fallback: jev.reason } : judgment
 }

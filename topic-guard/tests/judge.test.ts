@@ -103,3 +103,63 @@ test('a conversation with no answer of the model, as after /clear and /reload-pl
   expect(await judge(host, { model: MODEL, percent: 0, message: 'Create calc.py.' })).toEqual({ outcome: 'none' })
   expect(prompts).toEqual([])
 })
+
+const jevAnswer = (classification: string, newTopic: number, decision: string) => ({
+  isError: false,
+  content: [{ type: 'text', text: JSON.stringify({ results: [{ classification, probabilities: { related: 1 - newTopic, 'new-topic': newTopic }, decision }] }) }],
+})
+
+/** A host whose Jev MCP answers `jev` (a function throws, null is no server) and whose model answers `reply`. */
+function jevHost(jev: unknown, reply: string | null = '{"decision": "related", "reason": "Same task."}') {
+  const asked: Record<string, unknown>[] = []
+  const { host, prompts } = fakeHost(reply)
+  const classify = async (args: Record<string, unknown>) => (asked.push(args), typeof jev === 'function' ? jev() : jev)
+
+  return { host: { ...host, classify } as unknown as Host, asked, prompts }
+}
+
+const JEV = { model: MODEL, percent: 62, message: 'Add a dark theme.', judge: 'jev' } as const
+
+test('a sure Jev decision judges alone, with its probability as the reason, and the model is not asked', async () => {
+  const { host, asked, prompts } = jevHost(jevAnswer('new-topic', 0.96, 'auto'))
+
+  expect(await judge(host, JEV)).toEqual({ outcome: 'new-topic', verdict: { reason: 'Jev is 96% sure it needs nothing from this conversation.', percent: 62 } })
+  expect(asked).toHaveLength(1)
+  expect(prompts).toEqual([])
+  expect(await judge(jevHost(jevAnswer('related', 0.02, 'auto')).host, JEV)).toEqual({ outcome: 'related' })
+})
+
+test('a Jev answer left to review asks the model and warns of nothing', async () => {
+  const { host, prompts } = jevHost(jevAnswer('new-topic', 0.75, 'review'), '{"decision": "new-topic", "reason": "Another feature."}')
+
+  expect(await judge(host, JEV)).toEqual({ outcome: 'new-topic', verdict: { reason: 'Another feature.', percent: 62 } })
+  expect(prompts).toHaveLength(1)
+})
+
+const JEV_FAILURES = [
+  ['is not connected', null],
+  ['failed or did not answer in time', () => { throw new Error('the Jev MCP did not answer in time') }],
+  ['reported an error', { isError: true, content: [{ type: 'text', text: 'Missing key' }] }],
+  ['sent an answer the mod cannot read', { isError: false, content: [{ type: 'text', text: 'oops' }] }],
+] as const
+
+for (const [reason, jev] of JEV_FAILURES) {
+  test(`a Jev MCP that ${reason} leaves the judgment to the model and says why`, async () => {
+    const { host, prompts } = jevHost(jev)
+
+    expect(await judge(host, JEV)).toEqual({ outcome: 'related', fallback: reason })
+    expect(prompts).toHaveLength(1)
+  })
+}
+
+test('a model that does not answer after a Jev failure is no judgment, and the failure is still named', async () => {
+  expect(await judge(jevHost(null, null).host, JEV)).toEqual({ outcome: 'none', fallback: 'is not connected' })
+})
+
+test('the model judge, the default, never calls the Jev MCP', async () => {
+  const { host, asked } = jevHost(jevAnswer('new-topic', 0.96, 'auto'))
+
+  await judge(host, { model: MODEL, percent: 62, message: 'Yes.' })
+
+  expect(asked).toEqual([])
+})

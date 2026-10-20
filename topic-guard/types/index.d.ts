@@ -13,6 +13,8 @@ declare module 'claude-code' {
       keptAt: number | null
       /** True while New session clears the session. */
       isBusy: boolean
+      /** True after the toast that says the Jev MCP could not judge; it clears when Jev judges again, so one outage warns once. */
+      isJevDown: boolean
     }
   }
 }

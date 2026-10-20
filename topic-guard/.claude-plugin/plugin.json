@@ -1,6 +1,6 @@
 {
   "name": "topic-guard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Before a prompt enters the session, a small model judges whether it belongs to the session's topic. When it starts a separate topic, the mod holds it in the prompt box: press Enter to keep it here, or New session to clear the session and send it there.",
   "author": {
     "name": "Douglas Cunha",
@@ -16,10 +16,20 @@
       "description": "Before a prompt you type enters the session, ask a small model whether it belongs to the session's topic, and hold it when it does not. Off lets every prompt enter.",
       "default": true
     },
+    "judge": {
+      "type": "string",
+      "title": "Who judges the prompt",
+      "description": "model: the model below. jev: the Jev MCP (a server with a jev_classify tool, such as @jkudish/jev-mcp, which sends the end of the conversation and your prompt to the Jev provider); when it is not connected, fails, takes over 4 seconds or is unsure, the model judges, and a toast says so when it fails.",
+      "default": "model",
+      "options": [
+        "model",
+        "jev"
+      ]
+    },
     "model": {
       "type": "string",
       "title": "Model that judges the prompt",
-      "description": "An alias (haiku) or a full model id. The call goes through the session's own client, and the prompt waits for it, up to 8 seconds.",
+      "description": "An alias (haiku) or a full model id. The call goes through the session's own client, and the prompt waits for it, up to 8 seconds. With judge set to jev, it judges only when Jev cannot.",
       "default": "haiku"
     },
     "minContextPercent": {
