@@ -136,6 +136,14 @@ The TTL comes from these sources, the first one that applies:
 
 A switch to another model starts the cache over, so the row waits for the next reply. After a reload or an install in a session with a finished turn, the mod dates the cache from the end of that turn until the next request. The first request after a compaction writes the shorter context and does not count as a re-cache.
 
+#### Resumed sessions
+
+A session resumed with `claude --resume` or `/resume` has turns behind it and no request seen yet, so the mod dates its cache this way:
+
+1. The `classic.SessionStart` event of the resume, when it reaches the mod: it says how long ago the last response came and how much context it left.
+2. The touch the mod kept in its store: every request of the main conversation, and every keep-warm ping, writes when it ended and how much context it held, for the 24 most recent sessions. A resume reads the entry of its session, so the age is known even when the event never arrives.
+3. No touch on record, as for a session last used before this version: the cache is taken as expired, since a resume starts after the process before it ended. The row reads `probably cold · resumed`, and the guard's band says the cache has probably expired instead of how long ago.
+
 ### ✋ Cache guard
 
 When the cache expired and the context has at least `cacheGuardMinTokens` tokens (150k by default), the prompt you type does not go in. Claude Code puts it back in the prompt box, and a band above the prompt shows how long ago the cache expired and how many tokens the prompt would write to the cache again:
@@ -608,7 +616,8 @@ After every shell command, the mod also checks that each listed file still exist
 - **Autopick** depends on Claude Code closing the question when the mod answers the call first. This was measured on Claude Code 2.1.296, for a pick after the wait and for Pick now pressed in the pane while the question was open; the mod API does not document it. Waits longer than 1 minute were not measured live. A question in a language whose word for "recommended" is not on the list waits for you. A copy of ask-autopick loaded under another name is not detected.
 - **Cache TTL** is not in the mod API, except when you switch the model. The `auto` TTL is a guess from the account until a request shows it. A request after 5.5 to 60 idle minutes corrects it, so the first cold prompt after a wrong guess can be held too early or not at all. Set `cacheTtl` when you know your TTL.
 - **Cache age after a resume** comes only from a `classic.SessionStart` event with `seconds_since_last_response`, which Claude Code documents for a resume or a fork; this was not measured live. The context the guard weighs against `cacheGuardMinTokens` comes from the same event's `context_tokens` until the first reply, because the live reading can be empty before it. A `/resume` inside a running session raises no such event for a mod (measured on 2.1.296), so the cache row and the guard wait for the next reply.
-- **Model switch and resume** need the `classic.PostModelSwitch` and `classic.SessionStart` events, which Claude Code does not send to a plugin you install yourself where an organization manages Claude Code. There the TTL comes from the account and the requests only.
+- **Model switch and resume** need the `classic.PostModelSwitch` and `classic.SessionStart` events, which Claude Code does not send to a plugin you install yourself where an organization manages Claude Code: its built-in security plugin sits above every plugin, ends the event there, and Claude Code says in a notice that the hook was skipped. There the TTL comes from the account and the requests only, and a resume dates its cache from the store's touch, or is taken as expired when there is none (see [Resumed sessions](#resumed-sessions)).
+- **Resume without a touch on record** guesses: a session whose process was still running when the mod was first installed in it, for example, is also read as a resume and its first prompt can be held with a warm cache. Press Enter to send it.
 - **Cache guard and topic-guard** both hold a prompt at the same Enter. With both mods on, a prompt can be held twice in a row, once by each band.
 - **Compact** in the cache guard's band runs `/compact` as you would type it. That the prompt box keeps the held prompt through it was not measured live. If the box is empty after it, type the prompt again.
 - **Keep warm** costs a cache read of the whole context per ping, added to the session's cost. A turn that runs while it pings is not interrupted.

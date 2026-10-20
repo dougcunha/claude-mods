@@ -10,7 +10,7 @@ import { AUTOPICK_USAGE, autopickPrompt, autopickSummary, countdown, DEFAULT_SET
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
 import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCommandLine, inFlightIds, orderedTasks, startedTask, STOP_TOOL, stoppedTaskId, taskLabel, taskRowCount, taskState, withEnd, withInFlight, withStopped, withTask } from './background'
-import { CACHE_STATUS, cacheParts, cacheStatus, contextOf, holdText, isPingDue, isSameMessage, KEEP_WARM_PROMPT, moveToNewSession, NO_CACHE, pingVerdict, shouldHold, span, ttlOf, ttlSetting, withCompact, withPing, withRequest, withResume, withSeed, withSwitch } from './cache'
+import { CACHE_STATUS, cacheParts, cacheStatus, contextOf, holdAge, holdText, holdTitle, isPingDue, isSameMessage, KEEP_WARM_PROMPT, moveToNewSession, NO_CACHE, pingVerdict, readTouches, shouldHold, span, totalOf, TOUCH_STORE, ttlOf, ttlSetting, withCompact, withPing, withRecovered, withRequest, withResume, withSeed, withSwitch, withTouch } from './cache'
 import type { TtlSetting } from './cache'
 import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
@@ -401,6 +401,28 @@ async function seedCache($: EngineInterface): Promise<void> {
   await update($, cache, state => withSeed(state ?? NO_CACHE, last.at, context))
 }
 
+/**
+ * A resume dates its cache from the touch the store kept for the session, since the engine's own SessionStart reaches
+ * a plugin only where nothing above it ends the event, and not under an organization's security plugin. A session with
+ * turns behind it, no finished turn to date it from and no request seen here is a resume.
+ */
+async function recoverCache($: EngineInterface): Promise<void> {
+  if ((await $.session.turns()) === 0) return
+  if ((await read($, lastTurn)) !== null || (await read($, cache)).touchedAt !== undefined) return
+  const touches = readTouches(await $.store.get(TOUCH_STORE))
+  const found = touches[await $.session.id()]
+  const now = await $.clock.now()
+  const context = (await $.session.usage()).context.tokens ?? 0
+  await update($, cache, state => withRecovered(state ?? NO_CACHE, found, now, context))
+  $.ui.invalidate('ui.render')
+}
+
+/** Keeps when this session touched the cache, so a resume in another process can date it. */
+async function rememberTouch($: EngineInterface, at: number, context: number): Promise<void> {
+  const touches = readTouches(await $.store.get(TOUCH_STORE))
+  await $.store.set(TOUCH_STORE, withTouch(touches, await $.session.id(), { at, tokens: context }))
+}
+
 async function seedTurns($: EngineInterface): Promise<void> {
   const sent = await $.session.turns()
   await update($, turns, stats => ((stats ?? NO_TURNS).count > 0 ? (stats ?? NO_TURNS) : { ...(stats ?? NO_TURNS), count: sent }))
@@ -773,6 +795,7 @@ async function noteRequest($: EngineInterface, usage: { input_tokens: number; ca
   const limits = await $.session.usage().then(read => read.rateLimits, () => [])
   const endedAt = await $.clock.now()
   await update($, cache, state => withRequest(state ?? NO_CACHE, { usage, startedAt, endedAt, hasPlanLimits: limits.length > 0 }))
+  await rememberTouch($, endedAt, totalOf(usage)).catch(() => undefined)
 }
 
 /** Starts keep warm for the configured hours, or stops it. */
@@ -811,6 +834,7 @@ function keepWarmTick($: EngineInterface, setting: TtlSetting): Promise<void> {
     if (verdict === 'miss') return stopKeepWarm($, 'the ping wrote the cache instead of reading it')
     const pinged = await $.clock.now()
     await update($, cache, current => withPing(current ?? NO_CACHE, pinged))
+    await rememberTouch($, pinged, state.tokens).catch(() => undefined)
     await update($, keepWarm, current => (current === null ? null : { ...current, pings: current.pings + 1 }))
     $.ui.invalidate('ui.render')
   })().finally(() => {
@@ -877,7 +901,7 @@ async function guardPrompt($: EngineInterface, e: { text: string; origin: { kind
   const status = cacheStatus(state, await read($, keepWarm), ttlOf(state, setting), await $.clock.now())
   const context = contextOf((await $.session.usage()).context.tokens, state)
   if (!shouldHold(e, { status, tokens: context, minTokens })) return undefined
-  const hold: CacheHold = { text: e.text, tokens: context, coldMs: status.kind === 'cold' ? status.ms : 0 }
+  const hold: CacheHold = { text: e.text, tokens: context, coldMs: status.kind === 'cold' ? status.ms : 0, isAgeUnknown: state.isAgeUnknown === true }
   await update($, cacheHold, () => hold)
   $.ui.invalidate('ui.render')
 
@@ -972,6 +996,7 @@ export const register: Register = (on, options) => {
     if (isCacheTracked) $.clock.every(KEEP_WARM_TICK_MS, () => void keepWarmTick($, cacheOptions.ttl).catch(() => undefined))
     void seedTurns($).catch(() => undefined)
     if (isCacheTracked && shows.turn) void seedCache($).catch(() => undefined)
+    if (isCacheTracked) void recoverCache($).catch(() => undefined)
     if (shows.ci) {
       $.clock.every(CI_POLL_MS, () => void pollCi($).catch(() => undefined))
       // A reload during a run picks the watch up again from the state.
@@ -1068,9 +1093,9 @@ export const register: Register = (on, options) => {
                   <Text color="suggestion" bold>
                     ◇ session-info
                   </Text>
-                  <Text dimColor> · the prompt cache expired</Text>
+                  <Text dimColor>{` · ${holdTitle(hold)}`}</Text>
                 </Text>
-                <Text dimColor>{`${span(hold.coldMs)} ago`}</Text>
+                <Text dimColor>{holdAge(hold)}</Text>
               </Box>
               <Text>{`Sending this prompt writes ${tokens(hold.tokens)} tokens of context to the cache again.`}</Text>
               <Box flexDirection="row">
@@ -1106,6 +1131,7 @@ export const register: Register = (on, options) => {
       afterSwitch($, e.sessionId, async () => {
         if (shows.todos && isResume) await restoreTodos($).catch(() => undefined)
         if (isResume) await seedTurns($).catch(() => undefined)
+        if (isResume && isCacheTracked) await recoverCache($).catch(() => undefined)
         if (shows.git) void refreshRepo($)
         if (shows.jira) await findJiraServer($).catch(() => undefined)
         if (shows.checks) await loadGuard($).catch(() => undefined)

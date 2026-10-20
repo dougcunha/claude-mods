@@ -187,13 +187,18 @@ export type CacheState = {
   restarts: number
   restartTokens: number
   isAfterCompact: boolean
+  /** True when a resumed session had no touch on record: `touchedAt` is then a guess past every TTL, not a reading. */
+  isAgeUnknown?: boolean
 }
 
 /** Keep warm while it runs: when it stops, and the pings it sent. */
 export type KeepWarm = { until: number; pings: number }
 
-/** A prompt the cache guard held: its text, the context it would write to the cache again, and how long the cache was cold. */
-export type CacheHold = { text: string; tokens: number; coldMs: number }
+/**
+ * A prompt the cache guard held: its text, the context it would write to the cache again, and how long the cache was
+ * cold. `isAgeUnknown` marks a resumed session whose cache age is a guess, which `coldMs` then does not measure.
+ */
+export type CacheHold = { text: string; tokens: number; coldMs: number; isAgeUnknown?: boolean }
 
 /** A GitHub Actions job as `gh run view --json jobs` reports it; `conclusion` is '' until the job completes. */
 export type CiJob = { name: string; status: string; conclusion: string }

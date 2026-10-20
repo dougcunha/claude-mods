@@ -69,7 +69,7 @@ export const ttlSetting = (value: unknown): TtlSetting => (value === '5m' || val
 /** The TTL in use: the setting when it fixes one, else what the session found. */
 export const ttlOf = (state: CacheState, setting: TtlSetting): CacheTtl => (setting === 'auto' ? state.ttl : setting)
 
-const totalOf = (usage: CacheUsage): number => usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens
+export const totalOf = (usage: CacheUsage): number => usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens
 
 /**
  * The cache after a main-thread request. A plan account is on the 1-hour TTL and an API account on 5 minutes; then
@@ -88,6 +88,7 @@ export function withRequest(state: CacheState, request: CacheRequest): CacheStat
     touchedAt: request.endedAt,
     tokens: total,
     isAfterCompact: false,
+    isAgeUnknown: false,
     ...(isPlanKnown ? { ttl: planTtl } : {}),
   }
   if (state.isAfterCompact || gap === undefined || total < JUDGE_MIN_TOKENS) return touched
@@ -118,7 +119,51 @@ export const withResume = (state: CacheState, resume: Resume, at: number): Cache
   ...state,
   touchedAt: at - resume.secondsSince * 1_000,
   tokens: resume.contextTokens ?? state.tokens,
+  isAgeUnknown: false,
 })
+
+/** The store key of the last cache touch of each session, which outlives the process and is shared by every window. */
+export const TOUCH_STORE = 'cacheTouches'
+
+/** The most sessions the store keeps a touch for; the least recent go first. */
+const TOUCH_LIMIT = 24
+
+/** How far back a resumed session with no touch on record is taken to have touched the cache: past every TTL. */
+const UNKNOWN_AGE_MS = 24 * HOUR_MS
+
+/** When a session last touched the cache and the context it held then. */
+export type CacheTouch = { at: number; tokens: number }
+
+export type CacheTouches = Record<string, CacheTouch>
+
+const isTouch = (value: unknown): value is CacheTouch =>
+  typeof value === 'object' && value !== null && 'at' in value && typeof value.at === 'number' && 'tokens' in value && typeof value.tokens === 'number'
+
+/** The touches as the store holds them: a record of sessions, with every entry of another shape left out. */
+export function readTouches(value: unknown): CacheTouches {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, CacheTouch] => isTouch(entry[1])))
+}
+
+/** The touches with this session's set, keeping the most recent ones. */
+export function withTouch(touches: CacheTouches, id: string, touch: CacheTouch): CacheTouches {
+  const recent = Object.entries({ ...touches, [id]: touch }).sort((a, b) => b[1].at - a[1].at)
+
+  return Object.fromEntries(recent.slice(0, TOUCH_LIMIT))
+}
+
+/**
+ * A session joined with turns behind it that no request dated, a resume in a new process. The touch the store kept
+ * dates its cache; without one the cache is taken as cold of unknown age, since a resume starts after the process
+ * before it ended. A cache already dated stays as it is.
+ */
+export function withRecovered(state: CacheState, found: CacheTouch | undefined, now: number, context: number): CacheState {
+  if (state.touchedAt !== undefined) return state
+  if (found !== undefined) return { ...state, touchedAt: found.at, tokens: found.tokens, isAgeUnknown: false }
+
+  return { ...state, touchedAt: now - UNKNOWN_AGE_MS, tokens: context, isAgeUnknown: true }
+}
 
 /** The context the next prompt would write: the live reading, which is empty until the first reply of a resumed session, else the last one the cache knew. */
 export const contextOf = (reported: number | undefined, state: CacheState): number => (reported !== undefined && reported > 0 ? reported : state.tokens)
@@ -131,7 +176,7 @@ export const withSeed = (state: CacheState, endedAt: number, context: number): C
   state.touchedAt === undefined ? { ...state, touchedAt: endedAt, tokens: context } : state
 
 /** A keep-warm ping read the cache, so its entry lives a full TTL again. */
-export const withPing = (state: CacheState, at: number): CacheState => ({ ...state, touchedAt: at })
+export const withPing = (state: CacheState, at: number): CacheState => ({ ...state, touchedAt: at, isAgeUnknown: false })
 
 const coolingMs = (ttl: CacheTtl): number => Math.min(COOLING_MS, TTL_MS[ttl] / 5)
 
@@ -160,7 +205,11 @@ export type CacheParts = { state: string; detail: string }
 export function cacheParts(status: CacheStatus, state: CacheState, keep: KeepWarm | null, ttl: CacheTtl): CacheParts {
   const restarts = state.restarts === 0 ? '' : ` · ${state.restarts} re-cache${state.restarts === 1 ? '' : 's'} (${tokens(state.restartTokens)})`
   if (status.kind === 'unknown') return { state: '', detail: `${ttl} TTL · after the next reply${restarts}` }
-  if (status.kind === 'cold') return { state: `cold for ${span(status.ms)}`, detail: `next prompt re-caches ${tokens(state.tokens)}${restarts}` }
+  if (status.kind === 'cold') {
+    const detail = `next prompt re-caches ${tokens(state.tokens)}${restarts}`
+
+    return state.isAgeUnknown === true ? { state: 'probably cold', detail: `resumed · ${detail}` } : { state: `cold for ${span(status.ms)}`, detail }
+  }
   if (status.kind === 'kept') return { state: `kept warm · ${span(status.ms)} left`, detail: `${keep?.pings ?? 0} ping${keep?.pings === 1 ? '' : 's'}${restarts}` }
   const left = status.kind === 'cooling' ? `cools in ${span(status.ms)}` : `warm · ${span(status.ms)} left`
 
@@ -179,8 +228,17 @@ export function shouldHold(submission: Submission, gate: HoldGate): boolean {
 export const isSameMessage = (text: string, held: string): boolean => text.trim() === held.trim()
 
 /** What the transcript shows where the held prompt would have entered; the engine puts the prompt back in the box. */
-export const holdText = (hold: CacheHold): string =>
-  `session-info: held. The prompt cache expired ${span(hold.coldMs)} ago, and this prompt would write ${tokens(hold.tokens)} tokens to it again. Press Enter to send it, or choose Compact or New session.`
+export const holdText = (hold: CacheHold): string => {
+  const expired = hold.isAgeUnknown === true ? 'The session was resumed, so its prompt cache has probably expired' : `The prompt cache expired ${span(hold.coldMs)} ago`
+
+  return `session-info: held. ${expired}, and this prompt would write ${tokens(hold.tokens)} tokens to it again. Press Enter to send it, or choose Compact or New session.`
+}
+
+/** The band's title: the cache expired, or probably did when the session was resumed with no touch on record. */
+export const holdTitle = (hold: CacheHold): string => (hold.isAgeUnknown === true ? 'the prompt cache has probably expired' : 'the prompt cache expired')
+
+/** The band's right side: how long ago the cache expired, or that the session was resumed. */
+export const holdAge = (hold: CacheHold): string => (hold.isAgeUnknown === true ? 'resumed' : `${span(hold.coldMs)} ago`)
 
 /** Whether keep warm pings now: it runs, the cache is known and cooling, and it is not cold yet. */
 export function isPingDue(state: CacheState, keep: KeepWarm | null, ttl: CacheTtl, at: number): boolean {

@@ -3,7 +3,7 @@ import type { TestBody } from 'claude-code/testing'
 
 import type { CacheState, KeepWarm } from '../types'
 
-import { cacheStatus, contextOf, moveToNewSession, NO_CACHE, pingVerdict, shouldHold, span, withCompact, withRequest, withSeed, withSwitch } from '../hooks/cache'
+import { cacheStatus, contextOf, moveToNewSession, NO_CACHE, pingVerdict, readTouches, shouldHold, span, withCompact, withPing, withRecovered, withRequest, withResume, withSeed, withSwitch, withTouch } from '../hooks/cache'
 import type { CacheStatus, CacheUsage, Submission } from '../hooks/cache'
 import type { Host } from '../hooks/host'
 
@@ -289,6 +289,121 @@ test('the context to write is the live reading when it has one, else the last on
   expect(contextOf(120_000, touched(0))).toBe(120_000)
   expect(contextOf(0, touched(0))).toBe(CONTEXT)
   expect(contextOf(undefined, touched(0))).toBe(CONTEXT)
+})
+
+/** The store the mod keeps the last touch of each session in, and a session that has `turns` turns behind it. */
+function storeWith(on: On, record: Record<string, unknown>, turns = 5): Record<string, unknown> {
+  const store: Record<string, unknown> = { ...record }
+  on('store.get', async (_, e) => ({ value: store[e.key] }) as never)
+  on('store.set', async (_, e) => ((store[e.key] = e.value), { value: undefined }))
+  on('session.turns', async () => ({ value: turns }))
+
+  return store
+}
+
+const TOUCHES_KEY = 'cacheTouches'
+
+/** The session starts with turns behind it, and the recovery that runs beside the start gets its moment before a prompt. */
+async function startResumed($: Parameters<TestBody>[0], clock: ReturnType<typeof mock.clock>): Promise<void> {
+  await start($)
+  await clock.advance(1_000)
+}
+
+test('a resume with no SessionStart reaching the mod dates the cache from the touch the store kept', { options: QUIET }, async ($, on) => {
+  const { entered, clock } = world(on, { now: 10 * HOUR, live: 0 })
+  storeWith(on, { [TOUCHES_KEY]: { s1: { at: 0, tokens: 300_000 } } })
+
+  await startResumed($, clock)
+  const held = await submit($)
+
+  expect(held).toEqual({ drop: expect.stringContaining('expired 9h 0m ago, and this prompt would write 300k tokens') })
+  expect(entered).toEqual([])
+})
+
+test('a resume whose store kept a recent touch lets the first prompt in', { options: QUIET }, async ($, on) => {
+  const { entered, clock } = world(on, { now: 10 * HOUR })
+  storeWith(on, { [TOUCHES_KEY]: { s1: { at: 10 * HOUR - 10 * MINUTE, tokens: CONTEXT } } })
+
+  await startResumed($, clock)
+  await submit($)
+
+  expect(entered).toEqual([MESSAGE])
+})
+
+for (const surface of ['terminal', 'desktop'] as const)
+  test(`a resume with no touch on record holds the first prompt as probably cold (${surface})`, { options: QUIET }, async ($, on) => {
+    const { entered, clock } = world(on, { now: 10 * HOUR })
+    storeWith(on, {})
+
+    await startResumed($, clock)
+    const held = await submit($)
+    const band = await $.ui.mount({ ...BAND, surface })
+    const pane = await $.ui.mount({ ...PANE, surface, viewport: { columns: 100, rows: 80 } })
+
+    expect(held).toEqual({ drop: expect.stringContaining('The session was resumed, so its prompt cache has probably expired, and this prompt would write 200k tokens') })
+    expect(entered).toEqual([])
+    expect(await band.find({ type: 'Text', text: ' · the prompt cache has probably expired' })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: 'resumed' })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: 'probably cold' })).toBeDefined()
+    await band.unmount()
+    await pane.unmount()
+  })
+
+test('a session with no turns behind it, a new one, has no cache to recover', { options: QUIET }, async ($, on) => {
+  const { entered, clock } = world(on, { now: 10 * HOUR })
+  storeWith(on, {}, 0)
+
+  await startResumed($, clock)
+  await submit($)
+
+  expect(entered).toEqual([MESSAGE])
+})
+
+test('a request writes the session\'s touch to the store, and a ping renews it', { options: QUIET }, async ($, on) => {
+  const warm = world(on, { hasPlan: false })
+  const store = storeWith(on, {}, 0)
+  await start($)
+  await step($)
+  const first = readTouchesOf(store)
+  const pane = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 80 } })
+  await step($)
+  await pane.press({ key: 'keep-warm' })
+  await warm.clock.advance(4 * MINUTE + 30_000)
+  const renewed = readTouchesOf(store)
+
+  expect(first).toEqual({ s1: { at: 0, tokens: CONTEXT } })
+  expect(renewed.s1?.at).toBeGreaterThan(0)
+  await pane.unmount()
+})
+
+const readTouchesOf = (store: Record<string, unknown>): Record<string, { at: number; tokens: number } | undefined> => readTouches(store[TOUCHES_KEY])
+
+test('the store keeps the most recent touches and drops entries of another shape', () => {
+  const crowded = Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`s${index}`, { at: index, tokens: 1 }]))
+  const kept = withTouch(readTouches({ ...crowded, broken: { at: 'now' }, list: [1] }), 'fresh', { at: 99, tokens: 2 })
+
+  expect(Object.keys(kept)).toHaveLength(24)
+  expect(kept.fresh).toEqual({ at: 99, tokens: 2 })
+  expect(kept.s0).toBeUndefined()
+  expect(readTouches('nope')).toEqual({})
+  expect(readTouches([{ at: 1, tokens: 1 }])).toEqual({})
+})
+
+test('a recovered cache keeps a dated one, takes a found touch, and guesses past every TTL without one', () => {
+  const dated = touched(5 * MINUTE)
+
+  expect(withRecovered(dated, { at: 0, tokens: 1 }, HOUR, 1)).toBe(dated)
+  expect(withRecovered(NO_CACHE, { at: 7, tokens: 300_000 }, HOUR, 1)).toMatchObject({ touchedAt: 7, tokens: 300_000, isAgeUnknown: false })
+  expect(cacheStatus(withRecovered(NO_CACHE, undefined, HOUR, CONTEXT), null, '1h', HOUR)).toMatchObject({ kind: 'cold' })
+  expect(withRecovered(NO_CACHE, undefined, HOUR, CONTEXT)).toMatchObject({ tokens: CONTEXT, isAgeUnknown: true })
+})
+
+test('a request, a resume report and a ping make the age known again', () => {
+  const guessed = withRecovered(NO_CACHE, undefined, HOUR, CONTEXT)
+
+  expect(withRequest(guessed, request(WARM, 2 * HOUR))).toMatchObject({ isAgeUnknown: false })
+  expect(withResume(guessed, { secondsSince: 60 }, HOUR)).toMatchObject({ isAgeUnknown: false })
+  expect(withPing(guessed, HOUR)).toMatchObject({ isAgeUnknown: false })
 })
 
 test('keep warm pings the cache while it cools', { options: QUIET }, async ($, on) => {
