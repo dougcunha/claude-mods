@@ -507,6 +507,22 @@ function afterSwitch($: EngineInterface, endedId: string, reload: () => Promise<
   $.clock.after(SWITCH_POLL_MS, () => void poll())
 }
 
+/** The sections a /clear empties; the same keys as the `show*` options that turn them on. */
+type ClearedSections = { todos: boolean; turn: boolean; skills: boolean; jira: boolean; agents: boolean; background: boolean; autopick: boolean }
+
+/** Empties what belonged to the conversation a /clear ended; it is safe to run twice. */
+async function clearConversation($: EngineInterface, shows: ClearedSections): Promise<void> {
+  if (shows.todos) await update($, todos, () => [])
+  if (shows.todos) await update($, autoContinue, () => NO_CONTINUE)
+  if (shows.turn) await update($, lastTurn, () => null)
+  if (shows.skills) await update($, skills, () => [])
+  if (shows.jira) await update($, jiraIssues, () => [])
+  if (shows.agents) await update($, agentModels, () => ({}))
+  if (shows.background) await update($, background, () => [])
+  await update($, detail, () => null)
+  if (shows.autopick) await update($, autopickLast, () => null)
+}
+
 /** Reads the context when the session has no reading yet: after a /clear or a resume, before any turn ends. */
 async function readMissingContext($: EngineInterface): Promise<void> {
   if ((await read($, contextState)) === null) await refreshContext($).catch(() => undefined)
@@ -1025,19 +1041,12 @@ export const register: Register = (on, options) => {
   })
 
   // /clear starts a new conversation in the same process and raises no session.start: what belonged to the old one goes here.
+  // Where an organization manages Claude Code this event never reaches the mod; session.end below does the same reset.
   on('classic.SessionStart', async ($, e, next) => {
     const started = await next(e)
     if (e.source === 'clear') {
       draft = undefined
-      if (shows.todos) await update($, todos, () => [])
-      if (shows.todos) await update($, autoContinue, () => NO_CONTINUE)
-      if (shows.turn) await update($, lastTurn, () => null)
-      if (shows.skills) await update($, skills, () => [])
-      if (shows.jira) await update($, jiraIssues, () => [])
-      if (shows.agents) await update($, agentModels, () => ({}))
-      if (shows.background) await update($, background, () => [])
-      await update($, detail, () => null)
-      if (shows.autopick) await update($, autopickLast, () => null)
+      await clearConversation($, shows)
     }
     // A resume at launch says how long ago the last response came, so the cache's age is known before the first request.
     const secondsSince = e.seconds_since_last_response
@@ -1129,6 +1138,12 @@ export const register: Register = (on, options) => {
     if (e.reason === 'clear' || e.reason === 'resume') {
       const isResume = e.reason === 'resume'
       afterSwitch($, e.sessionId, async () => {
+        // The classic.SessionStart reset may never arrive; the new conversation is clean until its first prompt is sent,
+        // so this reset cannot wipe anything it wrote.
+        if (!isResume && (await $.session.turns().catch(() => 1)) === 0) {
+          draft = undefined
+          await clearConversation($, shows).catch(() => undefined)
+        }
         if (shows.todos && isResume) await restoreTodos($).catch(() => undefined)
         if (isResume) await seedTurns($).catch(() => undefined)
         if (isResume && isCacheTracked) await recoverCache($).catch(() => undefined)

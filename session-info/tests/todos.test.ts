@@ -137,6 +137,52 @@ test('a resume in the same process gets the list back once the session id is the
   await ui.unmount()
 })
 
+test('a /clear that raises no classic.SessionStart empties the list and the last turn once the session id is the next one', async ($, on) => {
+  let id = 's1'
+  const clock = mock.clock(on)
+  pane(on)
+  on('session.id', async () => ({ value: id }))
+  on('session.turns', async () => ({ value: 0 }))
+  on('session.end', async (_, e) => ({ sessionId: e.sessionId }))
+  on('process.run', async () => ({ value: { exitCode: 128, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('turn.start', async (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', async (_, e) => ({ text: e.answer }))
+  await $.tool.call({ tool: TODO_TOOL, todos: TODOS } as never)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await $.turn.complete({ answer: '', durationMs: 1_000, isAborted: false, turnId: 't1', reason: 'answer' })
+
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+  await clock.advance(1_000)
+  const before = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await before.find({ type: 'Text', text: '1/3 done' })).toBeDefined()
+  await before.unmount()
+
+  id = 's2'
+  await clock.advance(400)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /^No task list yet/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'No turn finished yet.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a /clear reset leaves the list alone once a prompt of the next conversation was sent', async ($, on) => {
+  let id = 's1'
+  const clock = mock.clock(on)
+  pane(on)
+  on('session.id', async () => ({ value: id }))
+  on('session.turns', async () => ({ value: 1 }))
+  on('session.end', async (_, e) => ({ sessionId: e.sessionId }))
+  on('process.run', async () => ({ value: { exitCode: 128, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  await $.tool.call({ tool: TODO_TOOL, todos: TODOS } as never)
+
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+  id = 's2'
+  await clock.advance(1_000)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: '1/3 done' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('showTodos false leaves out the tool, the prompt section and the section', { options: { showTodos: false } }, async ($, on) => {
   pane(on)
   on('prompt.compose', async () => ({ sections: [{ id: 'intro', text: 'Hi', scope: 'shared' }] }) as never)
