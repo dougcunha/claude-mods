@@ -3,7 +3,7 @@ import type { TestBody } from 'claude-code/testing'
 
 import type { CacheState, KeepWarm } from '../types'
 
-import { cacheStatus, moveToNewSession, NO_CACHE, pingVerdict, shouldHold, span, withCompact, withRequest, withSeed, withSwitch } from '../hooks/cache'
+import { cacheStatus, contextOf, moveToNewSession, NO_CACHE, pingVerdict, shouldHold, span, withCompact, withRequest, withSeed, withSwitch } from '../hooks/cache'
 import type { CacheStatus, CacheUsage, Submission } from '../hooks/cache'
 import type { Host } from '../hooks/host'
 
@@ -155,12 +155,12 @@ type World = { entered: string[]; ran: string[]; filled: string[]; toasts: strin
  * The engine beneath the mod: a 200k context, plan limits when `hasPlan`, requests that answer `usage`, and keep-warm
  * pings that answer `ping`. /clear switches the session id and empties the prompt box.
  */
-function world(on: On, { hasPlan = true, ping = WARM as CacheUsage | null, now = 0 } = {}): World & { clock: ReturnType<typeof mock.clock> } {
+function world(on: On, { hasPlan = true, ping = WARM as CacheUsage | null, now = 0, live = CONTEXT } = {}): World & { clock: ReturnType<typeof mock.clock> } {
   const state: World = { entered: [], ran: [], filled: [], toasts: [], forks: 0 }
   let sessionId = 's1'
   let box = MESSAGE
   const clock = mock.clock(on, { now })
-  on('session.usage', async () => ({ value: { startedAt: 0, rateLimits: hasPlan ? PLAN_LIMITS : [], context: { window: 1_000_000, tokens: CONTEXT, percent: 20 } } }) as never)
+  on('session.usage', async () => ({ value: { startedAt: 0, rateLimits: hasPlan ? PLAN_LIMITS : [], context: { window: 1_000_000, tokens: live, percent: 20 } } }) as never)
   on('session.id', async () => ({ value: sessionId }))
   on('session.cwd', async () => ({ value: '/repo' }))
   on('agent.list', async () => ({ value: [] }))
@@ -262,6 +262,33 @@ test('a session resumed two hours after its last response holds the first prompt
 
   expect(held).toEqual({ drop: expect.stringContaining('expired 1h 0m ago') })
   expect(entered).toEqual([])
+})
+
+test('a resumed session whose live context reads empty holds the first prompt by the context the resume reported', async ($, on) => {
+  const { entered } = world(on, { live: 0 })
+  on('classic.SessionStart', async () => ({}))
+
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: 7_200, context_tokens: 300_000 } as never)
+  const held = await submit($)
+
+  expect(held).toEqual({ drop: expect.stringContaining('this prompt would write 300k tokens') })
+  expect(entered).toEqual([])
+})
+
+test('a resumed session with no context reported anywhere lets the first prompt in', async ($, on) => {
+  const { entered } = world(on, { live: 0 })
+  on('classic.SessionStart', async () => ({}))
+
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: 7_200 } as never)
+  await submit($)
+
+  expect(entered).toEqual([MESSAGE])
+})
+
+test('the context to write is the live reading when it has one, else the last one the cache knew', () => {
+  expect(contextOf(120_000, touched(0))).toBe(120_000)
+  expect(contextOf(0, touched(0))).toBe(CONTEXT)
+  expect(contextOf(undefined, touched(0))).toBe(CONTEXT)
 })
 
 test('keep warm pings the cache while it cools', { options: QUIET }, async ($, on) => {

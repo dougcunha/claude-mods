@@ -110,8 +110,18 @@ export const withSwitch = (state: CacheState, ttl: CacheTtl, isNewModel: boolean
 
 export const withCompact = (state: CacheState): CacheState => ({ ...state, isAfterCompact: true })
 
-/** A session resumed at start: the engine says how long ago the last response came. */
-export const withResume = (state: CacheState, secondsSince: number, at: number): CacheState => ({ ...state, touchedAt: at - secondsSince * 1_000 })
+/** What the engine says about a session resumed at start: how long ago the last response came, and the context it left. */
+export type Resume = { secondsSince: number; contextTokens?: number }
+
+/** A session resumed at start: the cache dates from the last response, and the context is what that response left. */
+export const withResume = (state: CacheState, resume: Resume, at: number): CacheState => ({
+  ...state,
+  touchedAt: at - resume.secondsSince * 1_000,
+  tokens: resume.contextTokens ?? state.tokens,
+})
+
+/** The context the next prompt would write: the live reading, which is empty until the first reply of a resumed session, else the last one the cache knew. */
+export const contextOf = (reported: number | undefined, state: CacheState): number => (reported !== undefined && reported > 0 ? reported : state.tokens)
 
 /**
  * A load that finds turns behind it, after a reload or an install, takes the end of the last turn as the last touch:

@@ -10,7 +10,7 @@ import { AUTOPICK_USAGE, autopickPrompt, autopickSummary, countdown, DEFAULT_SET
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
 import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCommandLine, inFlightIds, orderedTasks, startedTask, STOP_TOOL, stoppedTaskId, taskLabel, taskRowCount, taskState, withEnd, withInFlight, withStopped, withTask } from './background'
-import { CACHE_STATUS, cacheParts, cacheStatus, holdText, isPingDue, isSameMessage, KEEP_WARM_PROMPT, moveToNewSession, NO_CACHE, pingVerdict, shouldHold, span, ttlOf, ttlSetting, withCompact, withPing, withRequest, withResume, withSeed, withSwitch } from './cache'
+import { CACHE_STATUS, cacheParts, cacheStatus, contextOf, holdText, isPingDue, isSameMessage, KEEP_WARM_PROMPT, moveToNewSession, NO_CACHE, pingVerdict, shouldHold, span, ttlOf, ttlSetting, withCompact, withPing, withRequest, withResume, withSeed, withSwitch } from './cache'
 import type { TtlSetting } from './cache'
 import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
@@ -875,7 +875,7 @@ async function guardPrompt($: EngineInterface, e: { text: string; origin: { kind
   const state = await read($, cache)
   if (state.touchedAt === undefined) return undefined
   const status = cacheStatus(state, await read($, keepWarm), ttlOf(state, setting), await $.clock.now())
-  const context = (await $.session.usage()).context.tokens ?? state.tokens
+  const context = contextOf((await $.session.usage()).context.tokens, state)
   if (!shouldHold(e, { status, tokens: context, minTokens })) return undefined
   const hold: CacheHold = { text: e.text, tokens: context, coldMs: status.kind === 'cold' ? status.ms : 0 }
   await update($, cacheHold, () => hold)
@@ -1018,7 +1018,7 @@ export const register: Register = (on, options) => {
     const secondsSince = e.seconds_since_last_response
     if (isCacheTracked && (e.source === 'resume' || e.source === 'fork') && secondsSince !== undefined) {
       const at = await $.clock.now()
-      await update($, cache, state => withResume(state ?? NO_CACHE, secondsSince, at))
+      await update($, cache, state => withResume(state ?? NO_CACHE, { secondsSince, contextTokens: e.context_tokens }, at))
     }
 
     return started
