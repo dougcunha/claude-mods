@@ -97,15 +97,15 @@ test('only a version above the installed one is offered', async () => {
 })
 
 /** A session with the Git, Jira, CI and tool sections off, the manifest at `installed` and the store in `store`. */
-function world(on: Parameters<TestBody>[1], store: Record<string, unknown>, published: string | 'rejects', calls: { fetched: string[]; toasts: string[]; filled: string[] }, box = '') {
-  mock.clock(on, { now: NOW })
+function world(on: Parameters<TestBody>[1], store: Record<string, unknown>, published: string | 'rejects', calls: { fetched: string[]; toasts: string[]; filled: string[]; id?: string; reads?: number }, box = '') {
+  const clock = mock.clock(on, { now: NOW })
   on('session.cwd', async () => ({ value: '/repo' }))
   on('agent.list', async () => ({ value: [] }))
-  on('session.id', async () => ({ value: 'sid' }))
+  on('session.id', async () => ({ value: calls.id ?? 'sid' }))
   on('session.usage', async () => ({ value: { startedAt: 0, rateLimits: [], context: { window: 200_000 } } }) as never)
   on('env.get', async () => ({ value: undefined }))
   on('process.run', async () => ({ value: { exitCode: 128, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
-  on('fs.read', async () => ({ value: MANIFEST('0.33.0') }) as never)
+  on('fs.read', async () => ((calls.reads = (calls.reads ?? 0) + 1), { value: MANIFEST('0.33.0') }) as never)
   on('http.fetch', async (_, e) => {
     calls.fetched.push(e.url)
     if (published === 'rejects') throw new Error('offline')
@@ -119,6 +119,8 @@ function world(on: Parameters<TestBody>[1], store: Record<string, unknown>, publ
   on('prompt.fill', async (_, e) => (calls.filled.push(e.text), { isFilled: true }) as never)
   on('session.start', async (_, e) => ({ cwd: e.cwd }))
   on('command.register', async (_, e) => ({ value: { command: e.name } }))
+
+  return clock
 }
 
 /** The check runs after the session starts, so the test waits for it to end before it draws the pane. */
@@ -203,4 +205,22 @@ test('a request the host refuses leaves the pane with the version and no button'
   expect(await ui.find({ type: 'Text', text: /↑/ })).toBeUndefined()
   expect(calls.toasts).toEqual([])
   await ui.unmount()
+})
+
+test('a /clear or a resume reads the installed version again once the session id is the next one', { options: QUIET }, async ($, on) => {
+  const calls: { fetched: string[]; toasts: string[]; filled: string[]; id: string; reads: number } = { fetched: [], toasts: [], filled: [], id: 's1', reads: 0 }
+  const clock = world(on, {}, '0.33.0', calls)
+  on('session.end', async (_, e) => ({ sessionId: e.sessionId }))
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await settled()
+  const started = calls.reads
+
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+  await clock.advance(1_000)
+  expect(calls.reads).toBe(started)
+  calls.id = 's2'
+  await clock.advance(400)
+  await settled()
+
+  expect(calls.reads).toBeGreaterThan(started)
 })

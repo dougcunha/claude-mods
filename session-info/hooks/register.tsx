@@ -1148,6 +1148,8 @@ export const register: Register = (on, options) => {
         if (isResume) await seedTurns($).catch(() => undefined)
         if (isResume && isCacheTracked) await recoverCache($).catch(() => undefined)
         if (shows.git) void refreshRepo($)
+        // The footer's version was read in session.start; the next conversation's state starts without it.
+        void refreshVersion($, isUpdateChecked).catch(() => undefined)
         if (shows.jira) await findJiraServer($).catch(() => undefined)
         if (shows.checks) await loadGuard($).catch(() => undefined)
         if (shows.todos) await loadContinue($).catch(() => undefined)
