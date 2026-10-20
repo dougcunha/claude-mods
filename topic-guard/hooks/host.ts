@@ -9,7 +9,8 @@ export type Host = {
   complete: (request: { model: string; system: string; prompt: string }) => Promise<string | null>
   /**
    * One `jev_classify` call, whose result comes back as MCP sends it; null when no Jev MCP is connected. It rejects when
-   * the call fails or does not answer in time.
+   * the call fails or does not answer in time, and with a `JevBlockedError` when the call failed and the permission
+   * mode does not allow the tool.
    */
   classify: (args: Record<string, unknown>) => Promise<unknown>
   sessionId: () => Promise<string>

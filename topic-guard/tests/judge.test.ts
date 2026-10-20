@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Host, Message } from '../hooks/host'
+import { JevBlockedError } from '../hooks/jev'
 import { judge, parseDecision, shouldJudge, skipReason, transcriptText } from '../hooks/judge'
 import type { Submission } from '../hooks/judge'
 
@@ -151,6 +152,13 @@ for (const [reason, jev] of JEV_FAILURES) {
     expect(prompts).toHaveLength(1)
   })
 }
+
+test('a Jev call the permission mode blocked says so and names the tool to allow', async () => {
+  const { host, prompts } = jevHost(() => { throw new JevBlockedError('mcp__jev__jev_classify') })
+
+  expect(await judge(host, JEV)).toEqual({ outcome: 'related', fallback: 'was blocked by the permission mode', blockedTool: 'mcp__jev__jev_classify' })
+  expect(prompts).toHaveLength(1)
+})
 
 test('a model that does not answer after a Jev failure is no judgment, and the failure is still named', async () => {
   expect(await judge(jevHost(null, null).host, JEV)).toEqual({ outcome: 'none', fallback: 'is not connected' })

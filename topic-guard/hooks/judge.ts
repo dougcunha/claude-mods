@@ -1,7 +1,7 @@
 import type { Verdict } from '../types'
 
 import type { Host, Message } from './host'
-import { jevArguments, readJev } from './jev'
+import { JevBlockedError, jevArguments, readJev } from './jev'
 
 /** The most characters of the conversation the judging model reads, taken from its end. */
 export const TRANSCRIPT_LIMIT = 12_000
@@ -140,8 +140,9 @@ function decisionOf(json: string): Decision | null {
 /**
  * What a judgment found: `new-topic` with its verdict, `related`, or `none` when there was no topic yet or no answer.
  * `fallback` says why the Jev MCP could not judge, so the model did; it is absent when Jev judged, or was not asked.
+ * `blockedTool` is the tool to allow when the permission mode was the reason.
  */
-export type Judgment = ({ outcome: 'new-topic'; verdict: Verdict } | { outcome: 'related' | 'none' }) & { fallback?: string }
+export type Judgment = ({ outcome: 'new-topic'; verdict: Verdict } | { outcome: 'related' | 'none' }) & { fallback?: string; blockedTool?: string }
 
 /** Which judge decides: the `model` through the session's client, or the `jev` MCP with the model as its fallback. */
 export type JudgeEngine = 'model' | 'jev'
@@ -150,18 +151,21 @@ export type JudgeEngine = 'model' | 'jev'
 const JEV_FAILURES = {
   absent: 'is not connected',
   failed: 'failed or did not answer in time',
+  blocked: 'was blocked by the permission mode',
   error: 'reported an error',
   unreadable: 'sent an answer the mod cannot read',
 } as const
 
 /** The Jev MCP's decision, `unsure` when it left the message to review, or the reason it could not judge. */
-type JevOutcome = { kind: 'decided'; decision: Decision } | { kind: 'unsure' } | { kind: 'failed'; reason: string }
+type JevOutcome = { kind: 'decided'; decision: Decision } | { kind: 'unsure' } | { kind: 'failed'; reason: string; blockedTool?: string }
 
 async function askJev(host: Host, settings: { percent: number; message: string }, transcript: string): Promise<JevOutcome> {
   let result: unknown
   try {
     result = await host.classify(jevArguments(settings.percent, transcript, settings.message))
-  } catch {
+  } catch (error) {
+    if (error instanceof JevBlockedError) return { kind: 'failed', reason: JEV_FAILURES.blocked, blockedTool: error.tool }
+
     return { kind: 'failed', reason: JEV_FAILURES.failed }
   }
   if (result === null) return { kind: 'failed', reason: JEV_FAILURES.absent }
@@ -197,5 +201,7 @@ export async function judge(
   const reply = await host.complete({ model: settings.model, system: JUDGE_SYSTEM, prompt: judgePrompt(settings.percent, transcript, settings.message) })
   const judgment = judgmentOf(reply === null ? null : parseDecision(reply), settings.percent)
 
-  return jev?.kind === 'failed' ? { ...judgment, fallback: jev.reason } : judgment
+  if (jev?.kind !== 'failed') return judgment
+
+  return { ...judgment, fallback: jev.reason, ...(jev.blockedTool === undefined ? {} : { blockedTool: jev.blockedTool }) }
 }

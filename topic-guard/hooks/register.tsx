@@ -4,7 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Held } from '../types'
 
 import type { Host } from './host'
-import { JEV_TOOL, serverNames, serverOf } from './jev'
+import { JEV_TOOL, JevBlockedError, serverNames, serverOf } from './jev'
 import { isSameMessage, judge, shouldJudge, skipReason } from './judge'
 import type { JudgeEngine } from './judge'
 import { debugLogPath, moveToNewSession } from './session'
@@ -16,6 +16,9 @@ const JUDGE_TIMEOUT_MS = 8_000
 
 /** The time limit of the Jev MCP; past it the model judges, so the person waits at most this plus the model's limit. */
 const JEV_TIMEOUT_MS = 4_000
+
+/** The message of the error the time limit throws, so a failure caused by the limit is told from a refused call. */
+const JEV_TIMEOUT_MESSAGE = 'the Jev MCP did not answer in time'
 
 /** The most lines the debug log keeps; older lines drop off its start. */
 const LOG_LINES = 200
@@ -29,6 +32,7 @@ const held = atom({ plugin: 'topic-guard', key: 'held' } as const, null)
 const keptAt = atom({ plugin: 'topic-guard', key: 'keptAt' } as const, null)
 const isBusy = atom({ plugin: 'topic-guard', key: 'isBusy' } as const, false)
 const isJevDown = atom({ plugin: 'topic-guard', key: 'isJevDown' } as const, false)
+const jevBlocked = atom({ plugin: 'topic-guard', key: 'jevBlocked' } as const, null)
 const lastJudgment = atom({ plugin: 'topic-guard', key: 'lastJudgment' } as const, null)
 
 type Settings = typeof DEFAULTS
@@ -74,17 +78,37 @@ function hostOf($: EngineInterface): Host {
       const spelled = (await $.tool.list()).map(tool => serverOf(tool.name)).find(name => name !== undefined)
       if (spelled === undefined) return null
 
-      return Promise.race([
-        callJev($, spelled, args),
-        $.clock.sleep(JEV_TIMEOUT_MS).then(() => {
-          throw new Error('the Jev MCP did not answer in time')
-        }),
-      ])
+      try {
+        return await Promise.race([
+          callJev($, spelled, args),
+          $.clock.sleep(JEV_TIMEOUT_MS).then(() => {
+            throw new Error(JEV_TIMEOUT_MESSAGE)
+          }),
+        ])
+      } catch (error) {
+        const tool = `mcp__${spelled}__${JEV_TOOL}`
+        if (!(error instanceof Error && error.message === JEV_TIMEOUT_MESSAGE) && (await isGated($, tool))) throw new JevBlockedError(tool)
+        throw error
+      }
     },
     sessionId: () => $.session.id(),
     clear: async () => void (await $.command.run({ command: 'clear' })),
     readBox: async () => (await $.prompt.read()).text,
     fill: async text => void (await $.prompt.fill({ text })),
+  }
+}
+
+/**
+ * Whether the permission mode would not let the tool run unasked (`ask` or `deny`), as auto mode puts an MCP tool it
+ * was not told to allow. The query asks no dialog and no classifier, and carries no arguments; a check that fails says no.
+ */
+async function isGated($: EngineInterface, tool: string): Promise<boolean> {
+  try {
+    const verdict = await $.tool.check({ tool, input: {} })
+
+    return verdict.decision !== 'allow'
+  } catch {
+    return false
   }
 }
 
@@ -153,16 +177,18 @@ async function newSession($: EngineInterface, settings: Settings): Promise<void>
  * Says once, in a toast, that the Jev MCP could not judge and the model did, and clears that when Jev judges again, so a
  * new outage warns again. `fallback` is the reason the judgment carries, if any.
  */
-async function reportJev($: EngineInterface, settings: Settings, fallback: string | undefined): Promise<void> {
+async function reportJev($: EngineInterface, settings: Settings, fallback: string | undefined, blockedTool?: string): Promise<void> {
   if (settings.judge !== 'jev') return
   const wasDown = await read($, isJevDown)
   if (fallback === undefined) {
     if (wasDown) await update($, isJevDown, () => false)
+    if (wasDown) await update($, jevBlocked, () => null)
 
     return
   }
   if (wasDown) return
   await update($, isJevDown, () => true)
+  if (blockedTool !== undefined) await update($, jevBlocked, () => blockedTool)
   $.ui.toast(`topic-guard: the Jev MCP ${fallback}. Judging with ${settings.model} instead.`)
 }
 
@@ -199,7 +225,7 @@ async function guard($: EngineInterface, settings: Settings, text: string): Prom
     return null
   }
   const judgment = await judge(hostOf($), { model: settings.model, percent, message: text, judge: settings.judge })
-  await reportJev($, settings, judgment.fallback)
+  await reportJev($, settings, judgment.fallback, judgment.blockedTool)
   await note($, settings, judgedText(judgment.outcome, percent))
   const via = judgment.fallback === undefined ? '' : ` (Jev MCP ${judgment.fallback})`
   if (judgment.outcome !== 'new-topic') {
@@ -210,6 +236,20 @@ async function guard($: EngineInterface, settings: Settings, text: string): Prom
   await log($, settings, `judge: new topic at ${percent}%${via}`)
 
   return { ...judgment.verdict, text }
+}
+
+/** Switches the judge to the model, as /config would; the engine then loads the module again with it. */
+async function useModel($: EngineInterface): Promise<void> {
+  await update($, jevBlocked, () => null)
+  redraw($)
+  const done = await $.config.set({ key: 'topic-guard.judge', value: 'model' })
+  if (done.deny !== undefined) $.ui.toast(`topic-guard: ${done.deny}`)
+}
+
+/** Hides the notice about a blocked Jev MCP; it comes back only after Jev has judged and then been blocked again. */
+async function dismissBlocked($: EngineInterface): Promise<void> {
+  await update($, jevBlocked, () => null)
+  redraw($)
 }
 
 export const register: Register = (on, options) => {
@@ -256,12 +296,13 @@ export const register: Register = (on, options) => {
     if (e.props.hasSurvey) return next(e)
     const isBusyNow = await read($, isBusy)
     const message = await read($, held)
-    if (!isBusyNow && message === null) return next(e)
+    const blockedTool = settings.judge === 'jev' ? await read($, jevBlocked) : null
+    if (!isBusyNow && message === null && blockedTool === null) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
     const isTerminal = e.surface === 'terminal'
 
     // A quiet frame in the suggestion color, dim at rest and full under the pointer, as session-info draws its cards.
-    return (
+    const band = (
       <Box
         key="topic-guard"
         flexDirection="column"
@@ -294,6 +335,43 @@ export const register: Register = (on, options) => {
             </Box>
           </>
         )}
+      </Box>
+    )
+
+    // The Jev MCP's call was refused by the permission mode, as auto mode refuses an MCP tool it was not told to allow.
+    const notice = blockedTool === null ? null : (
+      <Box
+        key="topic-guard-jev"
+        flexDirection="column"
+        borderStyle="round"
+        borderColor="suggestion"
+        borderDimColor
+        paddingX={1}
+        {...(isTerminal ? {} : { paddingY: 1, rowGap: 1 })}
+        hover={{ borderDimColor: false }}
+      >
+        <Text>
+          <Text color="suggestion" bold>
+            ◇ topic-guard
+          </Text>
+          <Text dimColor> · the permission mode blocked the Jev MCP</Text>
+        </Text>
+        <Text>{`${settings.model} judges instead. To use Jev, allow ${blockedTool} under permissions.allow in your settings.`}</Text>
+        <Box flexDirection="row">
+          <Button key="use-model" label={`Judge with ${settings.model}`} variant="primary" onPress={() => void useModel($).catch(() => undefined)} />
+          <Text>  </Text>
+          <Button key="dismiss-jev" label="Dismiss" onPress={() => void dismissBlocked($).catch(() => undefined)} />
+        </Box>
+      </Box>
+    )
+    // Only the band is left to show when nothing was blocked: the guard above ends the render when all three are empty.
+    if (notice === null) return band
+    if (!isBusyNow && message === null) return notice
+
+    return (
+      <Box flexDirection="column">
+        {notice}
+        {band}
       </Box>
     )
   })

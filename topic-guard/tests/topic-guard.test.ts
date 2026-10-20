@@ -264,6 +264,92 @@ test('a Jev MCP that does not answer in 4 seconds hands the judgment to the mode
   expect(toasts).toEqual([JEV_DOWN_TOAST])
 })
 
+const BLOCKED_TOAST = 'topic-guard: the Jev MCP was blocked by the permission mode. Judging with haiku instead.'
+
+/** The permission check of `mcp__jev__jev_classify`: `ask` is auto mode with no allow rule, `allow` is a rule or a mode that lets it run. */
+function jevCheck(on: On, decision: 'allow' | 'ask' | 'deny'): { checked: string[] } {
+  const checked: string[] = []
+  on('tool.check', async (_, e) => (checked.push(e.tool), { decision }) as never)
+
+  return { checked }
+}
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`a Jev call that fails while the permission mode would not allow it says so and offers the way out (${surface})`, JEV_OPTIONS, async ($, on) => {
+    const { entered, judged, toasts } = world(on, [RELATED])
+    jevServer(on, ['down'])
+    const { checked } = jevCheck(on, 'ask')
+
+    await $.prompt.submit(typed())
+
+    expect(checked).toEqual(['mcp__jev__jev_classify'])
+    expect(toasts).toEqual([BLOCKED_TOAST])
+    expect(entered).toEqual([MESSAGE])
+    expect(judged).toEqual(['haiku'])
+    const notice = await $.ui.mount({ ...BAND, surface })
+    expect(await notice.find({ type: 'Text', text: /blocked the Jev MCP/ })).toBeDefined()
+    expect(await notice.find({ type: 'Text', text: /allow mcp__jev__jev_classify under permissions\.allow/ })).toBeDefined()
+    await notice.unmount()
+  })
+}
+
+test('Judge with the model sets the judge option to model and hides the notice', JEV_OPTIONS, async ($, on) => {
+  world(on, [RELATED])
+  jevServer(on, ['down'])
+  jevCheck(on, 'ask')
+  const sets: { key: string; value: unknown }[] = []
+  on('config.set', async (_, e) => (sets.push({ key: e.key, value: e.value }), { value: e.value }) as never)
+  await $.prompt.submit(typed())
+
+  const notice = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await notice.press({ key: 'use-model' })
+
+  expect(sets).toEqual([{ key: 'topic-guard.judge', value: 'model' }])
+  expect(await notice.find({ type: 'Text', text: /blocked the Jev MCP/ })).toBeUndefined()
+  await notice.unmount()
+})
+
+test('Dismiss hides the notice, and the outage does not raise it again', JEV_OPTIONS, async ($, on) => {
+  const { toasts } = world(on, [RELATED])
+  jevServer(on, ['down'])
+  jevCheck(on, 'deny')
+  await $.prompt.submit(typed('One.'))
+
+  const notice = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await notice.press({ key: 'dismiss-jev' })
+  await $.prompt.submit(typed('Two.'))
+
+  expect(await notice.find({ type: 'Text', text: /blocked the Jev MCP/ })).toBeUndefined()
+  expect(toasts).toEqual([BLOCKED_TOAST])
+  await notice.unmount()
+})
+
+test('a Jev call that fails while the permission mode allows it is a plain failure, with no notice', JEV_OPTIONS, async ($, on) => {
+  const { toasts } = world(on, [RELATED])
+  jevServer(on, ['down'])
+  jevCheck(on, 'allow')
+
+  await $.prompt.submit(typed())
+
+  const notice = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(toasts).toEqual([JEV_DOWN_TOAST])
+  expect(await notice.find({ type: 'Text', text: /blocked the Jev MCP/ })).toBeUndefined()
+  await notice.unmount()
+})
+
+test('a Jev call that times out is not asked about the permission mode', JEV_OPTIONS, async ($, on) => {
+  const { clock, toasts } = world(on, [RELATED])
+  jevServer(on, ['hang'])
+  const { checked } = jevCheck(on, 'ask')
+
+  const submitted = $.prompt.submit(typed())
+  await clock.advance(4_000)
+  await submitted
+
+  expect(checked).toEqual([])
+  expect(toasts).toEqual([JEV_DOWN_TOAST])
+})
+
 test('the default judge asks the model and never calls the MCP tools', async ($, on) => {
   const { judged } = world(on, [RELATED])
   const { calls } = jevServer(on, [JEV_NEW_TOPIC])

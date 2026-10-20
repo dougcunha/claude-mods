@@ -1,6 +1,16 @@
 /** The Jev MCP tool that classifies a message. */
 export const JEV_TOOL = 'jev_classify'
 
+/**
+ * What `Host.classify` rejects with when the call failed and the permission check says the tool is not allowed to run
+ * (`ask` or `deny`, as in auto mode): `tool` is the name to allow, `mcp__<server>__jev_classify`.
+ */
+export class JevBlockedError extends Error {
+  constructor(readonly tool: string) {
+    super(`the permission mode does not allow ${tool}`)
+  }
+}
+
 /** The most characters of the new message Jev reads; its classify tool truncates an item at this size. */
 export const JEV_ITEM_LIMIT = 2_000
 
