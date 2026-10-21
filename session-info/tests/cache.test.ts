@@ -3,7 +3,7 @@ import type { TestBody } from 'claude-code/testing'
 
 import type { CacheState, KeepWarm } from '../types'
 
-import { cacheStatus, contextOf, moveToNewSession, NO_CACHE, pingVerdict, readTouches, shouldHold, span, withCompact, withPing, withRecovered, withRequest, withResume, withSeed, withSwitch, withTouch } from '../hooks/cache'
+import { cacheStatus, contextOf, moveToNewSession, NO_CACHE, pingVerdict, readTouches, shouldHold, span, withCompact, withCounted, withPing, withRecovered, withRequest, withResume, withSeed, withSwitch, withTouch } from '../hooks/cache'
 import type { CacheStatus, CacheUsage, Submission } from '../hooks/cache'
 import type { Host } from '../hooks/host'
 
@@ -110,8 +110,12 @@ const HOLD_CASES: [string, Submission, CacheStatus, number, boolean][] = [
 ]
 for (const [name, submission, status, context, expected] of HOLD_CASES)
   test(`the guard holds ${name}: ${expected}`, () => {
-    expect(shouldHold(submission, { status, tokens: context, minTokens: 150_000 })).toBe(expected)
+    expect(shouldHold(submission, { status, tokens: context, minTokens: 150_000, isAfterCompact: false })).toBe(expected)
   })
+
+test('the guard lets a prompt in after a compaction, over a cold cache and the context from before it', () => {
+  expect(shouldHold(typed(), { status: COLD, tokens: CONTEXT, minTokens: 150_000, isAfterCompact: true })).toBe(false)
+})
 
 const PING_CASES: [string, CacheUsage | undefined, string][] = [
   ['no answer', undefined, 'none'],
@@ -151,16 +155,36 @@ test('a new session gets the held prompt only when its box is empty', async () =
 
 type World = { entered: string[]; ran: string[]; filled: string[]; toasts: string[]; forks: number }
 
+/** What /context counts over a 1M window holding `total` tokens of messages. */
+const breakdownOf = (total: number) => ({
+  categories: [
+    { name: 'Messages', tokens: total, kind: 'used', isDeferred: false },
+    { name: 'Free space', tokens: 1_000_000 - total, kind: 'free', isDeferred: false },
+  ],
+  totalTokens: total,
+  maxTokens: 1_000_000,
+  rawMaxTokens: 1_000_000,
+  percentage: total / 10_000,
+  isAutoCompactEnabled: false,
+})
+
 /**
  * The engine beneath the mod: a 200k context, plan limits when `hasPlan`, requests that answer `usage`, and keep-warm
  * pings that answer `ping`. /clear switches the session id and empties the prompt box.
  */
-function world(on: On, { hasPlan = true, ping = WARM as CacheUsage | null, now = 0, live = CONTEXT } = {}): World & { clock: ReturnType<typeof mock.clock> } {
+function world(
+  on: On,
+  { hasPlan = true, ping = WARM as CacheUsage | null, now = 0, live = CONTEXT, counted = { tokens: CONTEXT } } = {},
+): World & { clock: ReturnType<typeof mock.clock> } {
   const state: World = { entered: [], ran: [], filled: [], toasts: [], forks: 0 }
   let sessionId = 's1'
   let box = MESSAGE
   const clock = mock.clock(on, { now })
-  on('session.usage', async () => ({ value: { startedAt: 0, rateLimits: hasPlan ? PLAN_LIMITS : [], context: { window: 1_000_000, tokens: live, percent: 20 } } }) as never)
+  on('session.usage', async (_, e) => {
+    const breakdown = e.breakdown ? { breakdown: breakdownOf(counted.tokens) } : {}
+
+    return { value: { startedAt: 0, rateLimits: hasPlan ? PLAN_LIMITS : [], context: { window: 1_000_000, tokens: live, percent: 20, ...breakdown } } } as never
+  })
   on('session.id', async () => ({ value: sessionId }))
   on('session.cwd', async () => ({ value: '/repo' }))
   on('agent.list', async () => ({ value: [] }))
@@ -251,6 +275,46 @@ test('Compact runs /compact and New session runs /clear and puts the prompt in t
   expect(ran).toEqual(['compact', 'clear'])
   expect(filled).toEqual(['Another prompt.'])
   await band.unmount()
+})
+
+test('a /compact typed after a hold lets the next prompt in, though the live context reads empty until its reply', async ($, on) => {
+  const { clock, entered } = world(on, { live: 0 })
+  const summary = { role: 'user', text: 'summary', toolUses: [] }
+  on('session.compact', async () => ({ messages: [summary] }) as never)
+  await step($)
+  await clock.set(2 * HOUR)
+
+  await submit($)
+  await $.session.compact({ trigger: 'manual', messages: [summary] } as never)
+  await submit($, 'Another prompt.')
+
+  expect(entered).toEqual(['Another prompt.'])
+})
+
+test('after a compaction, until its reply, the cache row re-caches what /context counts, not the context before it', { options: QUIET }, async ($, on) => {
+  const counted = { tokens: CONTEXT }
+  const { clock } = world(on, { live: 0, counted })
+  const summary = { role: 'user', text: 'summary', toolUses: [] }
+  on('session.compact', async () => ({ messages: [summary] }) as never)
+  await start($)
+  await step($)
+  await clock.set(2 * HOUR)
+  const pane = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 80 } })
+  const before = await pane.find({ type: 'Text', text: 'next prompt re-caches 200k' })
+
+  await $.session.compact({ trigger: 'manual', messages: [summary] } as never)
+  counted.tokens = 30_000
+  await clock.advance(500)
+
+  expect(before).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: 'next prompt re-caches 30k' })).toBeDefined()
+  await pane.unmount()
+})
+
+test('the cache takes the counted context only after a compaction and only when there is a count', () => {
+  expect(withCounted(touched(0, { isAfterCompact: true }), 30_000).tokens).toBe(30_000)
+  expect(withCounted(touched(0, { isAfterCompact: true }), undefined).tokens).toBe(CONTEXT)
+  expect(withCounted(touched(0), 30_000).tokens).toBe(CONTEXT)
 })
 
 test('a session resumed two hours after its last response holds the first prompt', async ($, on) => {

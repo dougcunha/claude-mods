@@ -10,7 +10,7 @@ import { AUTOPICK_USAGE, autopickPrompt, autopickSummary, countdown, DEFAULT_SET
 import type { Question } from './autopick'
 import type { AgentRow } from './agents'
 import { BACKGROUND_ROOM, BACKGROUND_STATUS, backgroundSummary, firstLine, hasCommandLine, inFlightIds, orderedTasks, startedTask, STOP_TOOL, stoppedTaskId, taskLabel, taskRowCount, taskState, withEnd, withInFlight, withStopped, withTask } from './background'
-import { CACHE_STATUS, cacheParts, cacheStatus, contextOf, holdAge, holdText, holdTitle, isPingDue, isSameMessage, KEEP_WARM_PROMPT, moveToNewSession, NO_CACHE, pingVerdict, readTouches, shouldHold, span, totalOf, TOUCH_STORE, ttlOf, ttlSetting, withCompact, withPing, withRecovered, withRequest, withResume, withSeed, withSwitch, withTouch } from './cache'
+import { CACHE_STATUS, cacheParts, cacheStatus, contextOf, holdAge, holdText, holdTitle, isPingDue, isSameMessage, KEEP_WARM_PROMPT, moveToNewSession, NO_CACHE, pingVerdict, readTouches, shouldHold, span, totalOf, TOUCH_STORE, ttlOf, ttlSetting, withCompact, withCounted, withPing, withRecovered, withRequest, withResume, withSeed, withSwitch, withTouch } from './cache'
 import type { TtlSetting } from './cache'
 import { BANNER_ROWS, FRAME_COLUMNS, FRAME_ROWS, isFramed, tileLayout, widgets } from './cards'
 import type { Tile } from './cards'
@@ -916,7 +916,7 @@ async function guardPrompt($: EngineInterface, e: { text: string; origin: { kind
   if (state.touchedAt === undefined) return undefined
   const status = cacheStatus(state, await read($, keepWarm), ttlOf(state, setting), await $.clock.now())
   const context = contextOf((await $.session.usage()).context.tokens, state)
-  if (!shouldHold(e, { status, tokens: context, minTokens })) return undefined
+  if (!shouldHold(e, { status, tokens: context, minTokens, isAfterCompact: state.isAfterCompact })) return undefined
   const hold: CacheHold = { text: e.text, tokens: context, coldMs: status.kind === 'cold' ? status.ms : 0, isAgeUnknown: state.isAgeUnknown === true }
   await update($, cacheHold, () => hold)
   $.ui.invalidate('ui.render')
@@ -1595,7 +1595,7 @@ export const register: Register = (on, options) => {
     const cacheTtl = ttlOf(cacheState, cacheOptions.ttl)
     // Before the first request there is no age to read the clock for.
     const cacheNow = shows.session && cacheState.touchedAt !== undefined ? cacheStatus(cacheState, keep, cacheTtl, await $.clock.now()) : { kind: 'unknown' as const }
-    const cacheRow = cacheParts(cacheNow, cacheState, keep, cacheTtl)
+    const cacheRow = cacheParts(cacheNow, withCounted(cacheState, reading?.total), keep, cacheTtl)
     const sessionRows = counts('#session') ? chrome + (isOpen('#session') ? 4 + legend.length : 0) : 0
     const agentLines = agentRows(agents)
     const models = shows.agents ? await read($, agentModels) : {}

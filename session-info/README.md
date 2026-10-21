@@ -116,7 +116,7 @@ Status colors follow your theme: green for created (`A`), yellow for modified (`
 | Context bar | The live context window: tokens used, the window size, where auto-compaction runs (`compacts at 967k`) and the percentage. The bar is stacked, one color per category (system prompt, tools, memory files, skills, messages), then the free space as a thin line and the compaction buffer shaded. Pressing `▸ Context` unfolds a legend with each category's tokens and share. The categories are estimated locally after each turn and compaction; before the first reading the bar has one color |
 | Compactions | Compactions that went through in the main conversation |
 | Clears | `/clear` commands run since the mod loaded, by hand or by another mod (`· 3 clears`); it shows after the first reply that follows a `/clear` |
-| Cache | The prompt cache of the main conversation: the state in its color on the left, `● Cache warm · 42m left`, `◐ Cache cools in 3m` in bold in the last 5 minutes (the last minute of a 5-minute TTL), `○ Cache cold for 12m` in bold, or `◆ Cache kept warm · 3h 55m left` while [keep warm](#-keep-warm) runs; and the details on the right, dim: the TTL, `next prompt re-caches 412k` when cold, the pings of keep warm, and `2 re-caches (380k)`, which counts the requests that wrote most of the context to the cache again. Before the first reply it shows the TTL alone |
+| Cache | The prompt cache of the main conversation: the state in its color on the left, `● Cache warm · 42m left`, `◐ Cache cools in 3m` in bold in the last 5 minutes (the last minute of a 5-minute TTL), `○ Cache cold for 12m` in bold, or `◆ Cache kept warm · 3h 55m left` while [keep warm](#-keep-warm) runs; and the details on the right, dim: the TTL, `next prompt re-caches 412k` when cold (after a compaction, until its reply, the size `/context` counts), the pings of keep warm, and `2 re-caches (380k)`, which counts the requests that wrote most of the context to the cache again. Before the first reply it shows the TTL alone |
 | Turns | Main-thread turns, their average output tokens, and how long the last one took |
 
 The compaction and clear counts start when the mod loads, so a newly installed mod starts them at zero. When the mod joins a conversation that already has turns, after a resume or an install, the turn count starts from the prompts in its transcript.
@@ -152,7 +152,7 @@ When the cache expired and the context has at least `cacheGuardMinTokens` tokens
 - **Compact** runs `/compact`. The prompt stays in the box, and Enter sends it over the shorter context.
 - **New session** runs `/clear` and leaves the prompt in the box of the new session.
 
-The mod never sends the prompt for you, so it goes in as your own, with its images and `@` mentions. The guard checks only a prompt you type at an idle session: slash commands, prompts typed during a turn and prompts from Remote Control, a plugin or a background task go in at once. Set `cacheGuard` to `false` to turn it off.
+The mod never sends the prompt for you, so it goes in as your own, with its images and `@` mentions. The guard checks only a prompt you type at an idle session: slash commands, prompts typed during a turn and prompts from Remote Control, a plugin or a background task go in at once. After a compaction, from the band or a `/compact` you type, the next prompt goes in at once: it writes only the summary to the cache. Set `cacheGuard` to `false` to turn it off.
 
 ### 🔥 Keep warm
 

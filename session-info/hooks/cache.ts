@@ -58,8 +58,8 @@ export const CACHE_STATUS = {
 /** A prompt as `prompt.submit` receives it, as far as the guard reads it. */
 export type Submission = { text: string; origin: { kind: string }; turnId?: string; command?: unknown; isMeta?: true }
 
-/** What decides a hold: the cache now, the context the prompt would write, and the guard's minimum. */
-export type HoldGate = { status: CacheStatus; tokens: number; minTokens: number }
+/** What decides a hold: the cache now, the context the prompt would write, the guard's minimum, and a compaction since the last request. */
+export type HoldGate = { status: CacheStatus; tokens: number; minTokens: number; isAfterCompact: boolean }
 
 /** What a keep-warm ping did: read the cache, missed it and wrote it, or got no answer. */
 export type PingVerdict = 'hit' | 'miss' | 'none'
@@ -168,6 +168,10 @@ export function withRecovered(state: CacheState, found: CacheTouch | undefined, 
 /** The context the next prompt would write: the live reading, which is empty until the first reply of a resumed session, else the last one the cache knew. */
 export const contextOf = (reported: number | undefined, state: CacheState): number => (reported !== undefined && reported > 0 ? reported : state.tokens)
 
+/** The cache with the context its next prompt writes: after a compaction, until its reply, the count of the compacted transcript. */
+export const withCounted = (state: CacheState, counted: number | undefined): CacheState =>
+  state.isAfterCompact && counted !== undefined ? { ...state, tokens: counted } : state
+
 /**
  * A load that finds turns behind it, after a reload or an install, takes the end of the last turn as the last touch:
  * its last request ended then. A cache whose requests the mod saw keeps its own touch.
@@ -216,10 +220,14 @@ export function cacheParts(status: CacheStatus, state: CacheState, keep: KeepWar
   return { state: left, detail: `${ttl} TTL${restarts}` }
 }
 
-/** Whether the guard holds the prompt: typed at an idle session, not a command, over a cold cache and a big context. */
+/**
+ * Whether the guard holds the prompt: typed at an idle session, not a command, over a cold cache and a big context.
+ * After a compaction the prompt writes only the summary, while the context the guard knows is the one before it.
+ */
 export function shouldHold(submission: Submission, gate: HoldGate): boolean {
   if (submission.origin.kind !== 'composer' || submission.turnId !== undefined) return false
   if (submission.command !== undefined || submission.isMeta === true || submission.text.trim() === '') return false
+  if (gate.isAfterCompact) return false
 
   return gate.status.kind === 'cold' && gate.tokens >= gate.minTokens
 }
