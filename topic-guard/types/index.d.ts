@@ -1,8 +1,8 @@
 /** What the judging model said about a message it found off the session's topic, and how full the context was then. */
 export type Verdict = { reason: string; percent: number }
 
-/** A message the mod held back because it looks like a new topic, waiting for the person's choice. */
-export type Held = Verdict & { text: string }
+/** A message the mod held back because it looks like a new topic, waiting for the person's choice; `isDismissed` once the band was closed. */
+export type Held = Verdict & { text: string; isDismissed?: true }
 
 declare module 'claude-code' {
   interface PluginState {

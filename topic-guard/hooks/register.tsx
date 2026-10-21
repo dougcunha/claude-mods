@@ -246,6 +246,12 @@ async function useModel($: EngineInterface): Promise<void> {
   if (done.deny !== undefined) $.ui.toast(`topic-guard: ${done.deny}`)
 }
 
+/** Closes the band and keeps the held message, so Enter still keeps it here and another message is judged. */
+async function dismissHeld($: EngineInterface): Promise<void> {
+  await update($, held, message => (message === null ? null : { ...message, isDismissed: true as const }))
+  redraw($)
+}
+
 /** Hides the notice about a blocked Jev MCP; it comes back only after Jev has judged and then been blocked again. */
 async function dismissBlocked($: EngineInterface): Promise<void> {
   await update($, jevBlocked, () => null)
@@ -295,7 +301,8 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
     const isBusyNow = await read($, isBusy)
-    const message = await read($, held)
+    const standing = await read($, held)
+    const message = standing?.isDismissed === true ? null : standing
     const blockedTool = settings.judge === 'jev' ? await read($, jevBlocked) : null
     if (!isBusyNow && message === null && blockedTool === null) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
@@ -331,6 +338,8 @@ export const register: Register = (on, options) => {
             <Text>{message.reason === '' ? 'It needs nothing from this conversation.' : message.reason}</Text>
             <Box flexDirection="row">
               <Button key="new" label="New session" variant="primary" onPress={() => void newSession($, settings).catch(() => undefined)} />
+              <Text>  </Text>
+              <Button key="dismiss" label="Dismiss" onPress={() => void dismissHeld($).catch(() => undefined)} />
               <Text dimColor>  or press Enter to keep it here</Text>
             </Box>
           </>

@@ -113,6 +113,37 @@ test('sending the held message again keeps it here, and the next prompts are not
   await band.unmount()
 })
 
+for (const surface of ['terminal', 'desktop'] as const)
+  test(`Dismiss closes the band, and Enter then keeps the held message here without judging it again (${surface})`, async ($, on) => {
+    const { entered, judged } = world(on)
+    await $.prompt.submit(typed())
+    const band = await $.ui.mount({ ...BAND, surface })
+
+    await band.press({ key: 'dismiss' })
+    const afterDismiss = await band.find({ key: 'new' })
+    await $.prompt.submit(typed())
+
+    expect(afterDismiss).toBeUndefined()
+    expect(entered).toEqual([MESSAGE])
+    expect(judged).toHaveLength(1)
+    await band.unmount()
+  })
+
+test('after Dismiss another message the person types is judged and can be held again', async ($, on) => {
+  const { entered, judged } = world(on)
+  await $.prompt.submit(typed())
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await band.press({ key: 'dismiss' })
+
+  const result = await $.prompt.submit(typed('Write the release notes.'))
+
+  expect(result).toEqual({ drop: expect.stringContaining('Press Enter to keep it here') })
+  expect(entered).toEqual([])
+  expect(judged).toHaveLength(2)
+  expect(await band.find({ key: 'new' })).toBeDefined()
+  await band.unmount()
+})
+
 test('another message the person types replaces the held one and is judged', async ($, on) => {
   const { entered, judged } = world(on, [NEW_TOPIC, RELATED])
   await $.prompt.submit(typed())

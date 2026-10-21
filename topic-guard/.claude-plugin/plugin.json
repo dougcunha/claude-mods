@@ -1,6 +1,6 @@
 {
   "name": "topic-guard",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Before a prompt enters the session, a small model judges whether it belongs to the session's topic. When it starts a separate topic, the mod holds it in the prompt box: press Enter to keep it here, or New session to clear the session and send it there.",
   "author": {
     "name": "Douglas Cunha",

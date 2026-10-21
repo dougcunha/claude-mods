@@ -24,8 +24,8 @@
 A session that mixes topics carries context the next message does not need. This mod checks each message you type before it enters the session:
 
 1. 🔎 **Judge:** a small model (Haiku by default) reads the end of the conversation and your new message, and decides `related` or `new-topic`. When it is not sure, it answers `related`. With the `judge` setting on `jev`, the [Jev MCP](#-the-jev-judge) judges instead, and the model stays as its fallback.
-2. ✋ **Hold:** a `new-topic` message does not enter the session, and Claude Code puts it back in the prompt box. A band above the prompt shows the reason, with a **New session** button.
-3. 🔁 **Move or keep:** **New session** runs `/clear` and leaves your message in the prompt box of the new session: press Enter to send it there. Press Enter in this session instead to keep the message here.
+2. ✋ **Hold:** a `new-topic` message does not enter the session, and Claude Code puts it back in the prompt box. A band above the prompt shows the reason, with a **New session** button and a **Dismiss** button.
+3. 🔁 **Move or keep:** **New session** runs `/clear` and leaves your message in the prompt box of the new session: press Enter to send it there. Press Enter in this session instead to keep the message here. **Dismiss** closes the band and leaves the message in the box: Enter still keeps it here, and another message is judged.
 
 <p align="center">
   <img src="images/band.png" width="640" alt="A held prompt: the transcript says the hook held it as a new topic, and a rounded band above the prompt box reads topic-guard, this looks like a new topic, 6% context, the model's reason, a New session button and the hint or press Enter to keep it here. The message is back in the prompt box.">
@@ -35,7 +35,7 @@ The band holds three lines in a quiet rounded frame, which lights up under the p
 
 - **Title:** `◇ topic-guard`, then `this looks like a new topic`, and on the right how full the context window is.
 - **Reason:** the judging model's reason, in one sentence.
-- **Action:** the **New session** button and the hint `or press Enter to keep it here`. While the mod clears the session, the frame reads `◌ topic-guard · clearing the session…`.
+- **Action:** the **New session** and **Dismiss** buttons and the hint `or press Enter to keep it here`. While the mod clears the session, the frame reads `◌ topic-guard · clearing the session…`.
 
 The mod never sends your message for you, so it enters as your own prompt, with its images and `@` mentions. A `related` message enters at once, as typed. The new session gets no handoff: a separate topic needs nothing from this conversation. To carry the work itself to a fresh session, use a tool made for it, such as ContextBrake.
 
@@ -63,6 +63,7 @@ Answer `y` to add the marketplace and choose a scope. If you already added the m
 | --- | --- |
 | Send a held message to a new session | Press **New session**, then Enter in the new session |
 | Send a held message to this session | Press Enter again. The mod judges again only when the context grows by 10 more points |
+| Close the band and decide later | Press **Dismiss**. The message stays in the box, and Enter keeps it here |
 | Drop a held message | Change or replace the text in the prompt box and send it. The mod judges the new text |
 
 While the mod clears the session, the band says so. When the clear fails, the session stays as it was, the message stays in the prompt box, and a toast says so.
