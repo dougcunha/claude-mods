@@ -8,6 +8,7 @@ type Engine = Parameters<TestBody>[0]
 
 const ROOT = '/work/shop'
 const BASE = '540a81830da84d6bfb7a47bc4be3d229520b577b'
+const AGENT_ID = 'a-analysis'
 const SUBMIT_TOOL = 'mcp__visual-review__submit_model'
 const CART_TS = ['import { Item } from "./item"', '', 'export class Cart {', '  items: Item[] = []', '}', ''].join('\n')
 
@@ -129,6 +130,7 @@ function world(
   on('session.end', async (_, e) => ({ sessionId: e.sessionId }) as never)
   on('turn.start', async (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', async (_, e) => ({ text: e.answer }))
+  on('agent.spawn', async () => ({ model: 'sonnet', agentId: AGENT_ID }) as never)
   on('fs.read', async (_, e) => {
     const written = state.written.filter(([path]) => path.replace(/\\/g, '/') === e.path.replace(/\\/g, '/')).at(-1)
     if (written !== undefined) return { value: written[1] } as never
@@ -341,6 +343,68 @@ test('TC-15 FR-25 the analysis turn that ends with no model clears the status an
   expect(toasts).toEqual(['visual-review: the design analysis failed: the turn was interrupted with no design model. Run /visual-review again.'])
   expect(await submit($, validModel(runId))).toBe(NO_RUN)
 })
+
+/** Runs /visual-review, starts its analysis turn and the subagent the turn spawns with `prompt`; returns the run id. */
+async function spawnAnalysis($: Engine, state: World, prompt: (runId: string) => string, parentAgentId?: string): Promise<string> {
+  await run($, '')
+  await state.clock.settle()
+  const runId = runIdOf(state.prompts[0])
+  await $.turn.start({ text: state.prompts[0] ?? '', turnId: 't-analysis' })
+  await $.agent.spawn({ prompt: prompt(runId), description: 'Visual review design model', subagentType: 'general-purpose', parentAgentId } as never)
+
+  return runId
+}
+
+const taskOf = (runId: string): string => `Call submit_model with the whole design model and runId "${runId}".`
+
+test('FR-25 the analysis turn that ends after it spawned the subagent in the background keeps the run, and the later model is accepted', async ($, on) => {
+  const state = world(on)
+  const runId = await spawnAnalysis($, state, taskOf)
+
+  await $.turn.complete({ answer: 'Started the analysis.', durationMs: 1_000, isAborted: false, turnId: 't-analysis', reason: 'answer' })
+
+  expect(state.toasts).toEqual([])
+  expect(state.statuses).toEqual([ANALYZING])
+  expect(await submit($, validModel(runId))).toBe(ACCEPTED)
+})
+
+test('FR-25 the analysis subagent that ends with no model clears the status and names the cause', async ($, on) => {
+  const state = world(on)
+  const runId = await spawnAnalysis($, state, taskOf)
+  await $.turn.complete({ answer: '', durationMs: 1_000, isAborted: false, turnId: 't-analysis', reason: 'answer' })
+
+  await $.turn.complete({ answer: '', durationMs: 50_000, isAborted: false, turnId: 't-agent', reason: 'error', agentId: AGENT_ID })
+
+  expect(state.statuses).toEqual([ANALYZING, undefined])
+  expect(state.toasts).toEqual(['visual-review: the design analysis failed: an API error ended the turn with no design model. Run /visual-review again.'])
+  expect(await submit($, validModel(runId))).toBe(NO_RUN)
+})
+
+test('an agent.spawn hook whose state read fails still starts the subagent', async ($, on) => {
+  world(on)
+  on('state.get', async () => ({ deny: 'state refused' }) as never)
+
+  const result = await $.agent.spawn({ prompt: 'Find the auth code.', description: 'find auth code', subagentType: 'Explore' } as never)
+
+  expect(result).toEqual({ model: 'sonnet', agentId: AGENT_ID })
+})
+
+const UNTRACKED_SPAWNS = [
+  ['a spawn whose prompt lacks the run id', () => 'Find the auth code.', undefined],
+  ['a spawn from a subagent', taskOf, 'a-parent'],
+] as const
+
+for (const [name, prompt, parentAgentId] of UNTRACKED_SPAWNS) {
+  test(`FR-25 ${name} is not the analysis subagent, so the analysis turn that ends still ends the run`, async ($, on) => {
+    const state = world(on)
+    await spawnAnalysis($, state, prompt, parentAgentId)
+
+    await $.turn.complete({ answer: '', durationMs: 1_000, isAborted: false, turnId: 't-analysis', reason: 'answer' })
+
+    expect(state.statuses).toEqual([ANALYZING, undefined])
+    expect(state.toasts).toEqual(['visual-review: the design analysis failed: the turn ended with no design model. Run /visual-review again.'])
+  })
+}
 
 test('TC-15 FR-25 an analysis prompt that a hook drops clears the status and says why', async ($, on) => {
   const { statuses, toasts, clock } = world(on, { drop: 'held by a guard' })

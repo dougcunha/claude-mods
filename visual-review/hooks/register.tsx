@@ -348,10 +348,27 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  // An observer: the analysis turn that ends while its run still waits ended with no accepted model (FR-25).
+  // An observer that never denies: the main-loop spawn whose prompt carries the run id is the analysis subagent. The
+  // Agent tool runs it in the background, so the analysis turn can end before the subagent sends its model. A failure
+  // after the spawn is kept inside, so the `.catch` handler never spawns a second subagent.
+  on('agent.spawn', async ($, e, next) => {
+    const run = e.parentAgentId === undefined ? await read($, pendingRun) : null
+    const result = await next(e)
+    const agentId = result.agentId
+    if (run === null || run.analysisAgentId !== undefined || agentId === undefined || !e.prompt.includes(run.runId)) return result
+    await update($, pendingRun, current => (current?.runId === run.runId ? { ...current, analysisAgentId: agentId } : current)).catch(() => undefined)
+
+    return result
+  }).catch(($, e, next) => next(e))
+
+  // An observer: the run ends with no accepted model (FR-25) when its subagent ends while the run still waits, or when
+  // the analysis turn ends with no subagent started. An interrupted analysis turn leaves a background subagent running,
+  // so the run waits for that subagent.
   on('turn.complete', async ($, e, next) => {
-    const run = e.agentId === undefined ? await read($, pendingRun) : null
-    if (run !== null && run.analysisTurnId === e.turnId) await endRun($, run.runId, noModelToast(e.reason))
+    const run = await read($, pendingRun)
+    const isAnalysisTurn = e.agentId === undefined && run?.analysisTurnId === e.turnId && run.analysisAgentId === undefined
+    const isAnalysisAgent = e.agentId !== undefined && run?.analysisAgentId === e.agentId
+    if (run !== null && (isAnalysisTurn || isAnalysisAgent)) await endRun($, run.runId, noModelToast(e.reason))
 
     return next(e)
   }).catch(($, e, next) => next(e))

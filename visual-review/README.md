@@ -43,7 +43,7 @@ At the end of a task, the diff shows the implementation, not the design. `/visua
 - **Rounds:** after the next `/visual-review` on the same branch, the comments of earlier rounds show with an **Open** or **Resolved** switch; a status change goes with the next submit. A comment whose element is gone, such as a comment on a deleted method, shows under **Unanchored**.
 - **Keyboard and themes:** every container header, card and arrow label takes the focus with Tab, in the order container, then its cards. The page follows the light or dark theme of the system; every state has a text badge, not only a color. In a window narrower than 900 px, the comment panel moves under the diagram.
 
-When the analysis turn ends with no accepted model, the status clears and a toast says why, for example `visual-review: the design analysis failed: the turn was interrupted with no design model. Run /visual-review again.`
+The subagent can run in the background, so the analysis turn can end before the model arrives: the run waits for the subagent. When the subagent ends with no accepted model, or the analysis turn ends with no subagent started, the status clears and a toast says why, for example `visual-review: the design analysis failed: the turn was interrupted with no design model. Run /visual-review again.`
 
 ## 🚀 Install
 
