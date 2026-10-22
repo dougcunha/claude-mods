@@ -18,6 +18,7 @@ Each mod lives in its own folder, and this repository is also a plugin marketpla
 | --- | --- | --- |
 | [**session-info**](session-info/) | One pane that shows the state of the session, the repository and the work Claude does. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info`, `/autopick` |
 | [**topic-guard**](topic-guard/) | Before a prompt enters the session, a small model judges whether it starts a separate topic. Enter keeps it here; New session clears the session for it. | — |
+| [**visual-review**](visual-review/) | Shows the design of the changes against a base branch as a diagram in the browser: classes, relations, size, quality notes and database tables. Comment on it and send the review back to the session in one step. | `/visual-review [base]` |
 
 <p align="center">
   <img src="session-info/images/overview.png" width="480" alt="The session-info pane: cost and elapsed tiles, then the Session, Usage, Autopick, Todos, Last turn, Skills, Agents, Checks and Changes sections">

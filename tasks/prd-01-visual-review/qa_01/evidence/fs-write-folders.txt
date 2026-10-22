@@ -1,0 +1,4 @@
+      1 C:\Users\Admin\AppData\Local\Temp\claude-visual-review\0c2086ba-ea17-4b14-9401-f889e79714a7
+      1 C:\Users\Admin\AppData\Local\Temp\claude-visual-review\30dbfbef-e7f6-4200-abd2-5f016ab04ee7
+      1 C:\Users\Admin\AppData\Local\Temp\claude-visual-review\cc9adce9-5ea3-424d-b46d-2ba3a72459a0
+Folders of the $.fs.write calls in the ts, cs and py debug logs (count = sessions). All are under <TEMP>/claude-visual-review/<session id>/. No write outside the mod's temp folder.

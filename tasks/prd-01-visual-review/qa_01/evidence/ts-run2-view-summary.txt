@@ -1,0 +1,21 @@
+base=main branch=main round=2 counts={"units":{"added":2,"modified":1,"deleted":0},"tables":{"added":1,"modified":0,"dropped":0}}
+container src closed=false units=3
+unit src/cart.Cart kind=class state=added file=src/cart.ts lines=8 +8 -0 methods=1 ce=1 ca=0 cohesion=5 summary=yes rangeChecked=true members=add:added
+unit src/item.Item kind=class state=modified file=src/item.ts lines=7 +4 -0 methods=1 ce=0 ca=2 cohesion=5 summary=yes rangeChecked=true members=isFree:added
+unit src/pricing kind=module state=added file=src/pricing.ts lines=9 +9 -0 methods=2 ce=1 ca=0 cohesion=4 summary=yes rangeChecked=true members=discount:added,isExpensive:added
+relation src/cart.Cart→src/item.Item→composition state=added
+relation src/pricing→src/item.Item→dependency state=added
+table orders state=added source=db/001_orders.sql entity=- columns=id:added,sku:added,total:added
+file README.md +3 -0 rest=null
+file db/001_orders.sql +5 -0 rest=null
+file src/cart.ts +10 -0 rest={"added":2,"removed":0}
+file src/item.ts +4 -0 rest={"added":0,"removed":0}
+file src/pricing.ts +9 -0 rest={"added":0,"removed":0}
+other README.md +3 -0 Documentation only, no code.
+comment unit:src/pricing type=change status=open round=1 anchored=true
+comment member:src/cart.Cart#total(): number type=question status=open round=1 anchored=false
+comment relation:src/cart.Cart→src/item.Item→composition type=change status=open round=1 anchored=true
+comment table:orders type=question status=open round=1 anchored=true
+comment column:orders.sku type=change status=open round=1 anchored=true
+comment review:review type=question status=open round=1 anchored=true
+notice=null anchors=13

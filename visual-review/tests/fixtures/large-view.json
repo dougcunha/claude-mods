@@ -1,0 +1,5373 @@
+{
+ "version": 1,
+ "runId": "vr-fixture",
+ "base": "540a818",
+ "baseLabel": "origin/main",
+ "branch": "feature/large",
+ "counts": {
+  "units": {
+   "added": 30,
+   "modified": 30,
+   "deleted": 30
+  },
+  "tables": {
+   "added": 10,
+   "modified": 10,
+   "dropped": 10
+  }
+ },
+ "containers": [
+  {
+   "id": "Shop.Module0",
+   "units": [
+    "Shop.Module0.Class0",
+    "Shop.Module0.Class1",
+    "Shop.Module0.Class2",
+    "Shop.Module0.Class3",
+    "Shop.Module0.Class4",
+    "Shop.Module0.Class5",
+    "Shop.Module0.Class6",
+    "Shop.Module0.Class7",
+    "Shop.Module0.Class8",
+    "Shop.Module0.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module1",
+   "units": [
+    "Shop.Module1.Class0",
+    "Shop.Module1.Class1",
+    "Shop.Module1.Class2",
+    "Shop.Module1.Class3",
+    "Shop.Module1.Class4",
+    "Shop.Module1.Class5",
+    "Shop.Module1.Class6",
+    "Shop.Module1.Class7",
+    "Shop.Module1.Class8",
+    "Shop.Module1.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module2",
+   "units": [
+    "Shop.Module2.Class0",
+    "Shop.Module2.Class1",
+    "Shop.Module2.Class2",
+    "Shop.Module2.Class3",
+    "Shop.Module2.Class4",
+    "Shop.Module2.Class5",
+    "Shop.Module2.Class6",
+    "Shop.Module2.Class7",
+    "Shop.Module2.Class8",
+    "Shop.Module2.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module3",
+   "units": [
+    "Shop.Module3.Class0",
+    "Shop.Module3.Class1",
+    "Shop.Module3.Class2",
+    "Shop.Module3.Class3",
+    "Shop.Module3.Class4",
+    "Shop.Module3.Class5",
+    "Shop.Module3.Class6",
+    "Shop.Module3.Class7",
+    "Shop.Module3.Class8",
+    "Shop.Module3.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module4",
+   "units": [
+    "Shop.Module4.Class0",
+    "Shop.Module4.Class1",
+    "Shop.Module4.Class2",
+    "Shop.Module4.Class3",
+    "Shop.Module4.Class4",
+    "Shop.Module4.Class5",
+    "Shop.Module4.Class6",
+    "Shop.Module4.Class7",
+    "Shop.Module4.Class8",
+    "Shop.Module4.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module5",
+   "units": [
+    "Shop.Module5.Class0",
+    "Shop.Module5.Class1",
+    "Shop.Module5.Class2",
+    "Shop.Module5.Class3",
+    "Shop.Module5.Class4",
+    "Shop.Module5.Class5",
+    "Shop.Module5.Class6",
+    "Shop.Module5.Class7",
+    "Shop.Module5.Class8",
+    "Shop.Module5.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module6",
+   "units": [
+    "Shop.Module6.Class0",
+    "Shop.Module6.Class1",
+    "Shop.Module6.Class2",
+    "Shop.Module6.Class3",
+    "Shop.Module6.Class4",
+    "Shop.Module6.Class5",
+    "Shop.Module6.Class6",
+    "Shop.Module6.Class7",
+    "Shop.Module6.Class8",
+    "Shop.Module6.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module7",
+   "units": [
+    "Shop.Module7.Class0",
+    "Shop.Module7.Class1",
+    "Shop.Module7.Class2",
+    "Shop.Module7.Class3",
+    "Shop.Module7.Class4",
+    "Shop.Module7.Class5",
+    "Shop.Module7.Class6",
+    "Shop.Module7.Class7",
+    "Shop.Module7.Class8",
+    "Shop.Module7.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module8",
+   "units": [
+    "Shop.Module8.Class0",
+    "Shop.Module8.Class1",
+    "Shop.Module8.Class2",
+    "Shop.Module8.Class3",
+    "Shop.Module8.Class4",
+    "Shop.Module8.Class5",
+    "Shop.Module8.Class6",
+    "Shop.Module8.Class7",
+    "Shop.Module8.Class8",
+    "Shop.Module8.Class9"
+   ],
+   "isClosed": false
+  },
+  {
+   "id": "Shop.Module9",
+   "units": [
+    "Shop.Module9.Class0",
+    "Shop.Module9.Class1",
+    "Shop.Module9.Class2",
+    "Shop.Module9.Class3",
+    "Shop.Module9.Class4",
+    "Shop.Module9.Class5",
+    "Shop.Module9.Class6",
+    "Shop.Module9.Class7",
+    "Shop.Module9.Class8",
+    "Shop.Module9.Class9"
+   ],
+   "isClosed": true
+  }
+ ],
+ "units": [
+  {
+   "id": "Shop.Module0.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module0/Class0.cs",
+   "container": "Shop.Module0",
+   "lines": 40,
+   "added": 5,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module0.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module0/Class1.cs",
+   "container": "Shop.Module0",
+   "lines": 47,
+   "added": 6,
+   "removed": 1,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module0.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module0/Class2.cs",
+   "container": "Shop.Module0",
+   "lines": 54,
+   "added": 0,
+   "removed": 2,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module0.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module0/Class3.cs",
+   "container": "Shop.Module0",
+   "lines": 61,
+   "added": 8,
+   "removed": 0,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module0.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module0/Class4.cs",
+   "container": "Shop.Module0",
+   "lines": 68,
+   "added": 9,
+   "removed": 4,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module0.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module0/Class5.cs",
+   "container": "Shop.Module0",
+   "lines": 75,
+   "added": 0,
+   "removed": 5,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module0.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module0/Class6.cs",
+   "container": "Shop.Module0",
+   "lines": 82,
+   "added": 11,
+   "removed": 0,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module0.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module0/Class7.cs",
+   "container": "Shop.Module0",
+   "lines": 89,
+   "added": 12,
+   "removed": 7,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module0.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module0/Class8.cs",
+   "container": "Shop.Module0",
+   "lines": 96,
+   "added": 0,
+   "removed": 8,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module0.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module0/Class9.cs",
+   "container": "Shop.Module0",
+   "lines": 103,
+   "added": 14,
+   "removed": 0,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 0 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module1/Class0.cs",
+   "container": "Shop.Module1",
+   "lines": 40,
+   "added": 5,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module1/Class1.cs",
+   "container": "Shop.Module1",
+   "lines": 47,
+   "added": 0,
+   "removed": 1,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module1/Class2.cs",
+   "container": "Shop.Module1",
+   "lines": 54,
+   "added": 7,
+   "removed": 0,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module1/Class3.cs",
+   "container": "Shop.Module1",
+   "lines": 61,
+   "added": 8,
+   "removed": 3,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module1.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module1/Class4.cs",
+   "container": "Shop.Module1",
+   "lines": 68,
+   "added": 0,
+   "removed": 4,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module1/Class5.cs",
+   "container": "Shop.Module1",
+   "lines": 75,
+   "added": 10,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module1/Class6.cs",
+   "container": "Shop.Module1",
+   "lines": 82,
+   "added": 11,
+   "removed": 6,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module1/Class7.cs",
+   "container": "Shop.Module1",
+   "lines": 89,
+   "added": 0,
+   "removed": 7,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module1/Class8.cs",
+   "container": "Shop.Module1",
+   "lines": 96,
+   "added": 13,
+   "removed": 0,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module1.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module1/Class9.cs",
+   "container": "Shop.Module1",
+   "lines": 103,
+   "added": 14,
+   "removed": 9,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 1 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module2/Class0.cs",
+   "container": "Shop.Module2",
+   "lines": 40,
+   "added": 0,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module2/Class1.cs",
+   "container": "Shop.Module2",
+   "lines": 47,
+   "added": 6,
+   "removed": 0,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module2/Class2.cs",
+   "container": "Shop.Module2",
+   "lines": 54,
+   "added": 7,
+   "removed": 2,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module2/Class3.cs",
+   "container": "Shop.Module2",
+   "lines": 61,
+   "added": 0,
+   "removed": 3,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module2.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module2/Class4.cs",
+   "container": "Shop.Module2",
+   "lines": 68,
+   "added": 9,
+   "removed": 0,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module2/Class5.cs",
+   "container": "Shop.Module2",
+   "lines": 75,
+   "added": 10,
+   "removed": 5,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module2/Class6.cs",
+   "container": "Shop.Module2",
+   "lines": 82,
+   "added": 0,
+   "removed": 6,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module2/Class7.cs",
+   "container": "Shop.Module2",
+   "lines": 89,
+   "added": 12,
+   "removed": 0,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module2/Class8.cs",
+   "container": "Shop.Module2",
+   "lines": 96,
+   "added": 13,
+   "removed": 8,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module2.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module2/Class9.cs",
+   "container": "Shop.Module2",
+   "lines": 103,
+   "added": 0,
+   "removed": 9,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 2 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module3/Class0.cs",
+   "container": "Shop.Module3",
+   "lines": 40,
+   "added": 5,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module3/Class1.cs",
+   "container": "Shop.Module3",
+   "lines": 47,
+   "added": 6,
+   "removed": 1,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module3/Class2.cs",
+   "container": "Shop.Module3",
+   "lines": 54,
+   "added": 0,
+   "removed": 2,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module3/Class3.cs",
+   "container": "Shop.Module3",
+   "lines": 61,
+   "added": 8,
+   "removed": 0,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 0,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module3.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module3/Class4.cs",
+   "container": "Shop.Module3",
+   "lines": 68,
+   "added": 9,
+   "removed": 4,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module3/Class5.cs",
+   "container": "Shop.Module3",
+   "lines": 75,
+   "added": 0,
+   "removed": 5,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module3/Class6.cs",
+   "container": "Shop.Module3",
+   "lines": 82,
+   "added": 11,
+   "removed": 0,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module3/Class7.cs",
+   "container": "Shop.Module3",
+   "lines": 89,
+   "added": 12,
+   "removed": 7,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module3/Class8.cs",
+   "container": "Shop.Module3",
+   "lines": 96,
+   "added": 0,
+   "removed": 8,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module3.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module3/Class9.cs",
+   "container": "Shop.Module3",
+   "lines": 103,
+   "added": 14,
+   "removed": 0,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 3 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module4/Class0.cs",
+   "container": "Shop.Module4",
+   "lines": 40,
+   "added": 5,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module4/Class1.cs",
+   "container": "Shop.Module4",
+   "lines": 47,
+   "added": 0,
+   "removed": 1,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module4/Class2.cs",
+   "container": "Shop.Module4",
+   "lines": 54,
+   "added": 7,
+   "removed": 0,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module4/Class3.cs",
+   "container": "Shop.Module4",
+   "lines": 61,
+   "added": 8,
+   "removed": 3,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module4.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module4/Class4.cs",
+   "container": "Shop.Module4",
+   "lines": 68,
+   "added": 0,
+   "removed": 4,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module4/Class5.cs",
+   "container": "Shop.Module4",
+   "lines": 75,
+   "added": 10,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module4/Class6.cs",
+   "container": "Shop.Module4",
+   "lines": 82,
+   "added": 11,
+   "removed": 6,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module4/Class7.cs",
+   "container": "Shop.Module4",
+   "lines": 89,
+   "added": 0,
+   "removed": 7,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module4/Class8.cs",
+   "container": "Shop.Module4",
+   "lines": 96,
+   "added": 13,
+   "removed": 0,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module4.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module4/Class9.cs",
+   "container": "Shop.Module4",
+   "lines": 103,
+   "added": 14,
+   "removed": 9,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 4 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module5/Class0.cs",
+   "container": "Shop.Module5",
+   "lines": 40,
+   "added": 0,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module5/Class1.cs",
+   "container": "Shop.Module5",
+   "lines": 47,
+   "added": 6,
+   "removed": 0,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module5/Class2.cs",
+   "container": "Shop.Module5",
+   "lines": 54,
+   "added": 7,
+   "removed": 2,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module5/Class3.cs",
+   "container": "Shop.Module5",
+   "lines": 61,
+   "added": 0,
+   "removed": 3,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module5.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module5/Class4.cs",
+   "container": "Shop.Module5",
+   "lines": 68,
+   "added": 9,
+   "removed": 0,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module5/Class5.cs",
+   "container": "Shop.Module5",
+   "lines": 75,
+   "added": 10,
+   "removed": 5,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module5/Class6.cs",
+   "container": "Shop.Module5",
+   "lines": 82,
+   "added": 0,
+   "removed": 6,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module5/Class7.cs",
+   "container": "Shop.Module5",
+   "lines": 89,
+   "added": 12,
+   "removed": 0,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module5/Class8.cs",
+   "container": "Shop.Module5",
+   "lines": 96,
+   "added": 13,
+   "removed": 8,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module5.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module5/Class9.cs",
+   "container": "Shop.Module5",
+   "lines": 103,
+   "added": 0,
+   "removed": 9,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 5 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module6/Class0.cs",
+   "container": "Shop.Module6",
+   "lines": 40,
+   "added": 5,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module6/Class1.cs",
+   "container": "Shop.Module6",
+   "lines": 47,
+   "added": 6,
+   "removed": 1,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module6/Class2.cs",
+   "container": "Shop.Module6",
+   "lines": 54,
+   "added": 0,
+   "removed": 2,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module6/Class3.cs",
+   "container": "Shop.Module6",
+   "lines": 61,
+   "added": 8,
+   "removed": 0,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module6.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module6/Class4.cs",
+   "container": "Shop.Module6",
+   "lines": 68,
+   "added": 9,
+   "removed": 4,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module6/Class5.cs",
+   "container": "Shop.Module6",
+   "lines": 75,
+   "added": 0,
+   "removed": 5,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module6/Class6.cs",
+   "container": "Shop.Module6",
+   "lines": 82,
+   "added": 11,
+   "removed": 0,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module6/Class7.cs",
+   "container": "Shop.Module6",
+   "lines": 89,
+   "added": 12,
+   "removed": 7,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module6/Class8.cs",
+   "container": "Shop.Module6",
+   "lines": 96,
+   "added": 0,
+   "removed": 8,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module6.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module6/Class9.cs",
+   "container": "Shop.Module6",
+   "lines": 103,
+   "added": 14,
+   "removed": 0,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 6 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module7/Class0.cs",
+   "container": "Shop.Module7",
+   "lines": 40,
+   "added": 5,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module7/Class1.cs",
+   "container": "Shop.Module7",
+   "lines": 47,
+   "added": 0,
+   "removed": 1,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module7/Class2.cs",
+   "container": "Shop.Module7",
+   "lines": 54,
+   "added": 7,
+   "removed": 0,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module7/Class3.cs",
+   "container": "Shop.Module7",
+   "lines": 61,
+   "added": 8,
+   "removed": 3,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module7.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module7/Class4.cs",
+   "container": "Shop.Module7",
+   "lines": 68,
+   "added": 0,
+   "removed": 4,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module7/Class5.cs",
+   "container": "Shop.Module7",
+   "lines": 75,
+   "added": 10,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module7/Class6.cs",
+   "container": "Shop.Module7",
+   "lines": 82,
+   "added": 11,
+   "removed": 6,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module7/Class7.cs",
+   "container": "Shop.Module7",
+   "lines": 89,
+   "added": 0,
+   "removed": 7,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module7/Class8.cs",
+   "container": "Shop.Module7",
+   "lines": 96,
+   "added": 13,
+   "removed": 0,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 2,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module7.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module7/Class9.cs",
+   "container": "Shop.Module7",
+   "lines": 103,
+   "added": 14,
+   "removed": 9,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 7 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class0",
+   "name": "Class0",
+   "kind": "interface",
+   "state": "deleted",
+   "file": "src/Module8/Class0.cs",
+   "container": "Shop.Module8",
+   "lines": 40,
+   "added": 0,
+   "removed": 0,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run0()",
+     "name": "Run0",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total0",
+     "name": "Total0",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 0 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module8/Class1.cs",
+   "container": "Shop.Module8",
+   "lines": 47,
+   "added": 6,
+   "removed": 0,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run1()",
+     "name": "Run1",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total1",
+     "name": "Total1",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 1 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module8/Class2.cs",
+   "container": "Shop.Module8",
+   "lines": 54,
+   "added": 7,
+   "removed": 2,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run2()",
+     "name": "Run2",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total2",
+     "name": "Total2",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 2 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module8/Class3.cs",
+   "container": "Shop.Module8",
+   "lines": 61,
+   "added": 0,
+   "removed": 3,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run3()",
+     "name": "Run3",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total3",
+     "name": "Total3",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 3 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 2,
+   "isRangeChecked": false
+  },
+  {
+   "id": "Shop.Module8.Class4",
+   "name": "Class4",
+   "kind": "interface",
+   "state": "added",
+   "file": "src/Module8/Class4.cs",
+   "container": "Shop.Module8",
+   "lines": 68,
+   "added": 9,
+   "removed": 0,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run4()",
+     "name": "Run4",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total4",
+     "name": "Total4",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 4 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "modified",
+   "file": "src/Module8/Class5.cs",
+   "container": "Shop.Module8",
+   "lines": 75,
+   "added": 10,
+   "removed": 5,
+   "methods": 2,
+   "members": [
+    {
+     "id": "Run5()",
+     "name": "Run5",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total5",
+     "name": "Total5",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 5 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 4,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 2,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module8/Class6.cs",
+   "container": "Shop.Module8",
+   "lines": 82,
+   "added": 0,
+   "removed": 6,
+   "methods": 3,
+   "members": [
+    {
+     "id": "Run6()",
+     "name": "Run6",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total6",
+     "name": "Total6",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 6 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 5,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "added",
+   "file": "src/Module8/Class7.cs",
+   "container": "Shop.Module8",
+   "lines": 89,
+   "added": 12,
+   "removed": 0,
+   "methods": 4,
+   "members": [
+    {
+     "id": "Run7()",
+     "name": "Run7",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total7",
+     "name": "Total7",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 7 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 1,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class8",
+   "name": "Class8",
+   "kind": "interface",
+   "state": "modified",
+   "file": "src/Module8/Class8.cs",
+   "container": "Shop.Module8",
+   "lines": 96,
+   "added": 13,
+   "removed": 8,
+   "methods": 5,
+   "members": [
+    {
+     "id": "Run8()",
+     "name": "Run8",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total8",
+     "name": "Total8",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 8 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 2,
+    "reason": "Score from the single responsibility of the class."
+   },
+   "ce": 1,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module8.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "deleted",
+   "file": "src/Module8/Class9.cs",
+   "container": "Shop.Module8",
+   "lines": 103,
+   "added": 0,
+   "removed": 9,
+   "methods": 6,
+   "members": [
+    {
+     "id": "Run9()",
+     "name": "Run9",
+     "kind": "method",
+     "state": "added"
+    },
+    {
+     "id": "Total9",
+     "name": "Total9",
+     "kind": "property",
+     "state": "modified"
+    }
+   ],
+   "summary": "Coordinates step 9 of module 8 and keeps its totals.",
+   "cohesion": {
+    "score": 3,
+    "reason": "Score from the mixed responsibility of the class."
+   },
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class0",
+   "name": "Class0",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class0.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class1",
+   "name": "Class1",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class1.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class2",
+   "name": "Class2",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class2.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class3",
+   "name": "Class3",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class3.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class4",
+   "name": "Class4",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class4.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class5",
+   "name": "Class5",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class5.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class6",
+   "name": "Class6",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class6.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class7",
+   "name": "Class7",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class7.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class8",
+   "name": "Class8",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class8.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 1,
+   "isRangeChecked": true
+  },
+  {
+   "id": "Shop.Module9.Class9",
+   "name": "Class9",
+   "kind": "class",
+   "state": "context",
+   "file": "src/Module9/Class9.cs",
+   "container": "Shop.Module9",
+   "lines": null,
+   "added": null,
+   "removed": null,
+   "methods": null,
+   "members": [],
+   "summary": null,
+   "cohesion": null,
+   "ce": 0,
+   "ca": 0,
+   "isRangeChecked": true
+  }
+ ],
+ "relations": [
+  {
+   "from": "Shop.Module0.Class0",
+   "to": "Shop.Module0.Class5",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module0.Class0→Shop.Module0.Class5→dependency"
+  },
+  {
+   "from": "Shop.Module0.Class0",
+   "to": "Shop.Module7.Class5",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module0.Class0→Shop.Module7.Class5→inheritance"
+  },
+  {
+   "from": "Shop.Module0.Class1",
+   "to": "Shop.Module4.Class4",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module0.Class1→Shop.Module4.Class4→implementation"
+  },
+  {
+   "from": "Shop.Module0.Class1",
+   "to": "Shop.Module7.Class4",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module0.Class1→Shop.Module7.Class4→composition"
+  },
+  {
+   "from": "Shop.Module0.Class2",
+   "to": "Shop.Module1.Class3",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module0.Class2→Shop.Module1.Class3→dependency"
+  },
+  {
+   "from": "Shop.Module0.Class2",
+   "to": "Shop.Module4.Class3",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module0.Class2→Shop.Module4.Class3→inheritance"
+  },
+  {
+   "from": "Shop.Module0.Class3",
+   "to": "Shop.Module1.Class2",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module0.Class3→Shop.Module1.Class2→implementation"
+  },
+  {
+   "from": "Shop.Module0.Class3",
+   "to": "Shop.Module8.Class2",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module0.Class3→Shop.Module8.Class2→composition"
+  },
+  {
+   "from": "Shop.Module0.Class4",
+   "to": "Shop.Module8.Class1",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module0.Class4→Shop.Module8.Class1→dependency"
+  },
+  {
+   "from": "Shop.Module0.Class5",
+   "to": "Shop.Module5.Class0",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module0.Class5→Shop.Module5.Class0→composition"
+  },
+  {
+   "from": "Shop.Module0.Class6",
+   "to": "Shop.Module1.Class9",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module0.Class6→Shop.Module1.Class9→inheritance"
+  },
+  {
+   "from": "Shop.Module0.Class7",
+   "to": "Shop.Module1.Class8",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module0.Class7→Shop.Module1.Class8→composition"
+  },
+  {
+   "from": "Shop.Module0.Class7",
+   "to": "Shop.Module8.Class8",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module0.Class7→Shop.Module8.Class8→implementation"
+  },
+  {
+   "from": "Shop.Module0.Class8",
+   "to": "Shop.Module5.Class7",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module0.Class8→Shop.Module5.Class7→dependency"
+  },
+  {
+   "from": "Shop.Module0.Class8",
+   "to": "Shop.Module8.Class7",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module0.Class8→Shop.Module8.Class7→inheritance"
+  },
+  {
+   "from": "Shop.Module0.Class9",
+   "to": "Shop.Module2.Class6",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module0.Class9→Shop.Module2.Class6→composition"
+  },
+  {
+   "from": "Shop.Module0.Class9",
+   "to": "Shop.Module5.Class6",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module0.Class9→Shop.Module5.Class6→implementation"
+  },
+  {
+   "from": "Shop.Module1.Class0",
+   "to": "Shop.Module2.Class5",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module1.Class0→Shop.Module2.Class5→dependency"
+  },
+  {
+   "from": "Shop.Module1.Class1",
+   "to": "Shop.Module9.Class4",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module1.Class1→Shop.Module9.Class4→composition"
+  },
+  {
+   "from": "Shop.Module1.Class2",
+   "to": "Shop.Module6.Class3",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module1.Class2→Shop.Module6.Class3→inheritance"
+  },
+  {
+   "from": "Shop.Module1.Class3",
+   "to": "Shop.Module3.Class2",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module1.Class3→Shop.Module3.Class2→implementation"
+  },
+  {
+   "from": "Shop.Module1.Class4",
+   "to": "Shop.Module0.Class1",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module1.Class4→Shop.Module0.Class1→dependency"
+  },
+  {
+   "from": "Shop.Module1.Class4",
+   "to": "Shop.Module3.Class1",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module1.Class4→Shop.Module3.Class1→inheritance"
+  },
+  {
+   "from": "Shop.Module1.Class5",
+   "to": "Shop.Module0.Class0",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module1.Class5→Shop.Module0.Class0→implementation"
+  },
+  {
+   "from": "Shop.Module1.Class5",
+   "to": "Shop.Module7.Class0",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module1.Class5→Shop.Module7.Class0→composition"
+  },
+  {
+   "from": "Shop.Module1.Class6",
+   "to": "Shop.Module3.Class9",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module1.Class6→Shop.Module3.Class9→inheritance"
+  },
+  {
+   "from": "Shop.Module1.Class6",
+   "to": "Shop.Module6.Class9",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module1.Class6→Shop.Module6.Class9→dependency"
+  },
+  {
+   "from": "Shop.Module1.Class7",
+   "to": "Shop.Module3.Class8",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module1.Class7→Shop.Module3.Class8→composition"
+  },
+  {
+   "from": "Shop.Module1.Class8",
+   "to": "Shop.Module0.Class7",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module1.Class8→Shop.Module0.Class7→inheritance"
+  },
+  {
+   "from": "Shop.Module1.Class9",
+   "to": "Shop.Module7.Class6",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module1.Class9→Shop.Module7.Class6→implementation"
+  },
+  {
+   "from": "Shop.Module2.Class0",
+   "to": "Shop.Module4.Class5",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module2.Class0→Shop.Module4.Class5→dependency"
+  },
+  {
+   "from": "Shop.Module2.Class1",
+   "to": "Shop.Module1.Class4",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module2.Class1→Shop.Module1.Class4→composition"
+  },
+  {
+   "from": "Shop.Module2.Class1",
+   "to": "Shop.Module4.Class4",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module2.Class1→Shop.Module4.Class4→implementation"
+  },
+  {
+   "from": "Shop.Module2.Class2",
+   "to": "Shop.Module1.Class3",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module2.Class2→Shop.Module1.Class3→dependency"
+  },
+  {
+   "from": "Shop.Module2.Class2",
+   "to": "Shop.Module8.Class3",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module2.Class2→Shop.Module8.Class3→inheritance"
+  },
+  {
+   "from": "Shop.Module2.Class3",
+   "to": "Shop.Module5.Class2",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module2.Class3→Shop.Module5.Class2→implementation"
+  },
+  {
+   "from": "Shop.Module2.Class3",
+   "to": "Shop.Module8.Class2",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module2.Class3→Shop.Module8.Class2→composition"
+  },
+  {
+   "from": "Shop.Module2.Class4",
+   "to": "Shop.Module5.Class1",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module2.Class4→Shop.Module5.Class1→inheritance"
+  },
+  {
+   "from": "Shop.Module2.Class5",
+   "to": "Shop.Module2.Class0",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module2.Class5→Shop.Module2.Class0→implementation"
+  },
+  {
+   "from": "Shop.Module2.Class6",
+   "to": "Shop.Module8.Class9",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module2.Class6→Shop.Module8.Class9→dependency"
+  },
+  {
+   "from": "Shop.Module2.Class7",
+   "to": "Shop.Module5.Class8",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module2.Class7→Shop.Module5.Class8→composition"
+  },
+  {
+   "from": "Shop.Module2.Class8",
+   "to": "Shop.Module2.Class7",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module2.Class8→Shop.Module2.Class7→inheritance"
+  },
+  {
+   "from": "Shop.Module2.Class8",
+   "to": "Shop.Module5.Class7",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module2.Class8→Shop.Module5.Class7→dependency"
+  },
+  {
+   "from": "Shop.Module2.Class9",
+   "to": "Shop.Module2.Class6",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module2.Class9→Shop.Module2.Class6→composition"
+  },
+  {
+   "from": "Shop.Module2.Class9",
+   "to": "Shop.Module9.Class6",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module2.Class9→Shop.Module9.Class6→implementation"
+  },
+  {
+   "from": "Shop.Module3.Class0",
+   "to": "Shop.Module6.Class5",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module3.Class0→Shop.Module6.Class5→dependency"
+  },
+  {
+   "from": "Shop.Module3.Class0",
+   "to": "Shop.Module9.Class5",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module3.Class0→Shop.Module9.Class5→inheritance"
+  },
+  {
+   "from": "Shop.Module3.Class1",
+   "to": "Shop.Module6.Class4",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module3.Class1→Shop.Module6.Class4→implementation"
+  },
+  {
+   "from": "Shop.Module3.Class2",
+   "to": "Shop.Module3.Class3",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module3.Class2→Shop.Module3.Class3→dependency"
+  },
+  {
+   "from": "Shop.Module3.Class3",
+   "to": "Shop.Module0.Class2",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module3.Class3→Shop.Module0.Class2→composition"
+  },
+  {
+   "from": "Shop.Module3.Class4",
+   "to": "Shop.Module7.Class1",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module3.Class4→Shop.Module7.Class1→inheritance"
+  },
+  {
+   "from": "Shop.Module3.Class5",
+   "to": "Shop.Module4.Class0",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module3.Class5→Shop.Module4.Class0→implementation"
+  },
+  {
+   "from": "Shop.Module3.Class5",
+   "to": "Shop.Module7.Class0",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module3.Class5→Shop.Module7.Class0→composition"
+  },
+  {
+   "from": "Shop.Module3.Class6",
+   "to": "Shop.Module0.Class9",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module3.Class6→Shop.Module0.Class9→dependency"
+  },
+  {
+   "from": "Shop.Module3.Class6",
+   "to": "Shop.Module3.Class9",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module3.Class6→Shop.Module3.Class9→inheritance"
+  },
+  {
+   "from": "Shop.Module3.Class7",
+   "to": "Shop.Module0.Class8",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module3.Class7→Shop.Module0.Class8→implementation"
+  },
+  {
+   "from": "Shop.Module3.Class7",
+   "to": "Shop.Module7.Class8",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module3.Class7→Shop.Module7.Class8→composition"
+  },
+  {
+   "from": "Shop.Module3.Class8",
+   "to": "Shop.Module7.Class7",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module3.Class8→Shop.Module7.Class7→dependency"
+  },
+  {
+   "from": "Shop.Module3.Class9",
+   "to": "Shop.Module4.Class6",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module3.Class9→Shop.Module4.Class6→composition"
+  },
+  {
+   "from": "Shop.Module4.Class0",
+   "to": "Shop.Module1.Class5",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module4.Class0→Shop.Module1.Class5→inheritance"
+  },
+  {
+   "from": "Shop.Module4.Class1",
+   "to": "Shop.Module8.Class4",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module4.Class1→Shop.Module8.Class4→implementation"
+  },
+  {
+   "from": "Shop.Module4.Class2",
+   "to": "Shop.Module5.Class3",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module4.Class2→Shop.Module5.Class3→dependency"
+  },
+  {
+   "from": "Shop.Module4.Class2",
+   "to": "Shop.Module8.Class3",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module4.Class2→Shop.Module8.Class3→inheritance"
+  },
+  {
+   "from": "Shop.Module4.Class3",
+   "to": "Shop.Module2.Class2",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module4.Class3→Shop.Module2.Class2→composition"
+  },
+  {
+   "from": "Shop.Module4.Class3",
+   "to": "Shop.Module5.Class2",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module4.Class3→Shop.Module5.Class2→implementation"
+  },
+  {
+   "from": "Shop.Module4.Class4",
+   "to": "Shop.Module2.Class1",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module4.Class4→Shop.Module2.Class1→dependency"
+  },
+  {
+   "from": "Shop.Module4.Class4",
+   "to": "Shop.Module9.Class1",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module4.Class4→Shop.Module9.Class1→inheritance"
+  },
+  {
+   "from": "Shop.Module4.Class5",
+   "to": "Shop.Module9.Class0",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module4.Class5→Shop.Module9.Class0→composition"
+  },
+  {
+   "from": "Shop.Module4.Class6",
+   "to": "Shop.Module5.Class9",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module4.Class6→Shop.Module5.Class9→inheritance"
+  },
+  {
+   "from": "Shop.Module4.Class7",
+   "to": "Shop.Module2.Class8",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module4.Class7→Shop.Module2.Class8→implementation"
+  },
+  {
+   "from": "Shop.Module4.Class8",
+   "to": "Shop.Module9.Class7",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module4.Class8→Shop.Module9.Class7→dependency"
+  },
+  {
+   "from": "Shop.Module4.Class9",
+   "to": "Shop.Module6.Class6",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module4.Class9→Shop.Module6.Class6→composition"
+  },
+  {
+   "from": "Shop.Module4.Class9",
+   "to": "Shop.Module9.Class6",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module4.Class9→Shop.Module9.Class6→implementation"
+  },
+  {
+   "from": "Shop.Module5.Class0",
+   "to": "Shop.Module3.Class5",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module5.Class0→Shop.Module3.Class5→inheritance"
+  },
+  {
+   "from": "Shop.Module5.Class0",
+   "to": "Shop.Module6.Class5",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module5.Class0→Shop.Module6.Class5→dependency"
+  },
+  {
+   "from": "Shop.Module5.Class1",
+   "to": "Shop.Module0.Class4",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module5.Class1→Shop.Module0.Class4→implementation"
+  },
+  {
+   "from": "Shop.Module5.Class1",
+   "to": "Shop.Module3.Class4",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module5.Class1→Shop.Module3.Class4→composition"
+  },
+  {
+   "from": "Shop.Module5.Class2",
+   "to": "Shop.Module0.Class3",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module5.Class2→Shop.Module0.Class3→inheritance"
+  },
+  {
+   "from": "Shop.Module5.Class3",
+   "to": "Shop.Module7.Class2",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module5.Class3→Shop.Module7.Class2→implementation"
+  },
+  {
+   "from": "Shop.Module5.Class4",
+   "to": "Shop.Module4.Class1",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module5.Class4→Shop.Module4.Class1→dependency"
+  },
+  {
+   "from": "Shop.Module5.Class5",
+   "to": "Shop.Module1.Class0",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module5.Class5→Shop.Module1.Class0→composition"
+  },
+  {
+   "from": "Shop.Module5.Class6",
+   "to": "Shop.Module0.Class9",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module5.Class6→Shop.Module0.Class9→dependency"
+  },
+  {
+   "from": "Shop.Module5.Class6",
+   "to": "Shop.Module7.Class9",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module5.Class6→Shop.Module7.Class9→inheritance"
+  },
+  {
+   "from": "Shop.Module5.Class7",
+   "to": "Shop.Module4.Class8",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module5.Class7→Shop.Module4.Class8→implementation"
+  },
+  {
+   "from": "Shop.Module5.Class7",
+   "to": "Shop.Module7.Class8",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module5.Class7→Shop.Module7.Class8→composition"
+  },
+  {
+   "from": "Shop.Module5.Class8",
+   "to": "Shop.Module1.Class7",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module5.Class8→Shop.Module1.Class7→dependency"
+  },
+  {
+   "from": "Shop.Module5.Class8",
+   "to": "Shop.Module4.Class7",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module5.Class8→Shop.Module4.Class7→inheritance"
+  },
+  {
+   "from": "Shop.Module5.Class9",
+   "to": "Shop.Module1.Class6",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module5.Class9→Shop.Module1.Class6→implementation"
+  },
+  {
+   "from": "Shop.Module6.Class0",
+   "to": "Shop.Module8.Class5",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module6.Class0→Shop.Module8.Class5→dependency"
+  },
+  {
+   "from": "Shop.Module6.Class1",
+   "to": "Shop.Module5.Class4",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module6.Class1→Shop.Module5.Class4→composition"
+  },
+  {
+   "from": "Shop.Module6.Class2",
+   "to": "Shop.Module2.Class3",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module6.Class2→Shop.Module2.Class3→inheritance"
+  },
+  {
+   "from": "Shop.Module6.Class3",
+   "to": "Shop.Module2.Class2",
+   "kind": "composition",
+   "state": "added",
+   "id": "Shop.Module6.Class3→Shop.Module2.Class2→composition"
+  },
+  {
+   "from": "Shop.Module6.Class3",
+   "to": "Shop.Module9.Class2",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module6.Class3→Shop.Module9.Class2→implementation"
+  },
+  {
+   "from": "Shop.Module6.Class4",
+   "to": "Shop.Module6.Class1",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module6.Class4→Shop.Module6.Class1→dependency"
+  },
+  {
+   "from": "Shop.Module6.Class4",
+   "to": "Shop.Module9.Class1",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module6.Class4→Shop.Module9.Class1→inheritance"
+  },
+  {
+   "from": "Shop.Module6.Class5",
+   "to": "Shop.Module3.Class0",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module6.Class5→Shop.Module3.Class0→composition"
+  },
+  {
+   "from": "Shop.Module6.Class5",
+   "to": "Shop.Module6.Class0",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module6.Class5→Shop.Module6.Class0→implementation"
+  },
+  {
+   "from": "Shop.Module6.Class6",
+   "to": "Shop.Module2.Class9",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module6.Class6→Shop.Module2.Class9→dependency"
+  },
+  {
+   "from": "Shop.Module6.Class7",
+   "to": "Shop.Module9.Class8",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module6.Class7→Shop.Module9.Class8→composition"
+  },
+  {
+   "from": "Shop.Module6.Class8",
+   "to": "Shop.Module6.Class7",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module6.Class8→Shop.Module6.Class7→inheritance"
+  },
+  {
+   "from": "Shop.Module6.Class9",
+   "to": "Shop.Module3.Class6",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module6.Class9→Shop.Module3.Class6→implementation"
+  },
+  {
+   "from": "Shop.Module7.Class0",
+   "to": "Shop.Module0.Class5",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module7.Class0→Shop.Module0.Class5→dependency"
+  },
+  {
+   "from": "Shop.Module7.Class0",
+   "to": "Shop.Module3.Class5",
+   "kind": "inheritance",
+   "state": "unchanged",
+   "id": "Shop.Module7.Class0→Shop.Module3.Class5→inheritance"
+  },
+  {
+   "from": "Shop.Module7.Class1",
+   "to": "Shop.Module0.Class4",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module7.Class1→Shop.Module0.Class4→implementation"
+  },
+  {
+   "from": "Shop.Module7.Class1",
+   "to": "Shop.Module7.Class4",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module7.Class1→Shop.Module7.Class4→composition"
+  },
+  {
+   "from": "Shop.Module7.Class2",
+   "to": "Shop.Module4.Class3",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module7.Class2→Shop.Module4.Class3→inheritance"
+  },
+  {
+   "from": "Shop.Module7.Class2",
+   "to": "Shop.Module7.Class3",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module7.Class2→Shop.Module7.Class3→dependency"
+  },
+  {
+   "from": "Shop.Module7.Class3",
+   "to": "Shop.Module4.Class2",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module7.Class3→Shop.Module4.Class2→composition"
+  },
+  {
+   "from": "Shop.Module7.Class4",
+   "to": "Shop.Module1.Class1",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module7.Class4→Shop.Module1.Class1→inheritance"
+  },
+  {
+   "from": "Shop.Module7.Class5",
+   "to": "Shop.Module8.Class0",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module7.Class5→Shop.Module8.Class0→implementation"
+  },
+  {
+   "from": "Shop.Module7.Class6",
+   "to": "Shop.Module4.Class9",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module7.Class6→Shop.Module4.Class9→dependency"
+  },
+  {
+   "from": "Shop.Module7.Class7",
+   "to": "Shop.Module1.Class8",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module7.Class7→Shop.Module1.Class8→composition"
+  },
+  {
+   "from": "Shop.Module7.Class7",
+   "to": "Shop.Module4.Class8",
+   "kind": "implementation",
+   "state": "removed",
+   "id": "Shop.Module7.Class7→Shop.Module4.Class8→implementation"
+  },
+  {
+   "from": "Shop.Module7.Class8",
+   "to": "Shop.Module1.Class7",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module7.Class8→Shop.Module1.Class7→dependency"
+  },
+  {
+   "from": "Shop.Module7.Class8",
+   "to": "Shop.Module8.Class7",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module7.Class8→Shop.Module8.Class7→inheritance"
+  },
+  {
+   "from": "Shop.Module7.Class9",
+   "to": "Shop.Module5.Class6",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module7.Class9→Shop.Module5.Class6→implementation"
+  },
+  {
+   "from": "Shop.Module7.Class9",
+   "to": "Shop.Module8.Class6",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module7.Class9→Shop.Module8.Class6→composition"
+  },
+  {
+   "from": "Shop.Module8.Class0",
+   "to": "Shop.Module5.Class5",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module8.Class0→Shop.Module5.Class5→inheritance"
+  },
+  {
+   "from": "Shop.Module8.Class1",
+   "to": "Shop.Module2.Class4",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module8.Class1→Shop.Module2.Class4→implementation"
+  },
+  {
+   "from": "Shop.Module8.Class2",
+   "to": "Shop.Module9.Class3",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module8.Class2→Shop.Module9.Class3→dependency"
+  },
+  {
+   "from": "Shop.Module8.Class3",
+   "to": "Shop.Module6.Class2",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module8.Class3→Shop.Module6.Class2→composition"
+  },
+  {
+   "from": "Shop.Module8.Class4",
+   "to": "Shop.Module3.Class1",
+   "kind": "inheritance",
+   "state": "added",
+   "id": "Shop.Module8.Class4→Shop.Module3.Class1→inheritance"
+  },
+  {
+   "from": "Shop.Module8.Class4",
+   "to": "Shop.Module6.Class1",
+   "kind": "dependency",
+   "state": "added",
+   "id": "Shop.Module8.Class4→Shop.Module6.Class1→dependency"
+  },
+  {
+   "from": "Shop.Module8.Class5",
+   "to": "Shop.Module0.Class0",
+   "kind": "implementation",
+   "state": "unchanged",
+   "id": "Shop.Module8.Class5→Shop.Module0.Class0→implementation"
+  },
+  {
+   "from": "Shop.Module8.Class5",
+   "to": "Shop.Module3.Class0",
+   "kind": "composition",
+   "state": "unchanged",
+   "id": "Shop.Module8.Class5→Shop.Module3.Class0→composition"
+  },
+  {
+   "from": "Shop.Module8.Class6",
+   "to": "Shop.Module6.Class9",
+   "kind": "dependency",
+   "state": "removed",
+   "id": "Shop.Module8.Class6→Shop.Module6.Class9→dependency"
+  },
+  {
+   "from": "Shop.Module8.Class6",
+   "to": "Shop.Module9.Class9",
+   "kind": "inheritance",
+   "state": "removed",
+   "id": "Shop.Module8.Class6→Shop.Module9.Class9→inheritance"
+  },
+  {
+   "from": "Shop.Module8.Class7",
+   "to": "Shop.Module6.Class8",
+   "kind": "implementation",
+   "state": "added",
+   "id": "Shop.Module8.Class7→Shop.Module6.Class8→implementation"
+  },
+  {
+   "from": "Shop.Module8.Class8",
+   "to": "Shop.Module3.Class7",
+   "kind": "dependency",
+   "state": "unchanged",
+   "id": "Shop.Module8.Class8→Shop.Module3.Class7→dependency"
+  },
+  {
+   "from": "Shop.Module8.Class9",
+   "to": "Shop.Module0.Class6",
+   "kind": "composition",
+   "state": "removed",
+   "id": "Shop.Module8.Class9→Shop.Module0.Class6→composition"
+  }
+ ],
+ "tables": [
+  {
+   "id": "shop.table00",
+   "state": "added",
+   "source": "src/Data/Migrations/20261020_Change0.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name0",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId0",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table01.Id"
+    },
+    {
+     "name": "Old0",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module0.Class0"
+  },
+  {
+   "id": "shop.table01",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261021_Change1.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name1",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId1",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table02.Id"
+    },
+    {
+     "name": "Old1",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module0.Class4"
+  },
+  {
+   "id": "shop.table02",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261022_Change2.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name2",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId2",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table03.Id"
+    },
+    {
+     "name": "Old2",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module0.Class8"
+  },
+  {
+   "id": "shop.table03",
+   "state": "added",
+   "source": "src/Data/Migrations/20261023_Change3.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name3",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId3",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table04.Id"
+    },
+    {
+     "name": "Old3",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module1.Class2"
+  },
+  {
+   "id": "shop.table04",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261024_Change4.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name4",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId4",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table05.Id"
+    },
+    {
+     "name": "Old4",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module1.Class6"
+  },
+  {
+   "id": "shop.table05",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261025_Change5.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name5",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId5",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table06.Id"
+    },
+    {
+     "name": "Old5",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module2.Class0"
+  },
+  {
+   "id": "shop.table06",
+   "state": "added",
+   "source": "src/Data/Migrations/20261026_Change6.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name6",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId6",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table07.Id"
+    },
+    {
+     "name": "Old6",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module2.Class4"
+  },
+  {
+   "id": "shop.table07",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261027_Change7.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name7",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId7",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table08.Id"
+    },
+    {
+     "name": "Old7",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module2.Class8"
+  },
+  {
+   "id": "shop.table08",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261028_Change8.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name8",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId8",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table09.Id"
+    },
+    {
+     "name": "Old8",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module3.Class2"
+  },
+  {
+   "id": "shop.table09",
+   "state": "added",
+   "source": "src/Data/Migrations/20261029_Change9.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name9",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId9",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table10.Id"
+    },
+    {
+     "name": "Old9",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module3.Class6"
+  },
+  {
+   "id": "shop.table10",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261020_Change10.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name10",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId10",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table11.Id"
+    },
+    {
+     "name": "Old10",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module4.Class0"
+  },
+  {
+   "id": "shop.table11",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261021_Change11.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name11",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId11",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table12.Id"
+    },
+    {
+     "name": "Old11",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module4.Class4"
+  },
+  {
+   "id": "shop.table12",
+   "state": "added",
+   "source": "src/Data/Migrations/20261022_Change12.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name12",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId12",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table13.Id"
+    },
+    {
+     "name": "Old12",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module4.Class8"
+  },
+  {
+   "id": "shop.table13",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261023_Change13.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name13",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId13",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table14.Id"
+    },
+    {
+     "name": "Old13",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module5.Class2"
+  },
+  {
+   "id": "shop.table14",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261024_Change14.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name14",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId14",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table15.Id"
+    },
+    {
+     "name": "Old14",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module5.Class6"
+  },
+  {
+   "id": "shop.table15",
+   "state": "added",
+   "source": "src/Data/Migrations/20261025_Change15.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name15",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId15",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table16.Id"
+    },
+    {
+     "name": "Old15",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module6.Class0"
+  },
+  {
+   "id": "shop.table16",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261026_Change16.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name16",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId16",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table17.Id"
+    },
+    {
+     "name": "Old16",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module6.Class4"
+  },
+  {
+   "id": "shop.table17",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261027_Change17.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name17",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId17",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table18.Id"
+    },
+    {
+     "name": "Old17",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module6.Class8"
+  },
+  {
+   "id": "shop.table18",
+   "state": "added",
+   "source": "src/Data/Migrations/20261028_Change18.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name18",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId18",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table19.Id"
+    },
+    {
+     "name": "Old18",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module7.Class2"
+  },
+  {
+   "id": "shop.table19",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261029_Change19.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name19",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId19",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table20.Id"
+    },
+    {
+     "name": "Old19",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ],
+   "entity": "Shop.Module7.Class6"
+  },
+  {
+   "id": "shop.table20",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261020_Change20.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name20",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId20",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table21.Id"
+    },
+    {
+     "name": "Old20",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table21",
+   "state": "added",
+   "source": "src/Data/Migrations/20261021_Change21.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name21",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId21",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table22.Id"
+    },
+    {
+     "name": "Old21",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table22",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261022_Change22.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name22",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId22",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table23.Id"
+    },
+    {
+     "name": "Old22",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table23",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261023_Change23.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name23",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId23",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table24.Id"
+    },
+    {
+     "name": "Old23",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table24",
+   "state": "added",
+   "source": "src/Data/Migrations/20261024_Change24.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name24",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId24",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table25.Id"
+    },
+    {
+     "name": "Old24",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table25",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261025_Change25.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name25",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId25",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table26.Id"
+    },
+    {
+     "name": "Old25",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table26",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261026_Change26.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name26",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId26",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table27.Id"
+    },
+    {
+     "name": "Old26",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table27",
+   "state": "added",
+   "source": "src/Data/Migrations/20261027_Change27.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name27",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId27",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table28.Id"
+    },
+    {
+     "name": "Old27",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table28",
+   "state": "modified",
+   "source": "src/Data/Migrations/20261028_Change28.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name28",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId28",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table29.Id"
+    },
+    {
+     "name": "Old28",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  },
+  {
+   "id": "shop.table29",
+   "state": "dropped",
+   "source": "src/Data/Migrations/20261029_Change29.cs",
+   "columns": [
+    {
+     "name": "Id",
+     "type": "int",
+     "state": "unchanged",
+     "isPrimaryKey": true
+    },
+    {
+     "name": "Name29",
+     "type": "nvarchar(200)",
+     "baseType": "nvarchar(100)",
+     "state": "modified"
+    },
+    {
+     "name": "ParentId29",
+     "type": "int",
+     "state": "added",
+     "references": "shop.table00.Id"
+    },
+    {
+     "name": "Old29",
+     "type": "bit",
+     "state": "dropped"
+    }
+   ]
+  }
+ ],
+ "links": [
+  {
+   "id": "Shop.Module0.Class0⇢shop.table00",
+   "unit": "Shop.Module0.Class0",
+   "table": "shop.table00"
+  },
+  {
+   "id": "Shop.Module0.Class4⇢shop.table01",
+   "unit": "Shop.Module0.Class4",
+   "table": "shop.table01"
+  },
+  {
+   "id": "Shop.Module0.Class8⇢shop.table02",
+   "unit": "Shop.Module0.Class8",
+   "table": "shop.table02"
+  },
+  {
+   "id": "Shop.Module1.Class2⇢shop.table03",
+   "unit": "Shop.Module1.Class2",
+   "table": "shop.table03"
+  },
+  {
+   "id": "Shop.Module1.Class6⇢shop.table04",
+   "unit": "Shop.Module1.Class6",
+   "table": "shop.table04"
+  },
+  {
+   "id": "Shop.Module2.Class0⇢shop.table05",
+   "unit": "Shop.Module2.Class0",
+   "table": "shop.table05"
+  },
+  {
+   "id": "Shop.Module2.Class4⇢shop.table06",
+   "unit": "Shop.Module2.Class4",
+   "table": "shop.table06"
+  },
+  {
+   "id": "Shop.Module2.Class8⇢shop.table07",
+   "unit": "Shop.Module2.Class8",
+   "table": "shop.table07"
+  },
+  {
+   "id": "Shop.Module3.Class2⇢shop.table08",
+   "unit": "Shop.Module3.Class2",
+   "table": "shop.table08"
+  },
+  {
+   "id": "Shop.Module3.Class6⇢shop.table09",
+   "unit": "Shop.Module3.Class6",
+   "table": "shop.table09"
+  },
+  {
+   "id": "Shop.Module4.Class0⇢shop.table10",
+   "unit": "Shop.Module4.Class0",
+   "table": "shop.table10"
+  },
+  {
+   "id": "Shop.Module4.Class4⇢shop.table11",
+   "unit": "Shop.Module4.Class4",
+   "table": "shop.table11"
+  },
+  {
+   "id": "Shop.Module4.Class8⇢shop.table12",
+   "unit": "Shop.Module4.Class8",
+   "table": "shop.table12"
+  },
+  {
+   "id": "Shop.Module5.Class2⇢shop.table13",
+   "unit": "Shop.Module5.Class2",
+   "table": "shop.table13"
+  },
+  {
+   "id": "Shop.Module5.Class6⇢shop.table14",
+   "unit": "Shop.Module5.Class6",
+   "table": "shop.table14"
+  },
+  {
+   "id": "Shop.Module6.Class0⇢shop.table15",
+   "unit": "Shop.Module6.Class0",
+   "table": "shop.table15"
+  },
+  {
+   "id": "Shop.Module6.Class4⇢shop.table16",
+   "unit": "Shop.Module6.Class4",
+   "table": "shop.table16"
+  },
+  {
+   "id": "Shop.Module6.Class8⇢shop.table17",
+   "unit": "Shop.Module6.Class8",
+   "table": "shop.table17"
+  },
+  {
+   "id": "Shop.Module7.Class2⇢shop.table18",
+   "unit": "Shop.Module7.Class2",
+   "table": "shop.table18"
+  },
+  {
+   "id": "Shop.Module7.Class6⇢shop.table19",
+   "unit": "Shop.Module7.Class6",
+   "table": "shop.table19"
+  }
+ ],
+ "files": [],
+ "otherFiles": [
+  {
+   "path": "README.md",
+   "added": 3,
+   "removed": 1
+  },
+  {
+   "path": "src/Data/Migrations/20261020_Change0.Designer.cs",
+   "added": 80,
+   "removed": 0,
+   "reason": "Generated by EF Core."
+  }
+ ]
+}

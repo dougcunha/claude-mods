@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visual review</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css?t=__REVIEW_TOKEN__" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <h1>Visual review</h1>
+      <p id="base" class="base"></p>
+      <ul id="counts" class="counts" aria-label="Changes"></ul>
+      <div class="filter" role="group" aria-label="Show">
+        <button type="button" data-filter="both" aria-pressed="true">Units and tables</button>
+        <button type="button" data-filter="units" aria-pressed="false">Units</button>
+        <button type="button" data-filter="tables" aria-pressed="false">Tables</button>
+      </div>
+    </header>
+    <aside id="panel" class="panel" aria-labelledby="panel-title">
+      <div class="panel-head">
+        <h2 id="panel-title">Comments</h2>
+        <button type="button" id="submit" class="primary">Submit review</button>
+      </div>
+      <p id="sent" class="sent" role="status"></p>
+      <button type="button" id="comment-review">Comment on the whole review</button>
+      <form id="form" class="form" hidden>
+        <p id="form-anchor" class="form-anchor"></p>
+        <fieldset>
+          <legend>Type</legend>
+          <label><input type="radio" name="type" value="change" checked /> Change request</label>
+          <label><input type="radio" name="type" value="question" /> Question</label>
+        </fieldset>
+        <label for="form-text">Comment</label>
+        <textarea id="form-text" rows="4" maxlength="10000" required></textarea>
+        <div class="form-actions">
+          <button type="submit" class="primary">Save</button>
+          <button type="button" id="form-cancel">Cancel</button>
+        </div>
+      </form>
+      <section aria-labelledby="drafts-title">
+        <h3 id="drafts-title">This round</h3>
+        <ul id="drafts" class="comments"></ul>
+      </section>
+      <section aria-labelledby="earlier-title">
+        <h3 id="earlier-title">Earlier rounds</h3>
+        <ul id="earlier" class="comments"></ul>
+      </section>
+      <section aria-labelledby="unanchored-title">
+        <h3 id="unanchored-title">Unanchored</h3>
+        <ul id="unanchored" class="comments"></ul>
+      </section>
+    </aside>
+    <main>
+      <p id="status" class="status" role="status">Loading the view model…</p>
+      <section id="diagram" class="diagram" aria-label="Design diagram">
+        <div id="canvas" class="canvas">
+          <svg id="edges" class="edges" aria-hidden="true"></svg>
+        </div>
+      </section>
+      <section id="other" class="other" aria-labelledby="other-title" hidden>
+        <h2 id="other-title">Other files</h2>
+        <ul id="other-list"></ul>
+      </section>
+    </main>
+    <script src="vendor/elk.bundled.js?t=__REVIEW_TOKEN__"></script>
+    <script src="review-text.js?t=__REVIEW_TOKEN__"></script>
+    <script src="app.js?t=__REVIEW_TOKEN__"></script>
+  </body>
+</html>

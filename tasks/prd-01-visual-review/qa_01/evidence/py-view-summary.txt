@@ -1,0 +1,22 @@
+base=main branch=main round=1 counts={"units":{"added":2,"modified":2,"deleted":0},"tables":{"added":1,"modified":1,"dropped":0}}
+container migrations/versions closed=false units=1
+container shop closed=false units=4
+unit migrations.versions.0002_add_orders kind=module state=added file=migrations/versions/0002_add_orders.py lines=16 +16 -0 methods=1 ce=0 ca=0 cohesion=5 summary=yes rangeChecked=true members=upgrade:added
+unit shop.models.Base kind=class state=context file=shop/models.py lines=null +null -null methods=null ce=0 ca=2 cohesion=null summary=no rangeChecked=true members=
+unit shop.models.Customer kind=class state=modified file=shop/models.py lines=6 +2 -1 methods=0 ce=2 ca=2 cohesion=5 summary=yes rangeChecked=true members=name:modified,orders:added
+unit shop.models.Order kind=class state=added file=shop/models.py lines=7 +7 -0 methods=0 ce=2 ca=2 cohesion=5 summary=yes rangeChecked=true members=id:added,customer_id:added,total:added,customer:added
+unit shop.service kind=module state=modified file=shop/service.py lines=11 +7 -1 methods=2 ce=2 ca=0 cohesion=4 summary=yes rangeChecked=true members=place_order:added
+relation shop.models.Customer→shop.models.Base→inheritance state=unchanged
+relation shop.models.Customer→shop.models.Order→composition state=added
+relation shop.models.Order→shop.models.Base→inheritance state=added
+relation shop.models.Order→shop.models.Customer→dependency state=added
+relation shop.service→shop.models.Customer→dependency state=unchanged
+relation shop.service→shop.models.Order→dependency state=added
+table customers state=modified source=migrations/versions/0002_add_orders.py entity=shop.models.Customer columns=name:modified
+table orders state=added source=migrations/versions/0002_add_orders.py entity=shop.models.Order columns=id:added,customer_id:added->customers.id,total:added
+link shop.models.Customer -> customers
+link shop.models.Order -> orders
+file migrations/versions/0002_add_orders.py +16 -0 rest={"added":0,"removed":0}
+file shop/models.py +13 -3 rest={"added":4,"removed":2}
+file shop/service.py +7 -1 rest={"added":0,"removed":0}
+notice=null anchors=25

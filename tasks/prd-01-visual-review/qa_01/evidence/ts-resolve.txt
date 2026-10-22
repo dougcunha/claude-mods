@@ -1,0 +1,16 @@
+POST resolve: 204
+comment unit:src/pricing type=change status=open round=1 anchored=true
+comment member:src/cart.Cart#total(): number type=question status=open round=1 anchored=false
+comment relation:src/cart.Cart→src/item.Item→composition type=change status=open round=1 anchored=true
+comment table:orders type=question status=open round=1 anchored=true
+comment column:orders.sku type=change status=open round=1 anchored=true
+comment review:review type=question status=open round=1 anchored=true
+POST /submit: Review sent 202
+base=main branch=main round=3 counts={"units":{"added":2,"modified":1,"deleted":0},"tables":{"added":1,"modified":0,"dropped":0}}
+comment unit:src/pricing type=change status=resolved round=1 anchored=true
+comment member:src/cart.Cart#total(): number type=question status=open round=1 anchored=false
+comment relation:src/cart.Cart→src/item.Item→composition type=change status=open round=1 anchored=true
+comment table:orders type=question status=open round=1 anchored=true
+comment column:orders.sku type=change status=open round=1 anchored=true
+comment review:review type=question status=open round=1 anchored=true
+"result":"Nesta revisão não há perguntas novas nem pedidos de mudança novos. Não alterei nenhum arquivo.\n\n## Comentário resolvido\n\nVocê marcou como resolvido o pedido de mover a regra de desconto para uma classe `Pricing`. Por isso, tirei o pedido A do plano. A pergunta sobre `isExpensive` também saiu do plano.\n\nO arquivo `src/pricing.ts` não mudou: `discount` e `isExpensive` continuam como f

@@ -1,0 +1,6 @@
+"result":"OK
+"result":"visual-review: Analyzing the design of 3 changed files against main.
+"result":"A página de revisão visual está pronta: a ferramenta aceitou o modelo de design (run `vr-mvju0ntq`) no primeiro envio.
+visual-review): visual-review: Visual review ready: http://127.0.0.1:62581/?t=<token>
+claude exit: 0
+server.mjs node processes after exit: 0

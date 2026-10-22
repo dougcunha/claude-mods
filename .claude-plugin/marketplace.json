@@ -17,6 +17,11 @@
       "name": "topic-guard",
       "source": "./topic-guard",
       "description": "Before a prompt enters the session, a small model judges whether it starts a separate topic; Enter keeps it here, New session clears the session for it."
+    },
+    {
+      "name": "visual-review",
+      "source": "./visual-review",
+      "description": "The /visual-review command shows the design of the changes against a base branch as a diagram in the browser; comment on it and send the review back to the session in one step."
     }
   ]
 }

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "generation": 17,
+  "feature": "prd-01-visual-review",
+  "workspace": "D:\\MyProjects\\claude-mods",
+  "phase": "acceptance",
+  "status": "awaiting-hil",
+  "safe_to_stop": true,
+  "owner_session": "session_01HjdnUaLWz54U7iqckkwe7E",
+  "mode": "auto",
+  "decision_log": "autonomous-decisions.md",
+  "objective": "New mod visual-review: /visual-review [base] analyzes the diff with a subagent and opens a local browser page with the design diagram, comments and a one-click review submit back to the session.",
+  "constraints": [
+    "Supported mod API only (AGENTS.md, NFR-03)",
+    "English for all repository text (NFR-11)",
+    "Logic in helper modules with tests; server and page stay thin (DEC-07)",
+    "Preserve pre-existing changes: .gitignore, skills-lock.json"
+  ],
+  "sources": {
+    "workflow": "workflow.md",
+    "prd": "prd.md",
+    "techspec": "techspec.md",
+    "tasks": "tasks.md",
+    "review": "codereview_02/codereview.md",
+    "qa": "qa_01/qa.md",
+    "snapshot": "context-snapshot.md"
+  },
+  "review_status": "REJECTED",
+  "qa_status": "BLOCKED",
+  "approved_sources": [
+    {
+      "path": "prd.md",
+      "sha256": "08c64d1272f495488f883b2d6a7f2812a38a8a6016265bea885578c2c3ec28ce",
+      "decision_id": "W-03"
+    },
+    {
+      "path": "techspec.md",
+      "sha256": "59c174bb25854b4dfe7dbc8551242b45a3f1b215bf7578e87922cdd0053f1ea5",
+      "decision_id": "W-04"
+    },
+    {
+      "path": "tasks.md",
+      "sha256": "999de4377419299c7840c4bf0e2860871d3783920fd86808498ccd4293f5e7d1",
+      "decision_id": "W-04"
+    }
+  ],
+  "decisions_to_read": [
+    "W-01",
+    "W-04",
+    "W-05"
+  ],
+  "git_base": "8d5ddebde265db7378b7bb730671e34709905a23",
+  "worktree_evidence": "workflow.md#Base and pre-existing changes",
+  "active_work": [],
+  "pending_hil": {
+    "gate": "HIL 3 (AUTO-16)",
+    "question": "Accept the delivery: run the manual script first, accept now with the manual items as accepted open items, or stop?",
+    "affected": [
+      "T07",
+      "TC-18",
+      "TC-19",
+      "FR-18",
+      "FR-24",
+      "NFR-07",
+      "NFR-08",
+      "O-05",
+      "O-06"
+    ]
+  },
+  "blockers": [
+    {
+      "id": "B-01",
+      "summary": "Essential manual acceptance open, accepted by the user as open manual acceptance for HIL 3 (W-05)",
+      "evidence": "workflow.md#Decisions W-05"
+    }
+  ],
+  "correction_round": 1,
+  "rounds_without_progress": 0,
+  "next_action": {
+    "kind": "await-decision",
+    "instruction": "Ask HIL 3. Manual first: record the user's result per script item in workflow.md, then accept or open corrections for failures (sdd-plan-corrections from qa_01 plus the user's evidence). Accept now: record the accepted open items, mark checkpoint completed and the snapshot closed. Commit only through the commit skill when asked",
+    "read": [
+      {
+        "path": "tasks/prd-01-visual-review/qa_01/qa.md",
+        "section": "Manual acceptance, Limitations and open items"
+      },
+      {
+        "path": "tasks/prd-01-visual-review/workflow.md",
+        "section": "Decisions, Recovery events"
+      }
+    ]
+  }
+}

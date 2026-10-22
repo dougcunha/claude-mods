@@ -1,0 +1,26 @@
+{
+  "name": "visual-review",
+  "version": "0.1.0",
+  "description": "The /visual-review command shows the design of the changes against a base branch as a diagram in the browser: classes and modules with their relations, size and quality notes, and the database tables. Comment on the diagram and send the review back to the session in one step.",
+  "author": {
+    "name": "Douglas Cunha",
+    "url": "https://github.com/dougcunha"
+  },
+  "homepage": "https://github.com/dougcunha/claude-mods/tree/main/visual-review",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "analysisModel": {
+      "type": "string",
+      "title": "Model of the design analysis",
+      "description": "The model of the subagent that reads the diff and returns the design model for the diagram. inherit uses the model of the session. Each /visual-review run starts 1 analysis.",
+      "default": "sonnet",
+      "options": [
+        "sonnet",
+        "opus",
+        "haiku",
+        "inherit"
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+Page checks: node visual-review/server/server.mjs --dir <QA>/page --web visual-review/web, with tests/fixtures/large-view.json copied as view.json.
+Browser: Playwright MCP Chromium (headless tool browser), Windows 11.
+- Status after load: "Drew 100 units and 30 tables in 885 ms." DOMContentLoaded 191 ms. Interactive in about 1.1 s (NFR-05: 3 s or less).
+- Anchors drawn: unit 90 (10 context units in closed containers), member 180, table 30, column 120, relation 130.
+- 10 container headers, all BUTTON with aria-expanded. Focus on "Shop.Module0 (10)" + Enter: aria-expanded true -> false, focus stays on the header, units 90 -> 80 (FR-17).
+- Filter: Tables -> units 0, tables 30; Units -> units 80, tables 0; both -> 80 and 30. window marker kept: no reload (FR-15).
+- Focus on a member + Enter: form opens, "Comment on member Shop.Module1.Class0#Run0()", focus in the text box (FR-18, NFR-07 keyboard).
+- State badges: 390 leaf elements with the text +, ~, - or ctx (NFR-07: state not only by color).
+- Dark theme: emulate prefers-color-scheme dark; screenshot page-100-units-dark.png. Contrast ratios not measured again.
+- Network requests (NFR-02), all 127.0.0.1:
+  GET / 200, /style.css 200, /vendor/elk.bundled.js 200, /review-text.js 200, /app.js 200, /view 200, /events 200

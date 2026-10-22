@@ -1,0 +1,33 @@
+Validating plugin manifest: D:\MyProjects\claude-mods\visual-review\.claude-plugin\plugin.json
+
+  ❯ types ./types/index.d.ts declares on $: nothing (no EngineInterface member)
+  ❯ types ./types/index.d.ts declares state: visual-review.pendingRun
+
+Validating hooks: D:\MyProjects\claude-mods\visual-review\hooks\hooks.json
+
+  ❯ ./register.tsx hooks: session.start, command.run{command=?}, tool.call{tool=?}, turn.start, turn.complete, session.end
+  ❯ ./register.tsx gating hook with .catch: command.run{command=?}
+  ❯ ./register.tsx gating hook with .catch: tool.call{tool=?}
+  ❯ ./register.tsx calls: $.clock.after (via startRun, startServer), $.clock.now (via saveComments, startRun, submitReview), $.command.register, $.env.get (via hostOf), $.fs.read (via hostOf), $.fs.write (via hostOf), $.process.run (via hostOf), $.process.spawn (via openBrowser, startServer), $.prompt.submit (via startRun, submitReview), $.session.cwd (via hostOf), $.session.id (via hostOf), $.state.get, $.state.set, $.store.delete (via hostOf), $.store.get (via hostOf), $.store.keys (via hostOf), $.store.set (via hostOf), $.tool.register, $.ui.status, $.ui.toast
+  ❯ ./register.tsx env writes: nothing
+  ❯ ./register.tsx env reads: OS, TEMP, TMPDIR
+  ❯ ./register.tsx state writes: visual-review.pendingRun
+  ❯ ./register.tsx state reads: visual-review.pendingRun
+
+Plugin directory checks for D:\MyProjects\claude-mods\visual-review. The plugin directory is the catalog that plugins are submitted to; this is a subset of what it runs.
+
+⚠ Found 1 plugin directory warning:
+
+  ❯ .claude-plugin/plugin.json icon: No icon (ICON_MISSING). No icon found in the plugin. The validator looked for `icon` in plugin.json and for a file at .claude-plugin/icon.png or .svg, assets/icon.png or .svg, or a similar path.
+    Fix: Add a square PNG to the plugin folder at .claude-plugin/icon.png, or set `icon` in plugin.json to the path of a square PNG or JPEG in the plugin: 512 to 2048 px on each side, under 2 MB. SVG and WebP are not accepted. That file may become the listing icon only once: the first time the plugin is saved or submitted in the developer portal. Adding or changing it later does not change the icon.
+
+About these checks:
+
+  ❯ hooks/hooks.json names a hooks module (a code file listed under `modules`). The plugin directory has rules of its own for such code, and these checks apply none of them, so passing here does not mean the directory accepts the plugin. The developer portal's own validation applies those rules.
+
+These plugin directory checks do not change the result below.
+
+The directory also runs a safety scan and a policy review that this command does not.
+
+✔ Validation passed
+exit 0

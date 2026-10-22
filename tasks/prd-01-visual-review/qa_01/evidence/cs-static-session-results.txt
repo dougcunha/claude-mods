@@ -1,0 +1,9 @@
+node on PATH: none
+"result":"OK
+"result":"visual-review: Analyzing the design of 5 changed files against main.
+"result":"A página de revisão visual está pronta como página estática, e o botão \
+visual-review): visual-review: Node.js not found. The page is static: use Copy review to send the comments. Page: file:///C:/Users/Admin/AppData/Local/Temp/claude-visual-review/30dbfbef-e7f6-4200-abd2-5f016ab04ee7/review.html
+server spawns: 0
+review.html
+view.js
+view.json

@@ -1,0 +1,9 @@
+shop-py numstat:
+13	3	shop/models.py
+7	1	shop/service.py
+16
+unit migrations.versions.0002_add_orders kind=module state=added file=migrations/versions/0002_add_orders.py lines=16 +16 -0 methods=1 ce=0 ca=0 cohesion=5
+unit shop.models.Base kind=class state=context file=shop/models.py lines=null +null -null methods=null ce=0 ca=2 cohesion=null
+unit shop.models.Customer kind=class state=modified file=shop/models.py lines=6 +2 -1 methods=0 ce=2 ca=2 cohesion=5
+unit shop.models.Order kind=class state=added file=shop/models.py lines=7 +7 -0 methods=0 ce=2 ca=2 cohesion=5
+unit shop.service kind=module state=modified file=shop/service.py lines=11 +7 -1 methods=2 ce=2 ca=0 cohesion=4

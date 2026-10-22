@@ -1,0 +1,9 @@
+no token /view: 403
+wrong token /view: 403
+header token /view: 200
+query token /: 200
+wrong Host: 403
+Host localhost: 403
+POST no token: 403
+OPTIONS preflight: 403
+  TCP    127.0.0.1:49680        0.0.0.0:0              LISTENING       15848
