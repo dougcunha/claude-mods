@@ -1,37 +1,48 @@
-/* The review page. Colors are tokens with WCAG 2.1 AA contrast on their background in both themes (NFR-07). */
+/*
+ * The review page: a Swiss grid sheet in the Claude Code palette. Colors are tokens with WCAG 2.1 AA contrast on their
+ * background in both themes (NFR-07). State colors do one job each; clay marks only the review path: comment counts,
+ * the comment target, the form and Submit review.
+ */
 :root {
   color-scheme: light;
-  --bg: #ffffff;
-  --panel: #f6f8fa;
-  --text: #1f2328;
-  --muted: #59636e;
-  --border: #d1d9e0;
-  --focus: #0969da;
-  --added: #1a7f37;
-  --modified: #7d4e00;
-  --deleted: #cf222e;
-  --context: #59636e;
-  --link: #59636e;
+  --bg: #faf9f5;
+  --panel: #faf9f5;
+  --text: #141413;
+  --muted: #5e5d59;
+  --rule: #d9d6cc;
+  --hover: #efede5;
   --card: #ffffff;
-  --card-context: #f6f8fa;
+  --added: #1a7f37;
+  --modified: #1f5fbf;
+  --deleted: #c42b2b;
+  --context: #5e5d59;
+  --on-state: #ffffff;
+  --clay: #b5522f;
+  --on-clay: #ffffff;
+  --sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+  --step: 90ms steps(2, jump-none);
+  /* The header and the panel head share 1 height, so their rules line up across the sheet. */
+  --head-height: 112px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --bg: #0d1117;
-    --panel: #151b23;
-    --text: #e6edf3;
-    --muted: #9198a1;
-    --border: #3d444d;
-    --focus: #4493f8;
-    --added: #3fb950;
-    --modified: #d29922;
-    --deleted: #f85149;
-    --context: #9198a1;
-    --link: #9198a1;
-    --card: #151b23;
-    --card-context: #0d1117;
+    --bg: #1f1e1d;
+    --panel: #1f1e1d;
+    --text: #f0eee6;
+    --muted: #a3a199;
+    --rule: #3a3936;
+    --hover: #2c2b29;
+    --card: #262624;
+    --added: #4ac26b;
+    --modified: #6aa1ff;
+    --deleted: #ff6b6b;
+    --context: #a3a199;
+    --on-state: #1f1e1d;
+    --clay: #e07a55;
+    --on-clay: #1f1e1d;
   }
 }
 
@@ -39,89 +50,260 @@
   box-sizing: border-box;
 }
 
+html {
+  scrollbar-color: var(--muted) var(--bg);
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font: 13px/1.45 var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The page fits the window: the diagram column and the panel each scroll on their own. */
+@media (min-width: 901px) {
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .toolbar {
+    flex: none;
+  }
+
+  main {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+}
+
+::selection {
+  background: var(--clay);
+  color: var(--on-clay);
 }
 
 :focus-visible {
-  outline: 3px solid var(--focus);
+  outline: 2px solid var(--text);
   outline-offset: 2px;
 }
 
+button,
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+}
+
+button {
+  background: transparent;
+  border: 1px solid var(--text);
+  border-radius: 0;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background-color var(--step), color var(--step);
+}
+
+button:hover {
+  background: var(--hover);
+}
+
+button.primary {
+  color: var(--on-clay);
+  background: var(--clay);
+  border-color: var(--clay);
+  font-weight: 700;
+}
+
+button.primary:hover {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+
+/* Submit review is the only filled button; the form's Save is the clay outline of it. */
+.form button.primary {
+  color: var(--clay);
+  background: transparent;
+}
+
+.form button.primary:hover {
+  color: var(--on-clay);
+  background: var(--clay);
+  border-color: var(--clay);
+}
+
+select {
+  appearance: none;
+  padding: 2px 24px 2px 6px;
+  background-color: var(--bg);
+  background-image: linear-gradient(45deg, transparent 50%, var(--text) 50%), linear-gradient(135deg, var(--text) 50%, transparent 50%);
+  background-position: right 11px center, right 7px center;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+  border: 1px solid var(--muted);
+  border-radius: 0;
+  cursor: pointer;
+}
+
+/*
+ * The header: the title block over the filter in the first column, and the change counts at poster scale on the column
+ * grid at the right.
+ */
 .toolbar {
   position: sticky;
   top: 0;
   z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  align-items: center;
-  padding: 8px 16px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 24px;
+  align-items: end;
+  min-height: var(--head-height);
+  padding: 12px 24px;
+  background: var(--bg);
+  border-bottom: 3px solid var(--text);
+}
+
+.title {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.counts {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.filter {
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: start;
+}
+
+/* A wide window holds the title, the counts and the filter on 1 row; a narrower one puts the filter under the title. */
+@media (min-width: 1400px) {
+  :root {
+    --head-height: 88px;
+  }
+
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .counts {
+    grid-row: 1;
+  }
+
+  .filter {
+    grid-column: 3;
+    grid-row: 1;
+  }
 }
 
 .toolbar h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 .base {
-  margin: 0;
+  margin: 2px 0 0;
   color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .counts {
   display: flex;
-  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .counts li {
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  width: 84px;
+  padding: 0 8px;
+  border-left: 1px solid var(--rule);
+}
+
+/* Units and tables: a heavier rule splits the 2 groups of counts. */
+.counts li:nth-child(4) {
+  margin-left: 8px;
+  border-left: 3px solid var(--text);
+}
+
+.count-value {
+  display: block;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.count-label {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: pre-line;
+}
+
+.counts .is-added .count-value {
+  color: var(--added);
+}
+
+.counts .is-modified .count-value {
+  color: var(--modified);
+}
+
+.counts .is-deleted .count-value {
+  color: var(--deleted);
+}
+
+.counts .is-zero .count-value {
+  color: var(--muted);
 }
 
 .filter {
   display: flex;
-  gap: 4px;
-  margin-left: auto;
 }
 
-button {
-  font: inherit;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
+.filter button {
+  font-size: 12px;
+  padding: 5px 10px;
 }
 
-button[aria-pressed='true'] {
-  border-color: var(--focus);
-  box-shadow: inset 0 0 0 1px var(--focus);
+.filter button + button {
+  border-left: 0;
+}
+
+.filter button[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--bg);
 }
 
 .status {
-  margin: 8px 16px;
+  margin: 10px 24px 0;
   color: var(--muted);
+  font-size: 12px;
 }
 
 .status.is-error {
   color: var(--deleted);
-  font-weight: 600;
+  font-weight: 700;
 }
 
+/* The diagram sheet. */
 .diagram {
   overflow: auto;
-  padding: 16px;
+  padding: 16px 24px 24px;
 }
 
 .canvas {
@@ -136,8 +318,8 @@ button[aria-pressed='true'] {
 
 .container-box {
   fill: none;
-  stroke: var(--border);
-  stroke-width: 1.5;
+  stroke: var(--text);
+  stroke-width: 1;
 }
 
 .container-box.is-tables {
@@ -146,12 +328,45 @@ button[aria-pressed='true'] {
 
 .container-head {
   position: absolute;
+  height: 32px;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  padding: 5px 10px;
+  background: var(--bg);
+  border: 0;
+  border-bottom: 1px solid var(--text);
+}
+
+div.container-head {
+  border-bottom-style: dashed;
+}
+
+/* The chevron of a container head: down when open, right when closed. */
+button.container-head::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 9px 2px 1px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  vertical-align: middle;
+}
+
+button.container-head[aria-expanded='false']::before {
+  transform: rotate(-45deg);
+}
+
+/* A closed container is only its head, so the head carries the frame. */
+.container-head[aria-expanded='false'] {
+  border: 1px solid var(--text);
 }
 
 .edge {
@@ -175,49 +390,73 @@ button[aria-pressed='true'] {
 }
 
 .edge.is-link {
-  stroke: var(--link);
+  stroke: var(--muted);
   stroke-dasharray: 2 4;
 }
 
-.edge-label {
+button.edge-label.badge {
   position: absolute;
-  padding: 0 4px;
-  font-size: 12px;
+  min-width: 0;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  background: var(--bg);
+  color: var(--muted);
+  font: 12px/17px var(--sans);
+  text-align: left;
   white-space: nowrap;
-  border-radius: 4px;
+}
+
+button.edge-label.badge.is-added {
+  color: var(--added);
+}
+
+button.edge-label.badge.is-removed {
+  color: var(--deleted);
+}
+
+/* An underline, not a wash: the state text keeps its AA contrast on the paper. */
+button.edge-label.badge:hover {
+  background: var(--bg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .card {
   position: absolute;
   width: 260px;
-  padding: 8px;
+  padding: 8px 10px 9px;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--rule);
 }
 
 .card.is-added {
-  border-left-color: var(--added);
+  border-top-color: var(--added);
 }
 
 .card.is-modified {
-  border-left-color: var(--modified);
+  border-top-color: var(--modified);
 }
 
 .card.is-deleted,
 .card.is-dropped {
-  border-left-color: var(--deleted);
+  border-top-color: var(--deleted);
 }
 
 .card.is-context {
-  background: var(--card-context);
+  background: transparent;
   color: var(--context);
   border-style: dashed;
+  border-top-width: 1px;
+  border-color: var(--muted);
 }
 
 .card.is-measuring {
   visibility: hidden;
+}
+
+.card[data-anchor]:hover {
+  border-color: var(--muted);
 }
 
 .card h3 {
@@ -226,6 +465,7 @@ button[aria-pressed='true'] {
   align-items: baseline;
   margin: 0;
   font-size: 14px;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
@@ -236,44 +476,58 @@ button[aria-pressed='true'] {
   font-weight: 400;
 }
 
+/* A state badge: a solid square with its glyph, so the state reads without the color. */
 .badge {
   flex: none;
-  min-width: 28px;
+  min-width: 22px;
   padding: 0 4px;
-  border: 1px solid currentColor;
-  border-radius: 4px;
+  background: var(--context);
+  color: var(--on-state);
   text-align: center;
-  font: 600 12px/18px ui-monospace, monospace;
+  font: 700 11px/17px var(--mono);
 }
 
 .badge.is-added {
-  color: var(--added);
+  background: var(--added);
 }
 
 .badge.is-modified {
-  color: var(--modified);
+  background: var(--modified);
 }
 
 .badge.is-deleted,
 .badge.is-dropped,
 .badge.is-removed {
-  color: var(--deleted);
+  background: var(--deleted);
 }
 
 .badge.is-context,
 .badge.is-unchanged {
+  background: transparent;
   color: var(--context);
+  box-shadow: inset 0 0 0 1px var(--context);
 }
 
 .metrics {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 10px;
+  gap: 0 10px;
   margin: 6px 0 0;
   padding: 0;
   list-style: none;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* 2 deliberate rows: size (lines, delta, methods), then quality (cohesion, Ce, Ca). */
+.metrics::after {
+  content: '';
+  flex-basis: 100%;
+  order: 2;
+}
+
+.metrics .quality {
+  order: 3;
 }
 
 .metrics .plus {
@@ -286,26 +540,41 @@ button[aria-pressed='true'] {
 
 .cohesion {
   text-decoration: underline dotted;
+  text-underline-offset: 3px;
   cursor: help;
 }
 
 .summary {
   margin: 6px 0 0;
+  font-size: 12.5px;
 }
 
 .members,
 .columns {
-  margin: 6px 0 0;
+  margin: 6px -4px 0;
   padding: 0;
   list-style: none;
-  font: 12px/1.5 ui-monospace, monospace;
+  font: 12px/18px var(--mono);
 }
 
+/* A member or a column is a full-width row: the whole row takes the click, the hover and the focus. */
 .members li,
 .columns li {
   display: flex;
   gap: 6px;
-  align-items: baseline;
+  align-items: center;
+  padding: 1px 4px;
+  overflow-wrap: anywhere;
+}
+
+.members li:hover,
+.columns li:hover {
+  background: var(--hover);
+}
+
+.members li:focus-visible,
+.columns li:focus-visible {
+  outline-offset: -2px;
 }
 
 .note {
@@ -315,12 +584,38 @@ button[aria-pressed='true'] {
   font-style: italic;
 }
 
+/* The element the open comment form is about. */
+.is-target,
+.card.is-target,
+button.edge-label.badge.is-target {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+}
+
+.members li.is-target,
+.columns li.is-target {
+  outline-offset: -2px;
+}
+
+/* An atomic inline, so the underline of a hovered label does not run under the count. */
+.comment-count {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  background: var(--clay);
+  color: var(--on-clay);
+  font: 700 11px/16px var(--sans);
+}
+
 .other {
-  margin: 0 16px 16px;
+  margin: 0 24px 24px;
+  padding-top: 8px;
+  border-top: 1px solid var(--text);
 }
 
 .other h2 {
-  font-size: 15px;
+  margin: 0 0 6px;
+  font-size: 13px;
 }
 
 .other ul {
@@ -330,11 +625,13 @@ button[aria-pressed='true'] {
 }
 
 .other li {
-  padding: 2px 0;
-  font-family: ui-monospace, monospace;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--rule);
+  font: 12px/18px var(--mono);
+  overflow-wrap: anywhere;
 }
 
-/* The comment panel: fixed on the right, so the diagram scrolls beside it. */
+/* The comment panel: a fixed column on the right, behind the second heavy rule, so the diagram scrolls beside it. */
 body {
   padding-right: 360px;
 }
@@ -347,49 +644,62 @@ body {
   z-index: 6;
   width: 360px;
   overflow: auto;
-  padding: 12px 16px;
+  padding: 0 20px 20px;
   background: var(--panel);
-  border-left: 1px solid var(--border);
+  border-left: 3px solid var(--text);
 }
 
 .panel-head {
   display: flex;
-  align-items: center;
+  gap: 12px;
+  align-items: flex-end;
   justify-content: space-between;
+  min-height: var(--head-height);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--text);
 }
 
+/* One step under the page title, so the panel reads after the diagram. */
 .panel h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.panel-head .primary {
+  padding: 8px 14px;
 }
 
 .panel h3 {
-  margin: 16px 0 4px;
-  font-size: 14px;
+  margin: 20px 0 0;
+  padding-bottom: 4px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--text);
 }
 
-button.primary {
-  color: var(--bg);
-  background: var(--focus);
-  border-color: var(--focus);
+#comment-review {
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 10px;
+  text-align: left;
 }
 
 .sent {
-  min-height: 1.4em;
-  margin: 6px 0;
+  min-height: 1.45em;
+  margin: 8px 0;
   color: var(--added);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 10px 0;
-  padding: 10px;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 10px 12px 12px;
   background: var(--card);
-  border: 1px solid var(--focus);
-  border-radius: 6px;
+  border: 1px solid var(--text);
+  border-top: 3px solid var(--clay);
 }
 
 /* `display: flex` would show a form that has the hidden attribute. */
@@ -399,30 +709,56 @@ button.primary {
 
 .form fieldset {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
+.form legend {
+  float: left;
+  margin-right: 4px;
+  color: var(--muted);
+}
+
+.form label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.form label[for='form-text'] {
+  color: var(--muted);
+}
+
+input[type='radio'] {
+  margin: 0;
+  accent-color: var(--clay);
+}
+
 .form textarea {
-  font: inherit;
-  color: var(--text);
+  min-height: 88px;
+  resize: vertical;
   background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 6px;
+  border: 1px solid var(--muted);
+  border-radius: 0;
+  padding: 6px 8px;
+  caret-color: var(--clay);
+}
+
+.form textarea:focus-visible {
+  outline-offset: 0;
 }
 
 .form-anchor {
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
 .form-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .comments {
@@ -432,11 +768,13 @@ button.primary {
 }
 
 .comments li {
-  margin: 0 0 8px;
-  padding: 8px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.comments li.meta {
+  padding: 8px 0;
+  border-bottom: 0;
 }
 
 .comments .meta {
@@ -446,8 +784,9 @@ button.primary {
 }
 
 .comments p {
-  margin: 4px 0;
+  margin: 3px 0 6px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .comments .actions {
@@ -456,20 +795,95 @@ button.primary {
   align-items: center;
 }
 
-.comment-count {
-  margin-left: 4px;
-  padding: 0 6px;
-  border-radius: 8px;
-  background: var(--focus);
-  color: var(--bg);
-  font: 600 11px/16px system-ui, sans-serif;
+.comments .actions button {
+  padding: 2px 10px;
+  font-size: 12px;
+  border-color: var(--rule);
+}
+
+.comments .actions button:hover {
+  border-color: var(--text);
 }
 
 [data-anchor] {
   cursor: pointer;
 }
 
-.members li[tabindex],
-.columns li[tabindex] {
-  border-radius: 3px;
+/* A narrow window puts the panel under the diagram, so neither is cut. */
+@media (max-width: 900px) {
+  body {
+    padding-right: 0;
+  }
+
+  /* The panel comes before the diagram in the page; a column puts the diagram first on the screen. */
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  main {
+    order: 1;
+  }
+
+  .panel {
+    order: 2;
+  }
+
+  .toolbar {
+    position: static;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px 16px;
+  }
+
+  .counts {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .filter {
+    grid-row: 3;
+  }
+
+  .counts {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .counts li {
+    width: 33.33%;
+  }
+
+  .counts li:nth-child(4) {
+    margin-left: 0;
+  }
+
+  .status {
+    margin: 10px 16px 0;
+  }
+
+  .diagram {
+    padding: 16px;
+  }
+
+  .other {
+    margin: 0 16px 16px;
+  }
+
+  .panel {
+    position: static;
+    width: auto;
+    padding: 0 16px 16px;
+    border-left: 0;
+    border-top: 3px solid var(--text);
+  }
+
+  .panel-head {
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
 }

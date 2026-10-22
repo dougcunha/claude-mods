@@ -21,10 +21,12 @@
     'elk.spacing.edgeLabel': '4',
   }
   var CONTAINER_PADDING = '[top=' + (HEAD_HEIGHT + 12) + ',left=12,bottom=12,right=12]'
+  /** The width under which the style sheet puts the panel under the diagram. */
+  var NARROW_QUERY = '(max-width: 900px)'
 
   var token = new URLSearchParams(location.search).get('t') || ''
   var elk = new ELK()
-  var page = { view: null, filter: 'both', closed: {}, drawing: 0, comments: [], awaitingRound: null }
+  var page = { view: null, filter: 'both', closed: {}, drawing: 0, comments: [], awaitingRound: null, isScrolled: false }
 
   function el(tag, className, text) {
     var node = document.createElement(tag)
@@ -86,13 +88,14 @@
     if (unit.removed !== null && unit.state !== 'added') metric(metrics, '−' + unit.removed, 'minus')
     if (unit.added === null) metric(metrics, 'delta unknown')
     if (unit.methods !== null) metric(metrics, unit.methods + (unit.methods === 1 ? ' method' : ' methods'))
+    // The quality metrics (cohesion, Ce, Ca) take a row of their own under the size metrics.
     if (unit.cohesion) {
-      var cohesion = metric(metrics, 'C ' + unit.cohesion.score, 'cohesion')
+      var cohesion = metric(metrics, 'C ' + unit.cohesion.score, 'cohesion quality')
       cohesion.setAttribute('title', unit.cohesion.reason)
       cohesion.setAttribute('aria-label', 'Cohesion ' + unit.cohesion.score + ' of 5: ' + unit.cohesion.reason)
     }
-    metric(metrics, 'Ce ' + unit.ce).setAttribute('title', 'Efferent coupling: the units it depends on')
-    metric(metrics, 'Ca ' + unit.ca).setAttribute('title', 'Afferent coupling: the units that depend on it')
+    metric(metrics, 'Ce ' + unit.ce, 'quality').setAttribute('title', 'Efferent coupling: the units it depends on')
+    metric(metrics, 'Ca ' + unit.ca, 'quality').setAttribute('title', 'Afferent coupling: the units that depend on it')
     card.appendChild(metrics)
     if (unit.summary) card.appendChild(el('p', 'summary', unit.summary))
     if (unit.members.length > 0) {
@@ -141,7 +144,8 @@
 
   function containerHead(container, units) {
     var isClosed = isContainerClosed(container)
-    var button = el('button', 'container-head', (isClosed ? '▸ ' : '▾ ') + container.id + ' (' + units.length + ')')
+    // The open or closed chevron is drawn by the style sheet from aria-expanded.
+    var button = el('button', 'container-head', container.id + ' (' + units.length + ')')
     button.type = 'button'
     button.setAttribute('aria-expanded', String(!isClosed))
     button.dataset.focus = 'c:' + container.id
@@ -222,7 +226,8 @@
         measure(head, canvas)
         parts.heads.push({ id: 'c:' + container.id, node: head })
         if (isContainerClosed(container)) {
-          root.children.push({ id: 'c:' + container.id, width: HEAD_WIDTH, height: HEAD_HEIGHT })
+          // A closed container is short; it sits at the top of its layer, not in the middle of a tall neighbor.
+          root.children.push({ id: 'c:' + container.id, width: HEAD_WIDTH, height: HEAD_HEIGHT, layoutOptions: { 'elk.alignment': 'TOP' } })
           members.forEach(function (unit) {
             nodeOf[unit.id] = 'c:' + container.id
           })
@@ -353,10 +358,12 @@
     parts.heads.forEach(function (head) {
       var box = boxes[head.id]
       var isGroup = Boolean(box.children && box.children.length)
-      if (isGroup || head.id === 'g:tables')
-        layer.appendChild(svg('rect', { class: 'container-box' + (head.id === 'g:tables' ? ' is-tables' : ''), x: box.x, y: box.y, width: box.width, height: box.height, rx: '8' }))
-      head.node.style.width = Math.min(box.width - 8, 400) + 'px'
-      place(head.node, { x: box.x + 4, y: box.y + 4 })
+      var isFramed = isGroup || head.id === 'g:tables'
+      if (isFramed) layer.appendChild(svg('rect', { class: 'container-box' + (head.id === 'g:tables' ? ' is-tables' : ''), x: box.x, y: box.y, width: box.width, height: box.height }))
+      // The head is the top band of its frame; a closed container has no frame, so its head draws its own border.
+      var inset = isFramed ? 1 : 0
+      head.node.style.width = box.width - 2 * inset + 'px'
+      place(head.node, { x: box.x + inset, y: box.y + inset })
     })
     parts.cards.forEach(function (card) {
       place(card.node, boxes[card.id])
@@ -381,14 +388,19 @@
     var counts = document.getElementById('counts')
     counts.textContent = ''
     ;[
-      ['+', view.counts.units.added, 'units added'],
-      ['~', view.counts.units.modified, 'units modified'],
-      ['−', view.counts.units.deleted, 'units deleted'],
-      ['+', view.counts.tables.added, 'tables added'],
-      ['~', view.counts.tables.modified, 'tables modified'],
-      ['−', view.counts.tables.dropped, 'tables dropped'],
+      ['added', view.counts.units.added, 'units\nadded'],
+      ['modified', view.counts.units.modified, 'units\nmodified'],
+      ['deleted', view.counts.units.deleted, 'units\ndeleted'],
+      ['added', view.counts.tables.added, 'tables\nadded'],
+      ['modified', view.counts.tables.modified, 'tables\nmodified'],
+      ['deleted', view.counts.tables.dropped, 'tables\ndropped'],
     ].forEach(function (row) {
-      counts.appendChild(el('li', '', row[0] + ' ' + row[1] + ' ' + row[2]))
+      // The count is a large figure over its label, set on 2 lines; the label names the state, so the color is not the
+      // only sign.
+      var item = el('li', 'is-' + row[0] + (row[1] === 0 ? ' is-zero' : ''))
+      item.appendChild(el('span', 'count-value', String(row[1])))
+      item.appendChild(el('span', 'count-label', row[2]))
+      counts.appendChild(item)
     })
   }
 
@@ -402,6 +414,18 @@
       var rename = file.oldPath ? ' (from ' + file.oldPath + ')' : ''
       list.appendChild(el('li', '', file.path + rename + ' · ' + counts + (file.reason ? ' · ' + file.reason : '')))
     })
+  }
+
+  /**
+   * On a narrow screen, the first draw scrolls the diagram to the first open container, so the first screen shows a
+   * card and not an empty strip of the layout. Later draws keep the reviewer's scroll.
+   */
+  function scrollToFirstContainer(canvas) {
+    if (page.isScrolled || !window.matchMedia(NARROW_QUERY).matches) return
+    page.isScrolled = true
+    var first = canvas.querySelector('.container-head[aria-expanded="true"]')
+    // The diagram's own padding is left of the frame, and the neighbor before it is out of the screen.
+    if (first) document.getElementById('diagram').scrollLeft = first.offsetLeft
   }
 
   /** Draws the view model again: after a new model, a filter change, or a container toggle. A newer draw wins. */
@@ -430,6 +454,7 @@
         setStatus('Drew ' + units + (units === 1 ? ' unit' : ' units') + ' and ' + view.tables.length + ' tables in ' + Math.round(performance.now() - started) + ' ms.')
         var again = focused && canvas.querySelector('[data-focus="' + CSS.escape(focused) + '"]')
         if (again) again.focus()
+        scrollToFirstContainer(canvas)
       })
       .catch(function (error) {
         setStatus('The diagram could not be drawn: ' + error.message, true)
@@ -541,12 +566,25 @@
     document.getElementById('form-text').value = comment ? comment.text : ''
     node.querySelector('input[value="' + (comment ? comment.type : 'change') + '"]').checked = true
     document.getElementById('form-text').focus()
+    markTarget()
   }
 
   function closeForm() {
     document.getElementById('form').hidden = true
     form.anchor = null
     form.editing = null
+    markTarget()
+  }
+
+  /** Marks the element the open form is about, so the reviewer sees what the comment goes to. */
+  function markTarget() {
+    Array.prototype.slice.call(document.querySelectorAll('.is-target')).forEach(function (node) {
+      node.classList.remove('is-target')
+    })
+    if (!form.anchor || form.anchor.kind === 'review') return
+    Array.prototype.slice.call(document.querySelectorAll('[data-anchor]')).forEach(function (node) {
+      if (node.dataset.anchor === form.anchor.kind && node.dataset.id === form.anchor.id) node.classList.add('is-target')
+    })
   }
 
   function commentItem(comment) {
@@ -622,6 +660,7 @@
       badge.setAttribute('aria-label', count + (count === 1 ? ' comment' : ' comments'))
       ;(node.querySelector('h3') || node).appendChild(badge)
     })
+    markTarget()
   }
 
   /** The anchor a click or Enter lands on: the innermost element with an anchor (a member before its card). */

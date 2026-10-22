@@ -3,6 +3,8 @@
 node_modules/
 .agents/
 .claude/
+# Impeccable design-session work files (mocks, review captures, build state)
+.impeccable/
 
 # >>> context-brake (managed by `context-brake init`; do not edit) >>>
 /.agents/hooks/context-brake.mjs

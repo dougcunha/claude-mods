@@ -1,6 +1,6 @@
 {
   "name": "visual-review",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The /visual-review command shows the design of the changes against a base branch as a diagram in the browser: classes and modules with their relations, size and quality notes, and the database tables. Comment on the diagram and send the review back to the session in one step.",
   "author": {
     "name": "Douglas Cunha",

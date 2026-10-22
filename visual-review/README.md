@@ -31,17 +31,17 @@ At the end of a task, the diff shows the implementation, not the design. `/visua
 
 ## 🗺️ The page
 
-- **Toolbar:** the base and the branch, the counts of added, modified and deleted units and tables, and a filter: units and tables, units only, or tables only. The filter redraws the diagram with no reload.
+- **Toolbar:** the base and the branch, the counts of added, modified and deleted units and tables as large figures, and a filter: units and tables, units only, or tables only. The filter redraws the diagram with no reload.
 - **Containers:** units sit in their namespace (C#) or folder (TypeScript, JavaScript, Python). A container that holds only unchanged neighbors starts closed. Click its header, or press Enter or Space on it, to open or close it; an arrow to a unit in a closed container goes to the container. Arrows of the same kind that meet there merge into 1, whose label counts each state, for example `dependency · 2 relations (+1 =1)`; open the container to comment on one of them.
 - **Unit cards:** a state badge (`+` added, `~` modified, `−` deleted, `ctx` an unchanged neighbor, in gray), the name and kind, the total lines, the lines added and removed, the number of methods, `C 1`–`C 5` cohesion with its reason as a tooltip, Ce and Ca, the summary, and the changed members with their state. A card whose file could not be read for the range check says so.
 - **Relations:** inheritance and implementation end in a hollow triangle, a dependency in an open arrow, a composition starts with a filled diamond. Implementation and dependency lines are dashed. A label in the middle of each arrow names the kind and the state (`added`, `removed`, `unchanged`).
 - **Tables:** a dashed group of the database tables, each with its columns, their state, a type change (`nvarchar(100) → nvarchar(200)`), the primary key and the foreign keys. A dotted line links an entity unit to its table.
 - **Other files:** the changed files outside the diagram, with their line counts, and the generated files the analysis skipped, with the reason.
-- **Comments:** click a card, a changed member, an arrow label, a table or a column, or press Enter on it, to open the comment form in the side panel; **Comment on the whole review** comments on everything. Choose **Change request** or **Question**, write, and **Save**. A count shows next to each element with comments. Edit or delete a comment of this round before you submit.
+- **Comments:** click a card, a changed member, an arrow label, a table or a column, or press Enter on it, to open the comment form in the side panel; an outline marks the element the form is about. **Comment on the whole review** comments on everything. Choose **Change request** or **Question**, write, and **Save**. A count shows next to each element with comments. Edit or delete a comment of this round before you submit.
 - **Submit review:** sends every comment of this round as 1 prompt to the session, grouped by element, with its type. Claude answers the questions, proposes a plan for the change requests, and changes no file before you confirm the plan. When Claude is busy, the prompt waits until the turn ends: the page says `Review handed to the session`, then `Review sent.` once the prompt entered. When nothing is new, or a hook drops the prompt, the page says why and keeps your comments.
 - **Copy review (static page):** the button in place of **Submit review** copies the same review text to the clipboard. Paste it in the Claude Code prompt. The static page keeps your comments in the browser's storage, per branch and base commit, so a reload or the next static page of the same review shows them again.
 - **Rounds:** after the next `/visual-review` on the same branch, the comments of earlier rounds show with an **Open** or **Resolved** switch; a status change goes with the next submit. A comment whose element is gone, such as a comment on a deleted method, shows under **Unanchored**.
-- **Keyboard and themes:** every container header, card and arrow label takes the focus with Tab, in the order container, then its cards. The page follows the light or dark theme of the system; every state has a text badge, not only a color.
+- **Keyboard and themes:** every container header, card and arrow label takes the focus with Tab, in the order container, then its cards. The page follows the light or dark theme of the system; every state has a text badge, not only a color. In a window narrower than 900 px, the comment panel moves under the diagram.
 
 When the analysis turn ends with no accepted model, the status clears and a toast says why, for example `visual-review: the design analysis failed: the turn was interrupted with no design model. Run /visual-review again.`
 
@@ -126,6 +126,7 @@ claude --plugin-dir .
 | `hooks/paths.ts` | Path helpers that normalize separators, and the session folder |
 | `hooks/host.ts` | The engine calls the helper modules use |
 | `types/index.d.ts` | The `$.state` contract |
+| `PRODUCT.md`, `DESIGN.md` | The product record and the design system of the page: tokens, components and the rules a change to `web/` keeps |
 
 </details>
 
