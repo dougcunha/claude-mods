@@ -1,7 +1,0 @@
-base=main branch=main round=2 counts={"units":{"added":2,"modified":1,"deleted":0},"tables":{"added":1,"modified":0,"dropped":0}}
-comment unit:src/pricing type=change status=open round=1 anchored=true
-comment member:src/cart.Cart#total(): number type=question status=open round=1 anchored=true
-comment relation:src/cart.Cart→src/item.Item→composition type=change status=open round=1 anchored=true
-comment table:orders type=question status=open round=1 anchored=true
-comment column:orders.sku type=change status=open round=1 anchored=true
-comment review:review type=question status=open round=1 anchored=true

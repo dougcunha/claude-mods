@@ -1,5 +1,0 @@
-== nogit session results
-"result":"OK
-"result":"visual-review: visual-review needs a Git repository.
-toasts:
-server spawns: 0

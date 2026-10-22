@@ -1,2 +1,0 @@
-POST /comments: 204
-POST /submit: Review sent 202

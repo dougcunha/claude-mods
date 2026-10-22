@@ -1,5 +1,0 @@
-== clean session results
-"result":"OK
-"result":"visual-review: No changes against main.
-toasts:
-server spawns: 0
