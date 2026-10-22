@@ -3,3 +3,16 @@
 node_modules/
 .agents/
 .claude/
+
+# >>> context-brake (managed by `context-brake init`; do not edit) >>>
+/.agents/hooks/context-brake.mjs
+/.claude/hooks/context-brake.mjs
+/.context-brake/.gitignore
+/.context-brake/claude-mod/.claude-plugin/marketplace.json
+/.context-brake/claude-mod/context-brake-restart/.claude-plugin/plugin.json
+/.context-brake/claude-mod/context-brake-restart/hooks/hooks.json
+/.context-brake/claude-mod/context-brake-restart/hooks/register.mjs
+/.context-brake/manifest.json
+/.context-brake/runtime/claude-mod-install.json
+/context-brake.config.json
+# <<< context-brake <<<
