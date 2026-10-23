@@ -75,9 +75,32 @@ body {
     flex: none;
   }
 
+  /* The diagram fills the space under the status line, so both of its scroll bars stay at the edges of the window. */
   main {
     flex: 1;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .bar {
+    flex: none;
+  }
+
+  .diagram,
+  .list {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .list {
+    overflow: auto;
+  }
+
+  .other {
+    flex: none;
+    max-height: 30vh;
     overflow: auto;
   }
 }
@@ -179,10 +202,13 @@ select {
   grid-row: 1 / span 2;
 }
 
-.filter {
+.controls {
   grid-column: 1;
   grid-row: 2;
   justify-self: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* A wide window holds the title, the counts and the filter on 1 row; a narrower one puts the filter under the title. */
@@ -199,7 +225,7 @@ select {
     grid-row: 1;
   }
 
-  .filter {
+  .controls {
     grid-column: 3;
     grid-row: 1;
   }
@@ -289,10 +315,66 @@ select {
   color: var(--bg);
 }
 
-.status {
+#toggle-panel {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+/* The bar over the diagram: the mode switch, the status line, the focus line and, at the right, the zoom. */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
   margin: 10px 24px 0;
+}
+
+.status {
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.focus {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.focus button,
+.zoom button {
+  font-size: 12px;
+  padding: 3px 9px;
+}
+
+.focus button {
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* `display: flex` would show a zoom group that has the hidden attribute. */
+.zoom[hidden] {
+  display: none;
+}
+
+.zoom button + button,
+.zoom .zoom-value + button {
+  border-left: 0;
+}
+
+.zoom-value {
+  min-width: 48px;
+  padding: 3px 0;
+  border: 1px solid var(--text);
+  border-left: 0;
+  font-size: 12px;
+  text-align: center;
 }
 
 .status.is-error {
@@ -301,9 +383,20 @@ select {
 }
 
 /* The diagram sheet. */
+/* A drag on the diagram moves it, so the cursor shows a hand; a card or a button keeps its own cursor. */
 .diagram {
   overflow: auto;
   padding: 16px 24px 24px;
+  cursor: grab;
+}
+
+.diagram.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.diagram.is-panning [data-anchor] {
+  cursor: grabbing;
 }
 
 .canvas {
@@ -343,11 +436,11 @@ select {
   border-bottom: 1px solid var(--text);
 }
 
-div.container-head {
+.container-head.is-tables {
   border-bottom-style: dashed;
 }
 
-/* The chevron of a container head: down when open, right when closed. */
+/* The chevron of a group head: down when open, right when closed. */
 button.container-head::before {
   content: '';
   display: inline-block;
@@ -367,6 +460,18 @@ button.container-head[aria-expanded='false']::before {
 /* A closed container is only its head, so the head carries the frame. */
 .container-head[aria-expanded='false'] {
   border: 1px solid var(--text);
+}
+
+.container-head.is-tables[aria-expanded='false'] {
+  border-style: dashed;
+}
+
+/* An Overview box: the closed head at 2 type steps up, so it reads after Fit. */
+.container-head.is-large {
+  height: 48px;
+  padding: 10px 14px;
+  font-size: 18px;
+  line-height: 26px;
 }
 
 .edge {
@@ -459,7 +564,33 @@ button.edge-label.badge:hover {
   border-color: var(--muted);
 }
 
-.card h3 {
+/* The card in focus: an ink frame, so it stands out from its neighbors. */
+.card.is-focused {
+  border-color: var(--text);
+}
+
+/* Focus shows on the hover or the focus of its card, so 100 cards do not repeat it. */
+.focus-button {
+  flex: none;
+  align-self: center;
+  padding: 0 5px;
+  border-color: var(--rule);
+  font: 11px/16px var(--sans);
+  opacity: 0;
+}
+
+.card:hover .focus-button,
+.card:focus-within .focus-button,
+.card.is-focused .focus-button {
+  opacity: 1;
+}
+
+.focus-button:hover {
+  border-color: var(--text);
+}
+
+.card h3,
+.row h3 {
   display: flex;
   gap: 6px;
   align-items: baseline;
@@ -607,6 +738,104 @@ button.edge-label.badge.is-target {
   font: 700 11px/16px var(--sans);
 }
 
+/* The list: 1 row per unit and per table under its group head, with a state rule at the left like the card top. */
+.list {
+  padding: 16px 24px 24px;
+}
+
+.list-group {
+  max-width: 920px;
+  margin: 0 0 16px;
+}
+
+.container-head.list-head {
+  position: static;
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  padding: 8px 10px 9px;
+  background: var(--card);
+  border-bottom: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
+}
+
+.row.is-added {
+  border-left-color: var(--added);
+}
+
+.row.is-modified {
+  border-left-color: var(--modified);
+}
+
+.row.is-deleted,
+.row.is-dropped {
+  border-left-color: var(--deleted);
+}
+
+.row.is-context {
+  background: transparent;
+  color: var(--context);
+  border-left: 1px dashed var(--muted);
+}
+
+.row[data-anchor]:hover {
+  background: var(--hover);
+}
+
+.row:focus-visible,
+.row.is-jumped {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+}
+
+.relations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 6px -4px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.relations li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 1px 4px;
+}
+
+.relations li[data-anchor]:hover {
+  background: var(--card);
+  outline: 1px solid var(--rule);
+}
+
+.relations li:focus-visible {
+  outline-offset: -2px;
+}
+
+.jump {
+  color: var(--text);
+  font-family: var(--mono);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.jump:hover {
+  color: var(--clay);
+}
+
 .other {
   margin: 0 24px 24px;
   padding-top: 8px;
@@ -647,6 +876,15 @@ body {
   padding: 0 20px 20px;
   background: var(--panel);
   border-left: 3px solid var(--text);
+}
+
+/* Hide comments gives the panel's column back to the diagram. */
+body.is-panel-hidden {
+  padding-right: 0;
+}
+
+body.is-panel-hidden .panel {
+  display: none;
 }
 
 .panel-head {
@@ -840,7 +1078,7 @@ input[type='radio'] {
     grid-row: 2;
   }
 
-  .filter {
+  .controls {
     grid-row: 3;
   }
 
@@ -857,11 +1095,12 @@ input[type='radio'] {
     margin-left: 0;
   }
 
-  .status {
+  .bar {
     margin: 10px 16px 0;
   }
 
-  .diagram {
+  .diagram,
+  .list {
     padding: 16px;
   }
 

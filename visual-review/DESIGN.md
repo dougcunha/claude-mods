@@ -229,9 +229,9 @@ A warm paper-and-ink neutral pair, 4 single-purpose state colors as the secondar
 
 ## Layout
 
-A two-column sheet at 901 px and wider: the diagram column (header, status, diagram, other files) fills the window and scrolls on its own, and the comment panel is a fixed 360 px column on the right behind a 3 px ink rule. The body reserves the panel width as right padding.
+A two-column sheet at 901 px and wider: the diagram column (header, status, diagram, other files) fills the window, and the comment panel is a fixed 360 px column on the right behind a 3 px ink rule. The body reserves the panel width as right padding. A bar sits between the header and the diagram: the view switch (Overview, Diagram, List, the filter's segmented style) flush-left, then the status line, the focus line when a card is in focus, and the zoom group (`−`, the percent, `+`, Fit, joined like the filter) flush-right; List hides the zoom group. The diagram, or the list in List view, takes the height left under the bar and scrolls on its own, so both of its scroll bars stay at the window edges; the other files list keeps at most 30vh and scrolls inside it. A mouse drag on the diagram pans it (grab cursor, grabbing while it moves). **Hide comments** removes the panel and its padding, and the diagram takes the full width.
 
-The header is a grid: title and base line flush-left in the first column, the 6 count columns (84 px each, 1 px hairline left rule, the units/tables split marked by a 3 px ink rule and 8 px gap) to its right, then the filter. At 1400 px and wider all 3 sit on one row and the header is 88 px; below 1400 px the filter moves under the title and the header is 112 px. The panel head shares the same `--head-height`, so the header rule and the panel head rule line up across the sheet.
+The header is a grid: title and base line flush-left in the first column, the 6 count columns (84 px each, 1 px hairline left rule, the units/tables split marked by a 3 px ink rule and 8 px gap) to its right, then the controls: the filter and the Hide comments toggle, 8 px apart. At 1400 px and wider all 3 sit on one row and the header is 88 px; below 1400 px the controls move under the title and the header is 112 px. The panel head shares the same `--head-height`, so the header rule and the panel head rule line up across the sheet.
 
 At 900 px and narrower the sheet stacks: header (static, single column, counts wrap 3 per row), diagram, then the panel below with a 3 px ink top rule. Gutters are 24 px wide and 16 px narrow.
 
@@ -261,6 +261,8 @@ Ink-outlined, square and compact.
 - **Default:** body type, 4px 10px padding.
 - **Primary:** Submit review / Copy review, clay fill, bold, 8px 14px in the panel head. The only filled button on the page. Hover inverts to ink fill with paper text.
 - **Form Save:** the clay outline of the primary (clay text and border, transparent); hover fills clay.
+- **Focus:** on each card head after the kind, 11px, 0 5px, hairline border; it shows only on the hover or the focus of its card, and always on the card in focus, where it reads Show all. The card in focus takes an ink frame.
+- **Panel toggle:** Hide comments / Show comments (with the new-comment count), a default button at the filter's 12px, 5px 10px, next to the filter.
 - **Quiet:** comment Edit / Delete, 12px, hairline border that turns ink on hover.
 - **Hover / Focus:** hover wash fill; focus is a 2 px ink outline offset 2 px. Transitions are `90ms steps(2, jump-none)` on background and color, removed under `prefers-reduced-motion`.
 
@@ -287,7 +289,13 @@ A solid square, minimum 22 px wide, mono 700 11px/17px glyph in on-state color: 
 The header's poster numerals: 6 columns of a display figure over a 2-line 12px muted label, each column behind a 1 px hairline, the units and tables groups split by a 3 px ink rule. Figures take their state color; a zero count goes muted.
 
 ### Container Frame and Head (signature)
-A 1 px ink SVG frame (dashed for tables) with a 32 px head band on paper: 12px bold, 5px 10px, an ink bottom rule (dashed for tables), the drawn chevron pointing down when open and right when closed. A closed container is only its head and the head carries the full 1 px ink frame.
+A 1 px ink SVG frame (dashed for tables) with a 32 px head band on paper: 12px bold, 5px 10px, an ink bottom rule (dashed for tables), the drawn chevron pointing down when open and right when closed. A closed container is only its head and the head carries the full 1 px ink frame. The tables group closes the same way, with a dashed frame. In Overview each closed head is a larger box (48 px, 18px bold, 10px 14px) whose text adds the changed-state counts, so it stays legible after Fit.
+
+### Overview Arrow
+A plain muted line with an open arrow between 2 Overview boxes, standing for every relation between them; no label, so the layout stays small. Its width grows with the count (1 px plus half a pixel a relation, at most 5 px), and an SVG title names the kinds.
+
+### List Row
+A list row is the card content on 1 full-width row (at most 920 px): card white, a 3 px left rule in its state color in place of the card's top rule, a hairline bottom divider, and the wash on hover; a context row is transparent with a 1 px dashed left rule. Under the members, the relations wrap as 12px items: the state badge, the relation in words, and a mono underlined link to the other row, clay on hover. A jump to a row marks it with a 2 px ink inset outline for 1.5 s. The group head is the container head, static and full width.
 
 ### Edge Label
 A small square label on paper over a relation, 12px/17px, 1 px border in its own text color (muted, added or removed), underlined on hover so the state text keeps its contrast on paper. It can hold a clay comment count.

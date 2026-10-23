@@ -20,13 +20,42 @@
     'elk.layered.spacing.nodeNodeBetweenLayers': '48',
     'elk.spacing.edgeLabel': '4',
   }
+  /** Overview draws straight arrows between the closed groups: orthogonal routes of many arrows need wide corridors. */
+  var OVERVIEW_LAYOUT = Object.assign({}, LAYOUT, { 'elk.edgeRouting': 'POLYLINE', 'elk.spacing.nodeNode': '40', 'elk.layered.spacing.nodeNodeBetweenLayers': '64' })
   var CONTAINER_PADDING = '[top=' + (HEAD_HEIGHT + 12) + ',left=12,bottom=12,right=12]'
   /** The width under which the style sheet puts the panel under the diagram. */
   var NARROW_QUERY = '(max-width: 900px)'
 
+  /** The words of a relation in the list, seen from its source and from its target. */
+  var RELATION_WORDS = {
+    inheritance: ['extends', 'extended by'],
+    implementation: ['implements', 'implemented by'],
+    composition: ['owns', 'owned by'],
+    dependency: ['uses', 'used by'],
+  }
+  var ZOOM_MIN = 0.1
+  var ZOOM_MAX = 2
+  var MODES = ['overview', 'diagram', 'list']
+  var MODE_KEY = 'visual-review:mode'
+
   var token = new URLSearchParams(location.search).get('t') || ''
   var elk = new ELK()
-  var page = { view: null, filter: 'both', closed: {}, drawing: 0, comments: [], awaitingRound: null, isScrolled: false }
+  // closed: the open or closed groups of each mode, by group key. focus: the unit or table key the graph modes show
+  // with its neighbors only. size: the laid-out size of the last graph, for Fit.
+  var page = {
+    view: null,
+    filter: 'both',
+    mode: 'diagram',
+    closed: { overview: {}, diagram: {}, list: {} },
+    focus: null,
+    zoom: 1,
+    size: null,
+    zoomAfterDraw: null,
+    drawing: 0,
+    comments: [],
+    awaitingRound: null,
+    isScrolled: false,
+  }
 
   function el(tag, className, text) {
     var node = document.createElement(tag)
@@ -71,17 +100,39 @@
     return item
   }
 
-  function unitCard(unit) {
-    var card = el('div', 'card is-' + unit.state)
-    card.tabIndex = 0
-    card.setAttribute('role', 'group')
-    card.setAttribute('aria-label', unit.kind + ' ' + unit.name + ', ' + unit.state)
-    card.dataset.anchor = 'unit'
-    card.dataset.id = unit.id
-    card.dataset.focus = 'u:' + unit.id
-    card.appendChild(heading(unit.state, unit.name, unit.kind))
-    if (unit.state === 'context') return card
+  /** The button that shows a card with its neighbors only; on the card in focus, it shows everything again. */
+  function focusButton(key, name) {
+    var isFocused = page.focus === key
+    var button = el('button', 'focus-button', isFocused ? 'Show all' : 'Focus')
+    button.type = 'button'
+    button.dataset.focusOn = key
+    button.setAttribute('aria-label', isFocused ? 'Show all units and tables' : 'Show ' + name + ' with its neighbors only')
+    return button
+  }
 
+  /** A unit card or a unit row of the list: the anchor, the heading and, for a changed unit, the body. */
+  function unitNode(tag, className, unit) {
+    var node = el(tag, className + ' is-' + unit.state)
+    node.tabIndex = 0
+    // A list row keeps its list item role.
+    if (tag === 'div') node.setAttribute('role', 'group')
+    node.setAttribute('aria-label', unit.kind + ' ' + unit.name + ', ' + unit.state)
+    node.dataset.anchor = 'unit'
+    node.dataset.id = unit.id
+    node.dataset.focus = 'u:' + unit.id
+    node.appendChild(heading(unit.state, unit.name, unit.kind))
+    if (unit.state !== 'context') unitBody(unit, node)
+    return node
+  }
+
+  function unitCard(unit) {
+    var card = unitNode('div', 'card', unit)
+    if (page.focus === 'u:' + unit.id) card.classList.add('is-focused')
+    card.querySelector('h3').appendChild(focusButton('u:' + unit.id, unit.name))
+    return card
+  }
+
+  function unitBody(unit, card) {
     var metrics = el('ul', 'metrics')
     if (unit.lines !== null) metric(metrics, unit.lines + ' lines')
     if (unit.added !== null && unit.state !== 'deleted') metric(metrics, '+' + unit.added, 'plus')
@@ -113,13 +164,13 @@
       card.appendChild(members)
     }
     if (!unit.isRangeChecked) card.appendChild(el('p', 'note', 'Range not checked: the file was too large or missing.'))
-    return card
   }
 
-  function tableCard(table) {
-    var card = el('div', 'card is-' + table.state)
+  /** A table card or a table row of the list: the anchor, the heading, the columns and the source. */
+  function tableNode(tag, className, table) {
+    var card = el(tag, className + ' is-' + table.state)
     card.tabIndex = 0
-    card.setAttribute('role', 'group')
+    if (tag === 'div') card.setAttribute('role', 'group')
     card.setAttribute('aria-label', 'Table ' + table.id + ', ' + table.state)
     card.dataset.anchor = 'table'
     card.dataset.id = table.id
@@ -142,22 +193,86 @@
     return card
   }
 
-  function containerHead(container, units) {
-    var isClosed = isContainerClosed(container)
+  function tableCard(table) {
+    var card = tableNode('div', 'card', table)
+    if (page.focus === 't:' + table.id) card.classList.add('is-focused')
+    card.querySelector('h3').appendChild(focusButton('t:' + table.id, table.id))
+    return card
+  }
+
+  /**
+   * The head of a group (a container or the table group), a button that opens or closes it in the current mode. In
+   * focus, every group is open, so the head is only a label.
+   */
+  function groupHead(key, text, isClosed, className) {
+    if (page.focus && page.mode !== 'list') return el('div', 'container-head ' + className, text)
     // The open or closed chevron is drawn by the style sheet from aria-expanded.
-    var button = el('button', 'container-head', container.id + ' (' + units.length + ')')
+    var button = el('button', 'container-head ' + className, text)
     button.type = 'button'
+    button.title = text
     button.setAttribute('aria-expanded', String(!isClosed))
-    button.dataset.focus = 'c:' + container.id
+    button.dataset.focus = key
     button.addEventListener('click', function () {
-      page.closed[container.id] = !isContainerClosed(container)
+      page.closed[page.mode][key] = !isClosed
       draw()
     })
     return button
   }
 
-  function isContainerClosed(container) {
-    return Object.prototype.hasOwnProperty.call(page.closed, container.id) ? page.closed[container.id] : container.isClosed
+  /**
+   * Whether a group is closed: the reviewer's choice in the current mode, else the mode's default. Overview starts with
+   * every group closed, List with every group open, and Diagram with the containers the view model closes.
+   */
+  function isGroupClosed(key, isClosedInModel) {
+    if (page.focus && page.mode !== 'list') return false
+    var closed = page.closed[page.mode]
+    if (Object.prototype.hasOwnProperty.call(closed, key)) return closed[key]
+    if (page.mode === 'overview') return true
+    return page.mode === 'list' ? false : isClosedInModel
+  }
+
+  /** The count of each changed state in a group, as glyphs: `+3 ~5 −2`. */
+  function stateSummary(items) {
+    var counts = {}
+    items.forEach(function (item) {
+      counts[item.state] = (counts[item.state] || 0) + 1
+    })
+    return ['added', 'modified', 'deleted', 'dropped']
+      .filter(function (state) {
+        return counts[state]
+      })
+      .map(function (state) {
+        return BADGES[state] + counts[state]
+      })
+      .join(' ')
+  }
+
+  function groupText(name, items, isClosed) {
+    var summary = isClosed ? stateSummary(items) : ''
+    return name + ' (' + items.length + ')' + (summary ? ' · ' + summary : '')
+  }
+
+  /** The units and tables that focus shows: the unit or table in focus and its direct neighbors; null shows all. */
+  function focusSet(view) {
+    if (!page.focus || page.mode === 'list') return null
+    var set = { units: {}, tables: {} }
+    var id = page.focus.slice(2)
+    if (page.focus.indexOf('u:') === 0) {
+      set.units[id] = true
+      view.relations.forEach(function (relation) {
+        if (relation.from === id) set.units[relation.to] = true
+        if (relation.to === id) set.units[relation.from] = true
+      })
+      view.links.forEach(function (link) {
+        if (link.unit === id) set.tables[link.table] = true
+      })
+    } else {
+      set.tables[id] = true
+      view.links.forEach(function (link) {
+        if (link.table === id) set.units[link.unit] = true
+      })
+    }
+    return set
   }
 
   /** Puts each card in the canvas off-screen, so its size is known before the layout. */
@@ -205,67 +320,95 @@
     return label
   }
 
+  /** The label of an Overview arrow: only the count of the relations it stands for, with the kinds for a screen reader. */
+  function overviewLabel(edge) {
+    var count = edge.relations.length
+    var label = el('button', 'edge-label badge', String(count))
+    var kinds = {}
+    edge.relations.forEach(function (relation) {
+      kinds[relation.kind] = (kinds[relation.kind] || 0) + 1
+    })
+    var text = Object.keys(kinds)
+      .map(function (kind) {
+        return kinds[kind] + ' ' + kind
+      })
+      .join(', ')
+    label.setAttribute('aria-label', count + (count === 1 ? ' relation' : ' relations') + ' from ' + edge.from.slice(2) + ' to ' + edge.to.slice(2) + ': ' + text + '. Open a container to comment on one.')
+    label.setAttribute('title', text + '. Open a container to comment on one relation.')
+    return label
+  }
+
   /** The ELK graph of what the filter shows: containers with their units, the table group, relations and entity links. */
   function graphOf(view, canvas, parts) {
     var showUnits = page.filter !== 'tables'
     var showTables = page.filter !== 'units'
-    var root = { id: 'root', layoutOptions: LAYOUT, children: [], edges: [] }
+    var root = { id: 'root', layoutOptions: page.mode === 'overview' && !page.focus ? OVERVIEW_LAYOUT : LAYOUT, children: [], edges: [] }
     var nodeOf = {}
+    var tableNodeOf = {}
     var units = {}
     view.units.forEach(function (unit) {
       units[unit.id] = unit
     })
+    var shown = focusSet(view)
+
+    /** Adds a group to the graph: its head, then its cards, or only its head when it is closed. */
+    function addGroup(key, name, items, isClosed, headClass, cardOf, nodeMap) {
+      // An Overview box is larger than a closed head of the diagram, so its text stays legible after Fit.
+      var isLarge = isClosed && page.mode === 'overview' && !page.focus
+      var head = groupHead(key, groupText(name, items, isClosed), isClosed, headClass + (isLarge ? ' is-large' : ''))
+      // The header goes in before its cards, so the Tab order is a container, then its cards.
+      var headSize = measure(head, canvas)
+      parts.heads.push({ id: key, node: head })
+      if (isClosed) {
+        // A closed group is short; it sits at the top of its layer, not in the middle of a tall neighbor.
+        // The slack covers the rounding of the text width at a zoom under 100 %, which would cut the last glyph.
+        var width = Math.min(isLarge ? 640 : 480, Math.max(HEAD_WIDTH, headSize.width + 12))
+        root.children.push({ id: key, width: width, height: headSize.height, layoutOptions: { 'elk.alignment': 'TOP' } })
+        items.forEach(function (item) {
+          nodeMap[item.id] = key
+        })
+        return
+      }
+      var group = { id: key, layoutOptions: { 'elk.padding': CONTAINER_PADDING }, children: [] }
+      items.forEach(function (item) {
+        var card = cardOf(item)
+        var size = measure(card, canvas)
+        parts.cards.push({ id: card.dataset.focus, node: card })
+        group.children.push({ id: card.dataset.focus, width: size.width, height: size.height })
+        nodeMap[item.id] = card.dataset.focus
+      })
+      root.children.push(group)
+    }
 
     if (showUnits)
       view.containers.forEach(function (container) {
-        var members = container.units.map(function (id) {
-          return units[id]
-        })
-        var head = containerHead(container, members)
-        // The header goes in before its cards, so the Tab order is a container, then its cards.
-        measure(head, canvas)
-        parts.heads.push({ id: 'c:' + container.id, node: head })
-        if (isContainerClosed(container)) {
-          // A closed container is short; it sits at the top of its layer, not in the middle of a tall neighbor.
-          root.children.push({ id: 'c:' + container.id, width: HEAD_WIDTH, height: HEAD_HEIGHT, layoutOptions: { 'elk.alignment': 'TOP' } })
-          members.forEach(function (unit) {
-            nodeOf[unit.id] = 'c:' + container.id
+        var members = container.units
+          .map(function (id) {
+            return units[id]
           })
-          return
-        }
-        var group = { id: 'c:' + container.id, layoutOptions: { 'elk.padding': CONTAINER_PADDING }, children: [] }
-        members.forEach(function (unit) {
-          var card = unitCard(unit)
-          var size = measure(card, canvas)
-          parts.cards.push({ id: 'u:' + unit.id, node: card })
-          group.children.push({ id: 'u:' + unit.id, width: size.width, height: size.height })
-          nodeOf[unit.id] = 'u:' + unit.id
-        })
-        root.children.push(group)
+          .filter(function (unit) {
+            return !shown || shown.units[unit.id]
+          })
+        if (members.length === 0) return
+        var key = 'c:' + container.id
+        addGroup(key, container.id, members, isGroupClosed(key, container.isClosed), 'is-container', unitCard, nodeOf)
       })
 
-    if (showTables && view.tables.length > 0) {
-      var tables = { id: 'g:tables', layoutOptions: { 'elk.padding': CONTAINER_PADDING }, children: [] }
-      var head = el('div', 'container-head', 'Database tables (' + view.tables.length + ')')
-      measure(head, canvas)
-      parts.heads.push({ id: 'g:tables', node: head })
-      view.tables.forEach(function (table) {
-        var card = tableCard(table)
-        var size = measure(card, canvas)
-        parts.cards.push({ id: 't:' + table.id, node: card })
-        tables.children.push({ id: 't:' + table.id, width: size.width, height: size.height })
-      })
-      root.children.push(tables)
-    }
+    var tables = view.tables.filter(function (table) {
+      return !shown || shown.tables[table.id]
+    })
+    if (showTables && tables.length > 0) addGroup('g:tables', 'Database tables', tables, isGroupClosed('g:tables', false), 'is-tables', tableCard, tableNodeOf)
 
     if (showUnits) {
       // A relation to a unit in a closed container goes to the container; the ones that meet there merge into 1 arrow.
+      // Overview merges the relations of every kind between 2 groups, so its few boxes keep few arrows.
+      var isOverview = page.mode === 'overview' && !page.focus
       var merged = {}
       view.relations.forEach(function (relation) {
         var from = nodeOf[relation.from]
         var to = nodeOf[relation.to]
         if (!from || !to || from === to) return
-        var key = from + '>' + to + '>' + relation.kind
+        var key = from + '>' + to + (isOverview ? '' : '>' + relation.kind)
         if (merged[key]) {
           merged[key].relations.push(relation)
           return
@@ -274,26 +417,43 @@
       })
       Object.keys(merged).forEach(function (key) {
         var edge = merged[key]
-        var isMerged = edge.relations.length > 1
-        var label = isMerged ? mergedLabel(edge) : relationLabel(edge.relation)
+        var isMerged = edge.relations.length > 1 || isOverview
+        var label = isOverview ? overviewLabel(edge) : isMerged ? mergedLabel(edge) : relationLabel(edge.relation)
         label.type = 'button'
         label.dataset.focus = edge.id
         var size = measure(label, canvas)
-        // A merged arrow stands for relations of several states, so its line takes no state style of its own.
-        var shown = isMerged ? { kind: edge.relation.kind, state: 'merged' } : edge.relation
-        parts.edges.push({ id: edge.id, relation: shown, label: label })
+        // A merged arrow stands for relations of several states, so its line takes no state style of its own; in
+        // Overview it can also stand for several kinds, and then it is a plain arrow.
+        var kinds = edge.relations.filter(function (relation) {
+          return relation.kind === edge.relation.kind
+        })
+        var kind = kinds.length === edge.relations.length ? edge.relation.kind : 'mixed'
+        var drawn = isMerged ? { kind: kind, state: 'merged' } : edge.relation
+        if (isOverview) {
+          // An Overview arrow has no label, which keeps the layout small: its width grows with its count.
+          label.remove()
+          parts.edges.push({ id: edge.id, relation: drawn, count: edge.relations.length, title: label.getAttribute('aria-label') })
+          root.edges.push({ id: edge.id, sources: [edge.from], targets: [edge.to] })
+          return
+        }
+        parts.edges.push({ id: edge.id, relation: drawn, label: label })
         var text = label.textContent
         root.edges.push({ id: edge.id, sources: [edge.from], targets: [edge.to], labels: [{ id: edge.id + ':label', text: text, width: size.width, height: size.height }] })
       })
     }
 
-    if (showUnits && showTables)
+    if (showUnits && showTables) {
+      // The links that meet at the same closed group draw 1 line.
+      var linked = {}
       view.links.forEach(function (link) {
         var from = nodeOf[link.unit]
-        if (!from || !view.tables.some(function (table) { return table.id === link.table })) return
+        var to = tableNodeOf[link.table]
+        if (!from || !to || linked[from + '>' + to]) return
+        linked[from + '>' + to] = true
         parts.edges.push({ id: 'l:' + link.id, isLink: true })
-        root.edges.push({ id: 'l:' + link.id, sources: [from], targets: ['t:' + link.table] })
+        root.edges.push({ id: 'l:' + link.id, sources: [from], targets: [to] })
       })
+    }
 
     return root
   }
@@ -349,6 +509,7 @@
         walk(child, boxes[node.id].x, boxes[node.id].y)
       })
     })(laid, 0, 0)
+    page.size = { width: laid.width, height: laid.height }
     canvas.style.width = laid.width + 'px'
     canvas.style.height = laid.height + 'px'
     layer.setAttribute('width', String(laid.width))
@@ -357,8 +518,7 @@
 
     parts.heads.forEach(function (head) {
       var box = boxes[head.id]
-      var isGroup = Boolean(box.children && box.children.length)
-      var isFramed = isGroup || head.id === 'g:tables'
+      var isFramed = Boolean(box.children && box.children.length)
       if (isFramed) layer.appendChild(svg('rect', { class: 'container-box' + (head.id === 'g:tables' ? ' is-tables' : ''), x: box.x, y: box.y, width: box.width, height: box.height }))
       // The head is the top band of its frame; a closed container has no frame, so its head draws its own border.
       var inset = isFramed ? 1 : 0
@@ -375,9 +535,11 @@
       var kind = part.isLink ? 'link' : part.relation.kind
       var attributes = { class: 'edge is-' + kind + (part.isLink ? '' : ' is-' + part.relation.state), d: pathOf(edge, offset) }
       if (kind === 'inheritance' || kind === 'implementation') attributes['marker-end'] = 'url(#m-triangle)'
-      if (kind === 'dependency') attributes['marker-end'] = 'url(#m-arrow)'
+      if (kind === 'dependency' || kind === 'mixed') attributes['marker-end'] = 'url(#m-arrow)'
       if (kind === 'composition') attributes['marker-start'] = 'url(#m-diamond)'
-      layer.appendChild(svg('path', attributes))
+      if (part.count) attributes.style = 'stroke-width: ' + Math.min(5, 1 + part.count / 2) + 'px'
+      var path = layer.appendChild(svg('path', attributes))
+      if (part.title) path.appendChild(svg('title', {})).textContent = part.title
       var label = (edge.labels || [])[0]
       if (part.label && label) place(part.label, { x: label.x + offset.x, y: label.y + offset.y })
     })
@@ -425,23 +587,339 @@
     page.isScrolled = true
     var first = canvas.querySelector('.container-head[aria-expanded="true"]')
     // The diagram's own padding is left of the frame, and the neighbor before it is out of the screen.
-    if (first) document.getElementById('diagram').scrollLeft = first.offsetLeft
+    if (first) document.getElementById('diagram').scrollLeft = first.offsetLeft * page.zoom
   }
 
-  /** Draws the view model again: after a new model, a filter change, or a container toggle. A newer draw wins. */
+  /**
+   * A mouse drag on the diagram scrolls it in both directions. The drag starts only after the pointer moves
+   * PAN_THRESHOLD pixels, so a plain click still lands on its card and opens the comment form. A touch screen scrolls
+   * the diagram on its own.
+   */
+  var PAN_THRESHOLD = 4
+  function enablePan(diagram) {
+    var pan = null
+    var isPanned = false
+    diagram.addEventListener('pointerdown', function (event) {
+      if (event.pointerType === 'touch' || event.button !== 0) return
+      if (event.target.closest('input, select, textarea')) return
+      pan = { id: event.pointerId, x: event.clientX, y: event.clientY, left: diagram.scrollLeft, top: diagram.scrollTop, isMoving: false }
+      isPanned = false
+    })
+    diagram.addEventListener('pointermove', function (event) {
+      if (!pan || event.pointerId !== pan.id) return
+      var dx = event.clientX - pan.x
+      var dy = event.clientY - pan.y
+      if (!pan.isMoving) {
+        if (Math.abs(dx) < PAN_THRESHOLD && Math.abs(dy) < PAN_THRESHOLD) return
+        pan.isMoving = true
+        diagram.setPointerCapture(pan.id)
+        diagram.classList.add('is-panning')
+        // The first pixels of the drag can start a text selection; the drag removes it.
+        window.getSelection().removeAllRanges()
+      }
+      diagram.scrollLeft = pan.left - dx
+      diagram.scrollTop = pan.top - dy
+    })
+    function stop(event) {
+      if (!pan || event.pointerId !== pan.id) return
+      isPanned = pan.isMoving
+      pan = null
+      diagram.classList.remove('is-panning')
+    }
+    diagram.addEventListener('pointerup', stop)
+    diagram.addEventListener('pointercancel', stop)
+    // The click after a drag is not a click on what the drag started on.
+    diagram.addEventListener(
+      'click',
+      function (event) {
+        if (!isPanned) return
+        isPanned = false
+        event.stopPropagation()
+        event.preventDefault()
+      },
+      true,
+    )
+  }
+
+  // Zoom (the graph modes): the CSS zoom of the canvas, so the scroll area follows the zoomed size.
+
+  function showZoom() {
+    document.getElementById('canvas').style.zoom = page.zoom === 1 ? '' : String(page.zoom)
+    document.getElementById('zoom-value').textContent = Math.round(page.zoom * 100) + '%'
+  }
+
+  /** Sets the zoom and keeps the point under `at` (a client point, else the center of the diagram) in its place. */
+  function setZoom(value, at) {
+    var diagram = document.getElementById('diagram')
+    var canvas = document.getElementById('canvas')
+    var frame = diagram.getBoundingClientRect()
+    var origin = canvas.getBoundingClientRect()
+    var point = at || { x: frame.left + diagram.clientWidth / 2, y: frame.top + diagram.clientHeight / 2 }
+    // The point in the canvas at zoom 1, and the left and top padding of the scroll area.
+    var x = (point.x - origin.left) / page.zoom
+    var y = (point.y - origin.top) / page.zoom
+    var left = origin.left - frame.left + diagram.scrollLeft
+    var top = origin.top - frame.top + diagram.scrollTop
+    page.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
+    showZoom()
+    diagram.scrollLeft = left + x * page.zoom - (point.x - frame.left)
+    diagram.scrollTop = top + y * page.zoom - (point.y - frame.top)
+  }
+
+  /**
+   * Fits the whole graph in the diagram, between `floor` (default ZOOM_MIN) and 100 %; a narrow screen fits only the
+   * width, as the page scrolls.
+   */
+  function fit(floor) {
+    if (!page.size) return
+    var diagram = document.getElementById('diagram')
+    var style = getComputedStyle(diagram)
+    var width = diagram.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    var height = diagram.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+    var scale = width / page.size.width
+    if (!window.matchMedia(NARROW_QUERY).matches) scale = Math.min(scale, height / page.size.height)
+    page.zoom = Math.min(1, Math.max(floor || ZOOM_MIN, scale))
+    showZoom()
+    diagram.scrollTo(0, 0)
+  }
+
+  /**
+   * After a mode or focus change, the next draw fits the graph, or goes back to 100 % at the top left. Focus fits no
+   * lower than 75 %, so its cards stay legible; a tall neighborhood scrolls.
+   */
+  function zoomAfter() {
+    if (page.zoomAfterDraw === 'fit') fit()
+    else if (page.zoomAfterDraw === 'focus') {
+      fit(0.75)
+      // A tall neighborhood at 75 % can put the card in focus under the fold.
+      var card = document.getElementById('canvas').querySelector('[data-focus="' + CSS.escape(page.focus) + '"]')
+      if (card) card.scrollIntoView({ block: 'center', inline: 'center' })
+    } else if (page.zoomAfterDraw === 'reset') {
+      page.zoom = 1
+      showZoom()
+      document.getElementById('diagram').scrollTo(0, 0)
+    }
+    page.zoomAfterDraw = null
+  }
+
+  // Focus (the graph modes): 1 unit or table with its direct neighbors only.
+
+  /** The full name of a unit (its container and name) or of a table, as the status and the focus line show it. */
+  function nameOf(key) {
+    var id = key.slice(2)
+    var unit = page.view.units.filter(function (item) {
+      return item.id === id
+    })[0]
+    return unit ? unit.container + '.' + unit.name : id
+  }
+
+  /** Shows 1 unit or table with its neighbors, or everything again with null; the keyboard focus stays on its card. */
+  function setFocus(key) {
+    var previous = page.focus
+    page.focus = key
+    // Focus fits its few cards in the window; Show all goes back to how the mode starts.
+    page.zoomAfterDraw = key ? 'focus' : page.mode === 'overview' ? 'fit' : 'reset'
+    page.focusAfterDraw = key || previous
+    draw()
+  }
+
+  function showFocusBar() {
+    var bar = document.getElementById('focus')
+    bar.hidden = !page.focus || page.mode === 'list'
+    if (bar.hidden) return
+    var shown = focusSet(page.view)
+    var neighbors = Object.keys(shown.units).length + Object.keys(shown.tables).length - 1
+    document.getElementById('focus-text').textContent = 'Focus on ' + nameOf(page.focus) + ' and ' + neighbors + (neighbors === 1 ? ' neighbor.' : ' neighbors.')
+  }
+
+  // Modes: Overview (every group closed, fitted), Diagram (the full graph), List (rows, no layout).
+
+  function setMode(mode) {
+    page.mode = mode
+    page.zoomAfterDraw = mode === 'overview' ? 'fit' : mode === 'diagram' ? 'reset' : null
+    try {
+      window.localStorage.setItem(MODE_KEY, mode)
+    } catch (error) {
+      // The mode lasts until the page closes.
+    }
+    draw()
+  }
+
+  function readMode() {
+    try {
+      var mode = window.localStorage.getItem(MODE_KEY)
+      return MODES.indexOf(mode) >= 0 ? mode : 'diagram'
+    } catch (error) {
+      return 'diagram'
+    }
+  }
+
+  function showMode() {
+    var isList = page.mode === 'list'
+    Array.prototype.slice.call(document.querySelectorAll('[data-mode]')).forEach(function (button) {
+      button.setAttribute('aria-pressed', String(button.dataset.mode === page.mode))
+    })
+    document.getElementById('diagram').hidden = isList
+    document.getElementById('list').hidden = !isList
+    document.getElementById('zoom').hidden = isList
+    showFocusBar()
+  }
+
+  // List: 1 row per unit and per table, by group, with the relations as words and links to the other rows.
+
+  function jumpLink(key, text) {
+    var link = el('a', 'jump', text)
+    link.href = '#'
+    link.dataset.target = key
+    return link
+  }
+
+  /** The name of another unit as a row shows it: with its container when that is not the row's own. */
+  function linkName(id, units, container) {
+    var other = units[id]
+    if (!other) return id
+    return other.container === container ? other.name : other.container + '.' + other.name
+  }
+
+  function listRelations(unit, units) {
+    var list = el('ul', 'relations')
+    list.setAttribute('aria-label', 'Relations')
+    page.view.relations.forEach(function (relation) {
+      var side = relation.from === unit.id ? 0 : relation.to === unit.id ? 1 : -1
+      if (side < 0) return
+      var other = side === 0 ? relation.to : relation.from
+      var item = el('li')
+      item.dataset.anchor = 'relation'
+      item.dataset.id = relation.id
+      item.tabIndex = 0
+      item.appendChild(badge(relation.state))
+      item.appendChild(el('span', '', (RELATION_WORDS[relation.kind] || [relation.kind, relation.kind])[side] + ' '))
+      item.appendChild(jumpLink('u:' + other, linkName(other, units, unit.container)))
+      list.appendChild(item)
+    })
+    page.view.links.forEach(function (link) {
+      if (link.unit !== unit.id) return
+      var item = el('li')
+      item.appendChild(el('span', '', 'maps to table '))
+      item.appendChild(jumpLink('t:' + link.table, link.table))
+      list.appendChild(item)
+    })
+    return list
+  }
+
+  function listUnit(unit, units) {
+    var row = unitNode('li', 'row', unit)
+    var relations = listRelations(unit, units)
+    if (relations.children.length > 0) row.appendChild(relations)
+    return row
+  }
+
+  function listTable(table, units) {
+    var row = tableNode('li', 'row', table)
+    var entities = el('ul', 'relations')
+    page.view.links.forEach(function (link) {
+      if (link.table !== table.id) return
+      var item = el('li')
+      item.appendChild(el('span', '', 'mapped by '))
+      item.appendChild(jumpLink('u:' + link.unit, linkName(link.unit, units, null)))
+      entities.appendChild(item)
+    })
+    if (entities.children.length > 0) row.appendChild(entities)
+    return row
+  }
+
+  function listGroup(key, name, items, rowOf, headClass) {
+    var isClosed = isGroupClosed(key, false)
+    var group = el('section', 'list-group')
+    group.appendChild(groupHead(key, groupText(name, items, isClosed), isClosed, 'list-head ' + headClass))
+    if (isClosed) return group
+    var rows = el('ul', 'rows')
+    items.forEach(function (item) {
+      rows.appendChild(rowOf(item))
+    })
+    group.appendChild(rows)
+    return group
+  }
+
+  function renderList() {
+    var view = page.view
+    var list = document.getElementById('list')
+    var focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.focus : null
+    var units = {}
+    view.units.forEach(function (unit) {
+      units[unit.id] = unit
+    })
+    list.textContent = ''
+    if (page.filter !== 'tables')
+      view.containers.forEach(function (container) {
+        var members = container.units.map(function (id) {
+          return units[id]
+        })
+        list.appendChild(listGroup('c:' + container.id, container.id, members, function (unit) {
+          return listUnit(unit, units)
+        }, 'is-container'))
+      })
+    if (page.filter !== 'units' && view.tables.length > 0)
+      list.appendChild(listGroup('g:tables', 'Database tables', view.tables, function (table) {
+        return listTable(table, units)
+      }, 'is-tables'))
+    var count = view.units.length
+    setStatus('Listed ' + count + (count === 1 ? ' unit' : ' units') + ' and ' + view.tables.length + ' tables.')
+    var again = focused && list.querySelector('[data-focus="' + CSS.escape(focused) + '"]')
+    if (again) again.focus()
+  }
+
+  /** Goes to the row of a unit or a table in the list, and opens its group first when it is closed. */
+  function jumpTo(key) {
+    var list = document.getElementById('list')
+    var selector = '[data-focus="' + CSS.escape(key) + '"]'
+    if (!list.querySelector(selector)) {
+      var id = key.slice(2)
+      var group = key.indexOf('t:') === 0 ? 'g:tables' : null
+      page.view.containers.forEach(function (container) {
+        if (container.units.indexOf(id) >= 0) group = 'c:' + container.id
+      })
+      if (group) page.closed.list[group] = false
+      renderList()
+      renderComments()
+    }
+    var row = list.querySelector(selector)
+    if (!row) return setStatus('The filter hides ' + nameOf(key) + '.')
+    row.scrollIntoView({ block: 'center' })
+    row.focus({ preventScroll: true })
+    // A mouse click does not show the focus ring, so the row is marked for a moment.
+    row.classList.add('is-jumped')
+    setTimeout(function () {
+      row.classList.remove('is-jumped')
+    }, 1500)
+  }
+
+  /** Draws the view model again: after a new model, a mode, filter or focus change, or a group toggle. A newer draw wins. */
   function draw() {
     var view = page.view
     if (!view) return
     var drawing = ++page.drawing
+    showMode()
+    if (page.mode === 'list') {
+      renderList()
+      renderComments()
+      return
+    }
     var started = performance.now()
     var canvas = document.getElementById('canvas')
     var layer = document.getElementById('edges')
     // A draw replaces every element, so the focus goes back to the element with the same key.
     var focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.focus : null
+    if (page.focusAfterDraw !== undefined) {
+      focused = page.focusAfterDraw
+      page.focusAfterDraw = undefined
+    }
     Array.prototype.slice.call(canvas.children).forEach(function (child) {
       if (child !== layer) canvas.removeChild(child)
     })
     layer.textContent = ''
+    // The cards are measured at zoom 1, as ELK lays them out.
+    canvas.style.zoom = ''
     var parts = { heads: [], cards: [], edges: [] }
     var graph = graphOf(view, canvas, parts)
     elk
@@ -449,11 +927,13 @@
       .then(function (laid) {
         if (drawing !== page.drawing) return
         render(laid, parts, canvas, layer)
+        showZoom()
+        zoomAfter()
         renderComments()
         var units = view.units.length
         setStatus('Drew ' + units + (units === 1 ? ' unit' : ' units') + ' and ' + view.tables.length + ' tables in ' + Math.round(performance.now() - started) + ' ms.')
         var again = focused && canvas.querySelector('[data-focus="' + CSS.escape(focused) + '"]')
-        if (again) again.focus()
+        if (again) again.focus({ preventScroll: true })
         scrollToFirstContainer(canvas)
       })
       .catch(function (error) {
@@ -557,7 +1037,44 @@
     return window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2)
   }
 
+  /** The browser storage key of the panel's hidden state, the same for every review: a preference of the reviewer. */
+  var PANEL_KEY = 'visual-review:panel-hidden'
+
+  function isPanelHidden() {
+    return document.body.classList.contains('is-panel-hidden')
+  }
+
+  /** Hides or shows the comment panel; the storage can be off, and then the page forgets the choice on reload. */
+  function setPanelHidden(isHidden) {
+    document.body.classList.toggle('is-panel-hidden', isHidden)
+    document.getElementById('toggle-panel').setAttribute('aria-expanded', String(!isHidden))
+    updateToggleLabel()
+    try {
+      window.localStorage.setItem(PANEL_KEY, isHidden ? '1' : '0')
+    } catch (error) {
+      // The choice lasts until the page closes.
+    }
+  }
+
+  /** The hidden panel's button shows the count of new comments, so the reviewer sees that drafts wait. */
+  function updateToggleLabel() {
+    var drafts = page.comments.filter(function (comment) {
+      return comment.status === 'draft'
+    }).length
+    document.getElementById('toggle-panel').textContent = isPanelHidden() ? 'Show comments' + (drafts > 0 ? ' (' + drafts + ' new)' : '') : 'Hide comments'
+  }
+
+  function readPanelHidden() {
+    try {
+      return window.localStorage.getItem(PANEL_KEY) === '1'
+    } catch (error) {
+      return false
+    }
+  }
+
   function openForm(anchor, comment) {
+    // A comment needs the panel, so a click on an anchor shows it again.
+    if (isPanelHidden()) setPanelHidden(false)
     form.anchor = anchor
     form.editing = comment || null
     var node = document.getElementById('form')
@@ -644,6 +1161,7 @@
       })
     })
     document.getElementById('panel-title').textContent = 'Comments (' + lists.drafts.length + ' new)'
+    updateToggleLabel()
     Array.prototype.slice.call(document.querySelectorAll('.comment-count')).forEach(function (badge) {
       badge.remove()
     })
@@ -669,16 +1187,31 @@
     return node ? { kind: node.dataset.anchor, id: node.dataset.id } : null
   }
 
-  document.getElementById('canvas').addEventListener('click', function (event) {
-    var anchor = anchorAt(event.target)
-    if (anchor) openForm(anchor)
+  // The diagram and the list take the same clicks: a Focus button, a link to another row, else a comment anchor.
+  ;['canvas', 'list'].forEach(function (id) {
+    var node = document.getElementById(id)
+    node.addEventListener('click', function (event) {
+      var focusOn = event.target.closest('[data-focus-on]')
+      if (focusOn) return setFocus(page.focus === focusOn.dataset.focusOn ? null : focusOn.dataset.focusOn)
+      var jump = event.target.closest('a.jump')
+      if (jump) {
+        event.preventDefault()
+        return jumpTo(jump.dataset.target)
+      }
+      var anchor = anchorAt(event.target)
+      if (anchor) openForm(anchor)
+    })
+    node.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' || event.target.tagName === 'BUTTON' || event.target.tagName === 'A') return
+      var anchor = anchorAt(event.target)
+      if (!anchor) return
+      event.preventDefault()
+      openForm(anchor)
+    })
   })
-  document.getElementById('canvas').addEventListener('keydown', function (event) {
-    if (event.key !== 'Enter' || event.target.tagName === 'BUTTON') return
-    var anchor = anchorAt(event.target)
-    if (!anchor) return
-    event.preventDefault()
-    openForm(anchor)
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape' || !page.focus || page.mode === 'list' || event.target.closest('form')) return
+    setFocus(null)
   })
   document.getElementById('comment-review').addEventListener('click', function () {
     openForm({ kind: 'review', id: 'review' })
@@ -782,6 +1315,12 @@
   function show(view) {
     if (!view || view.version !== VIEW_VERSION) return setStatus('This page cannot read the view model. Run /visual-review again.', true)
     page.view = view
+    // A new model can lose the unit or table in focus; then the page shows everything.
+    if (page.focus) {
+      var id = page.focus.slice(2)
+      var items = page.focus.indexOf('u:') === 0 ? view.units : view.tables
+      if (!items.some(function (item) { return item.id === id })) page.focus = null
+    }
     page.comments = (view.comments || []).map(function (comment) {
       return Object.assign({}, comment)
     })
@@ -806,6 +1345,43 @@
       draw()
     })
   })
+
+  Array.prototype.slice.call(document.querySelectorAll('[data-mode]')).forEach(function (button) {
+    button.addEventListener('click', function () {
+      if (button.dataset.mode !== page.mode) setMode(button.dataset.mode)
+    })
+  })
+  document.getElementById('focus-clear').addEventListener('click', function () {
+    setFocus(null)
+  })
+  document.getElementById('zoom-in').addEventListener('click', function () {
+    setZoom(page.zoom * 1.25)
+  })
+  document.getElementById('zoom-out').addEventListener('click', function () {
+    setZoom(page.zoom / 1.25)
+  })
+  document.getElementById('zoom-fit').addEventListener('click', function () {
+    fit()
+  })
+  // Ctrl+wheel, and the pinch of a touchpad, zoom at the pointer.
+  document.getElementById('diagram').addEventListener(
+    'wheel',
+    function (event) {
+      if (!event.ctrlKey) return
+      event.preventDefault()
+      setZoom(page.zoom * Math.exp(-event.deltaY * 0.002), { x: event.clientX, y: event.clientY })
+    },
+    { passive: false },
+  )
+
+  document.getElementById('toggle-panel').addEventListener('click', function () {
+    setPanelHidden(!isPanelHidden())
+  })
+  if (readPanelHidden()) setPanelHidden(true)
+  enablePan(document.getElementById('diagram'))
+  page.mode = readMode()
+  if (page.mode === 'overview') page.zoomAfterDraw = 'fit'
+  showMode()
 
   // The static page sets window.VIEW before this script; the server page fetches the view model and follows its updates.
   if (window.VIEW) {

@@ -14,10 +14,13 @@
         <p id="base" class="base"></p>
       </div>
       <ul id="counts" class="counts" aria-label="Changes"></ul>
-      <div class="filter" role="group" aria-label="Show">
-        <button type="button" data-filter="both" aria-pressed="true">Units and tables</button>
-        <button type="button" data-filter="units" aria-pressed="false">Units</button>
-        <button type="button" data-filter="tables" aria-pressed="false">Tables</button>
+      <div class="controls">
+        <div class="filter" role="group" aria-label="Show">
+          <button type="button" data-filter="both" aria-pressed="true">Units and tables</button>
+          <button type="button" data-filter="units" aria-pressed="false">Units</button>
+          <button type="button" data-filter="tables" aria-pressed="false">Tables</button>
+        </div>
+        <button type="button" id="toggle-panel" aria-controls="panel" aria-expanded="true">Hide comments</button>
       </div>
     </header>
     <aside id="panel" class="panel" aria-labelledby="panel-title">
@@ -55,12 +58,30 @@
       </section>
     </aside>
     <main>
-      <p id="status" class="status" role="status">Loading the view model…</p>
-      <section id="diagram" class="diagram" aria-label="Design diagram">
+      <div class="bar">
+        <div class="filter" role="group" aria-label="View">
+          <button type="button" data-mode="overview" aria-pressed="false">Overview</button>
+          <button type="button" data-mode="diagram" aria-pressed="true">Diagram</button>
+          <button type="button" data-mode="list" aria-pressed="false">List</button>
+        </div>
+        <p id="status" class="status" role="status">Loading the view model…</p>
+        <p id="focus" class="focus" hidden>
+          <span id="focus-text"></span>
+          <button type="button" id="focus-clear">Show all</button>
+        </p>
+        <div id="zoom" class="zoom" role="group" aria-label="Zoom">
+          <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+          <span id="zoom-value" class="zoom-value">100%</span>
+          <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+          <button type="button" id="zoom-fit" title="Fit the diagram to the window">Fit</button>
+        </div>
+      </div>
+      <section id="diagram" class="diagram" aria-label="Design diagram. Drag to move it. Ctrl+wheel zooms." tabindex="0">
         <div id="canvas" class="canvas">
           <svg id="edges" class="edges" aria-hidden="true"></svg>
         </div>
       </section>
+      <section id="list" class="list" aria-label="Change list" hidden></section>
       <section id="other" class="other" aria-labelledby="other-title" hidden>
         <h2 id="other-title">Other files</h2>
         <ul id="other-list"></ul>
