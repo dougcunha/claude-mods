@@ -873,11 +873,38 @@ async function claimMove($: EngineInterface, move: 'compact' | 'clear'): Promise
   return isClaimed
 }
 
+/** What a compaction updates: the cache when the guard or the row follows it, the context bar when the Session section shows. */
+type CompactionNotes = { isCacheTracked: boolean; isSessionShown: boolean }
+
+/** The context total and the compaction count before a /compact runs, to tell afterwards whether session.compact noted it. */
+type CompactMark = { before: number | undefined; count: number }
+
+/** Counts a compaction of the main conversation, marks the cache compacted and reads the context again until it moves. */
+async function noteCompaction($: EngineInterface, before: number | undefined, notes: CompactionNotes): Promise<void> {
+  await update($, compactions, count => (count ?? 0) + 1)
+  if (notes.isCacheTracked) await update($, cache, state => withCompact(state ?? NO_CACHE))
+  if (notes.isSessionShown) refreshAfterCompact($, before)
+}
+
+async function markCompact($: EngineInterface): Promise<CompactMark> {
+  return { before: (await read($, contextState))?.total, count: await read($, compactions) }
+}
+
+/**
+ * Notes a /compact that ran when the session.compact hook did not count it: a managed plugin in a tier above can send
+ * session.compact past every user plugin, while the command still reaches the mod.
+ */
+async function noteMissedCompaction($: EngineInterface, mark: CompactMark, notes: CompactionNotes): Promise<void> {
+  if ((await read($, compactions)) === mark.count) await noteCompaction($, mark.before, notes)
+}
+
 /** Compacts the conversation and leaves the held prompt in the box, where Enter sends it over the shorter context. */
-async function compactHeld($: EngineInterface): Promise<void> {
+async function compactHeld($: EngineInterface, notes: CompactionNotes): Promise<void> {
   if (!(await claimMove($, 'compact'))) return
   try {
+    const mark = await markCompact($)
     await $.command.run({ command: 'compact' })
+    await noteMissedCompaction($, mark, notes).catch(() => undefined)
     await update($, cacheHold, () => null)
   } catch {
     $.ui.toast('session-info: the conversation was not compacted. The prompt is still in the box.')
@@ -984,6 +1011,7 @@ export const register: Register = (on, options) => {
   }
   /** The Session section draws the cache, and the guard reads it: either one needs the requests followed. */
   const isCacheTracked = shows.session || cacheOptions.isGuarded
+  const compactionNotes: CompactionNotes = { isCacheTracked, isSessionShown: shows.session }
 
   /** The pane's layout mode toggles the sections, so /config leaves out their thirteen show* rows. */
   on('config.describe', { key: ORDER.map(key => `session-info.${showOption(key)}`) }, async ($, e, next) => ({ ...(await next(e)), isHidden: true }))
@@ -1108,7 +1136,7 @@ export const register: Register = (on, options) => {
               </Box>
               <Text>{`Sending this prompt writes ${tokens(hold.tokens)} tokens of context to the cache again.`}</Text>
               <Box flexDirection="row">
-                <Button key="cache-compact" label="Compact" variant="primary" onPress={() => void compactHeld($).catch(() => undefined)} />
+                <Button key="cache-compact" label="Compact" variant="primary" onPress={() => void compactHeld($, compactionNotes).catch(() => undefined)} />
                 <Text>  </Text>
                 <Button key="cache-new" label="New session" onPress={() => void newSessionHeld($).catch(() => undefined)} />
                 <Text dimColor>  or press Enter to send it here</Text>
@@ -1357,13 +1385,19 @@ export const register: Register = (on, options) => {
   on('session.compact', async ($, e, next) => {
     const before = shows.session ? (await read($, contextState))?.total : undefined
     const compacted = await next(e)
-    if (e.agentId === undefined && e.trigger !== 'precompute' && 'messages' in compacted) {
-      await update($, compactions, count => (count ?? 0) + 1)
-      if (isCacheTracked) await update($, cache, state => withCompact(state ?? NO_CACHE))
-      if (shows.session) refreshAfterCompact($, before)
-    }
+    if (e.agentId === undefined && e.trigger !== 'precompute' && 'messages' in compacted) await noteCompaction($, before, compactionNotes)
 
     return compacted
+  })
+
+  // Where a managed plugin sends session.compact past the mod, a /compact is seen only here. No .catch fallback: the
+  // command has run once next(e) resolves, and a fallback calling next(e) again would compact twice.
+  on('command.run', { command: 'compact' }, async ($, e, next) => {
+    const mark = await markCompact($).catch(() => undefined)
+    const ran = await next(e)
+    if (mark !== undefined) await noteMissedCompaction($, mark, compactionNotes).catch(() => undefined)
+
+    return ran
   })
 
   if (shows.checks) {

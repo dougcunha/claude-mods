@@ -13,6 +13,7 @@ const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const MESSAGE = 'Now add the export button.'
 const CONTEXT = 200_000
+const SUMMARY = { role: 'user', text: 'summary', toolUses: [] }
 const PLAN_LIMITS = [{ kind: 'five_hour', percentUsed: 10 }]
 
 /** A request over a 200k context that read it from the cache. */
@@ -170,7 +171,8 @@ const breakdownOf = (total: number) => ({
 
 /**
  * The engine beneath the mod: a 200k context, plan limits when `hasPlan`, requests that answer `usage`, and keep-warm
- * pings that answer `ping`. /clear switches the session id and empties the prompt box.
+ * pings that answer `ping`. /clear switches the session id and empties the prompt box. /compact raises no
+ * session.compact, as where a managed plugin sends that event past the mod.
  */
 function world(
   on: On,
@@ -259,33 +261,67 @@ test('with the cache guard off a prompt over an expired cache enters', { options
   expect(entered).toEqual([MESSAGE])
 })
 
-test('Compact runs /compact and New session runs /clear and puts the prompt in the new box', async ($, on) => {
+test('Compact on the band lets the prompt in and the row re-caches the counted context where session.compact never reaches the mod', { options: QUIET }, async ($, on) => {
+  const counted = { tokens: CONTEXT }
+  const { clock, ran, entered } = world(on, { counted })
+  await start($)
+  await step($)
+  await clock.set(2 * HOUR)
+  await submit($)
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const pane = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 80 } })
+
+  counted.tokens = 30_000
+  await band.press({ key: 'cache-compact' })
+  await clock.advance(500)
+  const afterCompact = await band.find({ key: 'cache-new' })
+  const row = await pane.find({ type: 'Text', text: 'next prompt re-caches 30k' })
+  const count = await pane.find({ type: 'Text', text: / · 1 compaction$/ })
+  await submit($)
+
+  expect(ran).toEqual(['compact'])
+  expect(afterCompact).toBeUndefined()
+  expect(row).toBeDefined()
+  expect(count).toBeDefined()
+  expect(entered).toEqual([MESSAGE])
+  await pane.unmount()
+  await band.unmount()
+})
+
+test('New session runs /clear and puts the held prompt in the new box', async ($, on) => {
   const { clock, ran, filled } = world(on)
   await step($)
   await clock.set(2 * HOUR)
   await submit($)
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
 
-  await band.press({ key: 'cache-compact' })
-  const afterCompact = await band.find({ key: 'cache-new' })
-  await submit($, 'Another prompt.')
   await band.press({ key: 'cache-new' })
 
-  expect(afterCompact).toBeUndefined()
-  expect(ran).toEqual(['compact', 'clear'])
-  expect(filled).toEqual(['Another prompt.'])
+  expect(ran).toEqual(['clear'])
+  expect(filled).toEqual([MESSAGE])
   await band.unmount()
 })
 
-test('a /compact typed after a hold lets the next prompt in, though the live context reads empty until its reply', async ($, on) => {
-  const { clock, entered } = world(on, { live: 0 })
-  const summary = { role: 'user', text: 'summary', toolUses: [] }
-  on('session.compact', async () => ({ messages: [summary] }) as never)
+test('a /compact typed after a hold lets the next prompt in where session.compact never reaches the mod', async ($, on) => {
+  const { clock, entered } = world(on)
   await step($)
   await clock.set(2 * HOUR)
 
   await submit($)
-  await $.session.compact({ trigger: 'manual', messages: [summary] } as never)
+  await $.command.run({ command: 'compact', args: '', origin: { kind: 'composer' } } as never)
+  await submit($, 'Another prompt.')
+
+  expect(entered).toEqual(['Another prompt.'])
+})
+
+test('a /compact typed after a hold lets the next prompt in, though the live context reads empty until its reply', async ($, on) => {
+  const { clock, entered } = world(on, { live: 0 })
+  on('session.compact', async () => ({ messages: [SUMMARY] }) as never)
+  await step($)
+  await clock.set(2 * HOUR)
+
+  await submit($)
+  await $.session.compact({ trigger: 'manual', messages: [SUMMARY] } as never)
   await submit($, 'Another prompt.')
 
   expect(entered).toEqual(['Another prompt.'])
@@ -294,15 +330,14 @@ test('a /compact typed after a hold lets the next prompt in, though the live con
 test('after a compaction, until its reply, the cache row re-caches what /context counts, not the context before it', { options: QUIET }, async ($, on) => {
   const counted = { tokens: CONTEXT }
   const { clock } = world(on, { live: 0, counted })
-  const summary = { role: 'user', text: 'summary', toolUses: [] }
-  on('session.compact', async () => ({ messages: [summary] }) as never)
+  on('session.compact', async () => ({ messages: [SUMMARY] }) as never)
   await start($)
   await step($)
   await clock.set(2 * HOUR)
   const pane = await $.ui.mount({ ...PANE, surface: 'terminal', viewport: { columns: 100, rows: 80 } })
   const before = await pane.find({ type: 'Text', text: 'next prompt re-caches 200k' })
 
-  await $.session.compact({ trigger: 'manual', messages: [summary] } as never)
+  await $.session.compact({ trigger: 'manual', messages: [SUMMARY] } as never)
   counted.tokens = 30_000
   await clock.advance(500)
 
