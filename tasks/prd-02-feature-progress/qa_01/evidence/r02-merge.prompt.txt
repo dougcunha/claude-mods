@@ -1,0 +1,1 @@
+Call the tool mcp__feature-progress__report exactly once with this input and nothing else: {"feature":{"id":"qa-demo","state":"review","round":2},"tasks":[{"id":"T01","state":"done"}]}. Then print the exact text the tool returned, verbatim, and stop.

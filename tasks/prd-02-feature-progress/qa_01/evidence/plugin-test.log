@@ -1,0 +1,108 @@
+
+tests\band.test.ts:
+(pass) TC-14 FR-09 the band shows the open feature updated last, with its stage and count (terminal) [463.52ms]
+(pass) TC-14 FR-09 the band shows the open feature updated last, with its stage and count (desktop) [320.36ms]
+(pass) TC-14 FR-09 a done feature leaves the band to the next open one, and with none the band draws nothing [336.66ms]
+(pass) TC-14 DEC-06 the band draws above what the hooks beneath draw, and yields to a survey [189.43ms]
+(pass) TC-14 NFR-05 on a narrow band the meter goes, the title shortens and the stage and the count stay whole [209.70ms]
+(pass) TC-17 FR-14 the stale marker shows after the limit and a new report removes it [216.57ms]
+(pass) the icons option draws the glyph of its set [181.33ms]
+(pass) TC-26 FR-22 with showBand off the band draws nothing and leaves the hooks beneath [134.50ms]
+(pass) TC-26 DEC-13 /feature-progress band flips showBand through /config (from true) [196.76ms]
+(pass) TC-26 DEC-13 /feature-progress band flips showBand through /config (from false) [223.76ms]
+(pass) TC-26 DEC-13 a refused change answers the reason [141.59ms]
+
+tests\pane.test.ts:
+(pass) TC-16 FR-11 FR-12 the pane lists open features latest first and expanded, task rows and a collapsed Done section (terminal) [475.62ms]
+(pass) TC-16 FR-11 FR-12 the pane lists open features latest first and expanded, task rows and a collapsed Done section (desktop) [226.60ms]
+(pass) paneBackground paints the pane body in the terminal only (terminal) [198.00ms]
+(pass) paneBackground paints the pane body in the terminal only (desktop) [164.30ms]
+(pass) the pane body has no background by default [183.62ms]
+(pass) NFR-05 on a narrow pane the task details move under the title [174.81ms]
+(pass) FR-12 NFR-04 a labelled task row shows its glyph and the word for its kind (terminal) [251.16ms]
+(pass) FR-12 NFR-04 a labelled task row shows its glyph and the word for its kind (desktop) [226.29ms]
+(pass) TC-16 pressing a collapsed feature and the Done section expands them [281.46ms]
+(pass) TC-16 FR-18 an unreadable file shows a warning row, and an empty folder shows the empty state [153.77ms]
+(pass) TC-15 FR-10 /feature-progress opens the pane and a second run closes it; another argument prints the usage [105.54ms]
+(pass) TC-15 FR-10 pressing the band opens the pane [120.72ms]
+(pass) TC-15 FR-10 pressing the band while the pane is open keeps it open [106.07ms]
+(pass) TC-15 FR-16 Refresh reads the folder once more and shows a feature another session wrote [103.73ms]
+(pass) flip adds an id that is absent and removes one that is present [0.68ms]
+(pass) TC-19 FR-17 clean deletes the files of done features in the storage folder and toasts the count [215.78ms]
+(pass) TC-19 FR-17 a delete that fails reports the files that are left [140.38ms]
+(pass) TC-18 FR-15 pressing a task link opens its file [95.99ms]
+
+tests\paths.test.ts:
+(pass) a relative folder resolves from a Windows working directory with back slashes and spaces [5.24ms]
+(pass) a relative folder with ./ resolves from a POSIX working directory [1.08ms]
+(pass) an absolute folder stays as given, with forward slashes and no trailing slash [1.09ms]
+(pass) a drive letter, a POSIX root and a UNC share are absolute; a relative path is not [2.52ms]
+(pass) join puts one slash between a folder and a file name [1.62ms]
+
+tests\progress.test.ts:
+(pass) TC-06 FR-13 the count includes correction tasks [15.35ms]
+(pass) TC-06 FR-08 the reply names the stage with its round and the count [1.56ms]
+(pass) FR-09 the stage shows the label instead of the kind, and no round when none is set [1.37ms]
+(pass) TC-07 FR-14 an open feature past the limit is stale; waiting, done and a limit of 0 never are [2.42ms]
+(pass) TC-08 FR-09 FR-11 open features come latest first, done ones apart, and the band takes the latest open one [2.84ms]
+(pass) TC-08 FR-12 tasks without a group come first, then each group in the order it first appears [3.82ms]
+(pass) relative times and durations read in minutes, hours and days [13.09ms]
+(pass) NFR-05 a long title is cut with an ellipsis, and a short one stays whole [1.18ms]
+(pass) a meter fills its share of the cells, never more than all of them, and none for an empty total [1.40ms]
+(pass) NFR-04 a task stage keeps the word for its kind and adds the label [0.99ms]
+
+tests\register.test.ts:
+(pass) TC-05 FR-01 session start registers the report tool with the exact description [267.19ms]
+(pass) TC-05 FR-07 FR-08 a valid report writes the feature file and answers the stage and the count [179.45ms]
+(pass) TC-05 FR-05 an invalid report is refused with the field and nothing is written [181.17ms]
+(pass) TC-05 DEC-02 a report from a subagent is ignored and nothing is written [184.07ms]
+(pass) TC-12 DEC-03 a report merges with the file on disk, which another session changed [177.97ms]
+(pass) TC-12 FR-18 a report for an unreadable file is refused and the file stays the same [184.33ms]
+(pass) TC-12 a failure while saving refuses the call with the reason [253.12ms]
+(pass) TC-13 FR-16 session start reads the folder once, and timer ticks read nothing more [196.71ms]
+(pass) TC-13 DEC-09 after /clear the mod reads the folder again once the session id switched [216.71ms]
+
+tests\report.test.ts:
+(pass) TC-01 FR-01 a valid input becomes a report with the feature, the tasks and the removals [8.54ms]
+(pass) TC-01 FR-04 an input without feature.id is refused with a message that names the field [1.55ms]
+(pass) TC-01 DEC-04 a feature id with upper case, a slash or more than 64 characters is refused [1.74ms]
+(pass) TC-01 FR-05 an unknown state is refused with the list of the 9 kinds [1.09ms]
+(pass) TC-01 FR-04 steps with done above total, a round of 0 and a task id with a control character are refused [1.83ms]
+(pass) TC-01 a task id sent twice in one call is refused [0.98ms]
+(pass) TC-01 an input that is not an object, or tasks that is not an array, is refused [0.86ms]
+(pass) TC-02 FR-02 a new feature keeps its tasks in the order received, and a missing state is pending [1.96ms]
+(pass) TC-02 FR-02 a report with only one task state keeps the other fields and the order [2.40ms]
+(pass) TC-02 an empty string clears a text field and null clears steps and round [1.51ms]
+(pass) TC-02 FR-04 a new feature without a title, or a new task without a title, is refused [1.18ms]
+(pass) TC-03 FR-03 remove drops a known task and ignores an unknown id [1.05ms]
+(pass) TC-04 FR-06 pending, active, done, fixing sets startedAt once and sets then clears finishedAt [1.87ms]
+(pass) TC-04 a task that stays done keeps its first finishedAt [0.97ms]
+(pass) TC-04 DEC-07 a task change moves the feature updatedAt, and an untouched task keeps its own [1.68ms]
+
+tests\settings.test.ts:
+(pass) the manifest defaults apply to missing options [6.61ms]
+(pass) set options are kept [1.32ms]
+(pass) an empty folder, a negative limit, an unknown editor or icon set, a non-boolean showBand and a non-string background fall back to the defaults [0.98ms]
+
+tests\store.test.ts:
+(pass) TC-09 FR-07 the folder resolves from the working directory, and the file is named by the id [3.78ms]
+(pass) TC-09 a stored file round-trips through serialize and parseFeature [2.23ms]
+(pass) TC-09 FR-18 broken JSON, another schema version and a task without a state are unreadable [1.19ms]
+(pass) TC-09 FR-18 loadAll returns the features and a warning for each unreadable or misnamed file; folders and other files are skipped [2.11ms]
+(pass) TC-09 a missing folder has no features and no warnings [0.86ms]
+(pass) readOne tells a missing file from an unreadable one [0.64ms]
+(pass) TC-10 NFR-03 a feature whose file passes 4 MiB is refused [33.76ms]
+(pass) utf8Bytes counts 1 to 4 bytes per character [0.94ms]
+(pass) TC-11 FR-17 DEC-05 the delete argv names only the files; the folder stays out of the command line [1.45ms]
+
+tests\viewer.test.ts:
+(pass) TC-18 FR-15 the open argv per program and platform [6.71ms]
+(pass) TC-18 FR-15 auto opens a relative link in VS Code when code is on the PATH, else in the default program [2.15ms]
+(pass) TC-18 FR-15 system on Linux uses xdg-open without looking for code [1.38ms]
+(pass) TC-18 FR-15 a missing file toasts its path and starts nothing [1.40ms]
+(pass) a link with a character cmd reads as syntax never reaches cmd /c code [1.47ms]
+
+ 85 pass
+ 0 fail
+Ran 85 tests across 9 files. [4.86s]
+exit=0

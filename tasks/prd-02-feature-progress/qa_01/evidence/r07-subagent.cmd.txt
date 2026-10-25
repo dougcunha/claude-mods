@@ -1,0 +1,2 @@
+claude -p <prompt in r07-subagent.prompt.txt> --output-format stream-json --verbose --allowedTools Agent mcp__feature-progress__report --max-turns 4 --no-session-persistence --debug-file <scratchpad>/qa01-debug/r07-subagent.debug.log (excerpt: evidence/r07-subagent.debug-excerpt.log) (cwd C:/Users/Admin/AppData/Local/Temp/claude/D--MyProjects-claude-mods/3ed6a7fd-8dea-4a05-98a8-10103726ae6d/scratchpad/qa01-run)
+exit=0

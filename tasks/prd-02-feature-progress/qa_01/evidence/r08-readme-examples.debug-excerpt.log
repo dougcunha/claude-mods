@@ -1,0 +1,54 @@
+2026-10-25T18:14:01.322Z [DEBUG] Read hooks.json for plugin feature-progress (enabled=true): D:\MyProjects\claude-mods\feature-progress\hooks\hooks.json
+2026-10-25T18:14:01.364Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:03.842Z [DEBUG] Keeping C:\Users\Admin\.claude\plugins\cache\claude-mods\feature-progress: it still holds a directory, a symlink, a versioned archive or an entry of unknown type
+2026-10-25T18:14:06.185Z [DEBUG] hooks module feature-progress@claude-mods loaded (worker, environment 9, tier user); events: session.start,ui.render,session.end,command.run,tool.call
+2026-10-25T18:14:06.237Z [DEBUG] engine.create: no plugin-provided interfaces; $ built for cc-plugin-sec-default,env,savvy-progress,session-info,pets,mod-store,topic-guard,visual-review,feature-progress,chat-clean,cc-plugin-agents-md,cc-plugin-telemetry,cc-plugin-plugin-authoring,cc-plugin-you-should-know
+2026-10-25T18:14:06.275Z [DEBUG] plugin.register: feature-progress (user, feature-progress@claude-mods), judged by cc-plugin-sec-default: admitted
+2026-10-25T18:14:07.738Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:09.145Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:09.153Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:09.834Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:09.948Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:10.327Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:10.536Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:10.799Z [DEBUG] hooks module cc-plugin-sec-default@builtin (native): tool.register nested in feature-progress#0
+2026-10-25T18:14:10.801Z [DEBUG] $.tool.register (feature-progress): 1 tool(s) served at 127.0.0.1:60362/<secret>/feature-progress v1
+2026-10-25T18:14:10.801Z [DEBUG] $.tool.register (feature-progress): mcp__feature-progress__report (1 tool(s) on server "feature-progress"); connecting
+2026-10-25T18:14:10.812Z [DEBUG] MCP server "feature-progress": Initializing HTTP transport to http://127.0.0.1:60362/REDACTED/feature-progress?v=REDACTED
+2026-10-25T18:14:10.812Z [DEBUG] MCP server "feature-progress": Node version: v26.3.0, Platform: win32
+2026-10-25T18:14:10.812Z [DEBUG] MCP server "feature-progress": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2026-10-25T18:14:10.813Z [DEBUG] MCP server "feature-progress": HTTP transport options: {"url":"http://127.0.0.1:60362/REDACTED/feature-progress?v=REDACTED","headers":{"User-Agent":"claude-code/2.1.310 (sdk-cli)","Accept-Encoding":"identity"},"hasAuthProvider":true,"timeoutMs":60000}
+2026-10-25T18:14:10.813Z [DEBUG] MCP server "feature-progress": HTTP transport created successfully
+2026-10-25T18:14:10.814Z [DEBUG] MCP server "feature-progress": Starting connection with timeout of 30000ms
+2026-10-25T18:14:10.814Z [DEBUG] MCP server "feature-progress": Testing basic HTTP connectivity to http://127.0.0.1:60362/REDACTED/feature-progress?v=REDACTED
+2026-10-25T18:14:10.814Z [DEBUG] MCP server "feature-progress": Parsed URL: host=127.0.0.1, port=60362, protocol=http:
+2026-10-25T18:14:10.815Z [DEBUG] MCP server "feature-progress": Using loopback address: 127.0.0.1
+2026-10-25T18:14:10.858Z [DEBUG] MCP server "feature-progress": No token data found
+2026-10-25T18:14:10.866Z [DEBUG] MCP server "feature-progress": No token data found
+2026-10-25T18:14:10.871Z [DEBUG] MCP server "feature-progress": No token data found
+2026-10-25T18:14:10.874Z [DEBUG] MCP server "feature-progress": Successfully connected (transport: http) in 65ms
+2026-10-25T18:14:10.875Z [DEBUG] MCP server "feature-progress": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"hasResourceSubscribe":false,"serverVersion":{"name":"feature-progress","version":"plugin-tools-1"},"protocolEra":"legacy","negotiatedProtocolVersion":"2025-11-25"}
+2026-10-25T18:14:10.875Z [DEBUG] [MCP] Server "feature-progress" connected with subscribe=false
+2026-10-25T18:14:10.880Z [DEBUG] MCP server "feature-progress": No token data found
+2026-10-25T18:14:10.881Z [DEBUG] MCP server "feature-progress": No token data found
+2026-10-25T18:14:10.894Z [DEBUG] $.tool.register (feature-progress): mcp__feature-progress__report visible after 93ms
+2026-10-25T18:14:10.899Z [DEBUG] $.command.register (feature-progress): /feature-progress listed
+2026-10-25T18:14:10.901Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:11.009Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:11.017Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:11.556Z [DEBUG] Checking plugin feature-progress: skillsPath=none, skillsPaths=0 paths
+2026-10-25T18:14:11.563Z [DEBUG] hooks module env@davekiss, savvy-progress@claude-kit, session-info@claude-mods, pets@claude-pets, mod-store@mod-store, topic-guard@claude-mods, visual-review@claude-mods, feature-progress@claude-mods, chat-clean@skills-dir session.start settled in 3941.9ms (worker hop, next() included)
+2026-10-25T18:14:18.228Z [DEBUG] $.fs.write (feature-progress): C:\Users\Admin\AppData\Local\Temp\claude\D--MyProjects-claude-mods\3ed6a7fd-8dea-4a05-98a8-10103726ae6d\scratchpad\qa01-run\.claude\feature-progress\02-checkout.json (624 bytes)
+2026-10-25T18:14:18.230Z [DEBUG] feature-progress (user) answered tool.call without next() in 7.2ms; nothing beneath it ran for this dispatch
+2026-10-25T18:14:18.231Z [DEBUG] hooks module env@davekiss, session-info@claude-mods, pets@claude-pets, feature-progress@claude-mods, chat-clean@skills-dir tool.call settled in 12.3ms (worker hop, next() included)
+2026-10-25T18:14:18.231Z [DEBUG] tool.call mcp__feature-progress__report toolu_01AJMm2LdutbPm5o4E96mKYG: resolved by a hooks module (result)
+2026-10-25T18:14:21.547Z [DEBUG] $.fs.write (feature-progress): C:\Users\Admin\AppData\Local\Temp\claude\D--MyProjects-claude-mods\3ed6a7fd-8dea-4a05-98a8-10103726ae6d\scratchpad\qa01-run\.claude\feature-progress\02-checkout.json (716 bytes)
+2026-10-25T18:14:21.550Z [DEBUG] hooks module env@davekiss, session-info@claude-mods, pets@claude-pets, feature-progress@claude-mods, chat-clean@skills-dir tool.call settled in 10.4ms (worker hop, next() included)
+2026-10-25T18:14:21.551Z [DEBUG] tool.call mcp__feature-progress__report toolu_01XqAGynezf48RTufrRo7J8m: resolved by a hooks module (result)
+2026-10-25T18:14:24.102Z [DEBUG] $.fs.write (feature-progress): C:\Users\Admin\AppData\Local\Temp\claude\D--MyProjects-claude-mods\3ed6a7fd-8dea-4a05-98a8-10103726ae6d\scratchpad\qa01-run\.claude\feature-progress\02-checkout.json (954 bytes)
+2026-10-25T18:14:24.105Z [DEBUG] hooks module env@davekiss, session-info@claude-mods, pets@claude-pets, feature-progress@claude-mods, chat-clean@skills-dir tool.call settled in 12.9ms (worker hop, next() included)
+2026-10-25T18:14:24.106Z [DEBUG] tool.call mcp__feature-progress__report toolu_01VRjZ12oEFFgMjjzZQoZBf4: resolved by a hooks module (result)
+2026-10-25T18:14:26.541Z [DEBUG] MCP server "feature-progress": HTTP connection closed after 15s (cleanly)
+2026-10-25T18:14:26.542Z [DEBUG] MCP server "feature-progress": Cleared connection cache for reconnection
+2026-10-25T18:14:28.231Z [DEBUG] feature-progress (user) answered tool.call without next() 2 more times in the last 10s (the last in 6.9ms)
+2026-10-25T18:14:28.935Z [DEBUG] hooks module session-info@claude-mods, visual-review@claude-mods, feature-progress@claude-mods session.end settled in 5.5ms (worker hop, next() included)

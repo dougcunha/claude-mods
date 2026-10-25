@@ -17,6 +17,7 @@ Each mod lives in its own folder, and this repository is also a plugin marketpla
 | Mod | What it does | Command |
 | --- | --- | --- |
 | [**session-info**](session-info/) | One pane that shows the state of the session, the repository and the work Claude does. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info`, `/autopick` |
+| [**feature-progress**](feature-progress/) | Shows the progress of a feature while a spec-driven flow runs: a band with the stage and the count, and a pane with each task's state, round, steps and note. Any flow reports through one tool. | `/feature-progress [band\|clean]` |
 | [**topic-guard**](topic-guard/) | Before a prompt enters the session, a small model judges whether it starts a separate topic. Enter keeps it here; New session clears the session for it. | — |
 | [**visual-review**](visual-review/) | Shows the design of the changes against a base branch as a diagram in the browser: classes, relations, size, quality notes and database tables. Comment on it and send the review back to the session in one step. | `/visual-review [base]` |
 
@@ -38,6 +39,20 @@ The **session-info** pane shows:
 - 🧪 The status of the last build and test run, background runs included, with a prompt that asks Claude to fix a failure.
 - 🌿 The Git state of the repository and its submodules, with a treeview of its changed files.
 - 📝 A treeview of the files the session created, modified or deleted.
+
+<p align="center">
+  <img src="feature-progress/images/band.png" width="560" alt="The feature-progress band above the prompt: the feature title, a waiting chip, a meter and 26/29">
+</p>
+
+<p align="center">
+  <img src="feature-progress/images/pane-unicode.png" width="320" alt="The feature-progress pane: a feature card with its stage chip, a meter with the count and percent, and task rows grouped under Review #1">
+</p>
+
+The **feature-progress** pane and band show:
+
+- 📍 The open feature with its stage as a colored chip, a meter of the done tasks and the count, in a band above the prompt.
+- 🗂️ One card per feature, with each task's state, round, steps, time, note and a link to its file.
+- 🧩 Any spec-driven flow reports through one tool, `mcp__feature-progress__report`; the progress survives `/clear` and new sessions.
 
 ## 🚀 Install
 

@@ -19,6 +19,11 @@
       "description": "Before a prompt enters the session, a small model judges whether it starts a separate topic; Enter keeps it here, New session clears the session for it."
     },
     {
+      "name": "feature-progress",
+      "source": "./feature-progress",
+      "description": "A tool any spec-driven flow calls to report the progress of a feature and its tasks; a band above the prompt shows the stage and the count, and a pane lists every task."
+    },
+    {
       "name": "visual-review",
       "source": "./visual-review",
       "description": "The /visual-review command shows the design of the changes against a base branch as a diagram in the browser; comment on it and send the review back to the session in one step."

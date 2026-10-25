@@ -1,0 +1,60 @@
+{
+  "name": "feature-progress",
+  "version": "0.3.0",
+  "description": "A tool any spec-driven flow calls to report the progress of a feature and its tasks; a band above the prompt shows the stage and the count, and a pane lists every task with its state, round, steps and note.",
+  "author": {
+    "name": "Douglas Cunha",
+    "url": "https://github.com/dougcunha"
+  },
+  "homepage": "https://github.com/dougcunha/claude-mods/tree/main/feature-progress",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "folder": {
+      "type": "string",
+      "title": "Folder of the feature files",
+      "description": "Where the mod keeps one JSON file per feature, relative to the session's working directory or absolute. Empty uses .claude/feature-progress/.",
+      "default": ".claude/feature-progress/"
+    },
+    "staleMinutes": {
+      "type": "number",
+      "title": "Minutes before a feature is stale",
+      "description": "Minutes without a report before the band and the pane mark an open feature as stale. A waiting or done feature is never stale. 0 turns the marker off.",
+      "default": 30
+    },
+    "editor": {
+      "type": "string",
+      "title": "Program that opens a task link",
+      "description": "auto: VS Code when its code command is available, else the system's default program. vscode: always VS Code. system: always the system's default program.",
+      "default": "auto",
+      "options": [
+        "auto",
+        "vscode",
+        "system"
+      ]
+    },
+    "showBand": {
+      "type": "boolean",
+      "title": "Show the band",
+      "description": "Shows the open feature in a band above the prompt. Off hides the band; the pane, the reports and /feature-progress still work. /feature-progress band turns it on or off.",
+      "default": true
+    },
+    "paneBackground": {
+      "type": "string",
+      "title": "Pane background in the terminal",
+      "description": "A color for the body of the pane in the terminal, as hex (#2e3440) or a color name, for example your terminal's background. Leave empty to keep the color Claude Code draws. The desktop app ignores it.",
+      "default": ""
+    },
+    "icons": {
+      "type": "string",
+      "title": "Icon set",
+      "description": "The glyphs of the states in the band and the pane. unicode works everywhere; nerd needs a Nerd Font; emoji needs a terminal that draws emoji two cells wide.",
+      "default": "unicode",
+      "options": [
+        "unicode",
+        "nerd",
+        "emoji"
+      ]
+    }
+  }
+}
