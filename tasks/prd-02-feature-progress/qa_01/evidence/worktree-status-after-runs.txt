@@ -1,4 +1,0 @@
- M .claude-plugin/marketplace.json
- M README.md
-?? feature-progress/
-?? tasks/

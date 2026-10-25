@@ -1,2 +1,0 @@
-?? .claude/feature-progress/qa-demo.json
-?? README.md
