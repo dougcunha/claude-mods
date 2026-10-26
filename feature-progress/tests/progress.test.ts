@@ -53,13 +53,23 @@ test('TC-08 FR-09 FR-11 open features come latest first, done ones apart, and th
   expect(latestOpen({ old, recent, closed })?.id).toBe('recent')
 })
 
-test('TC-08 FR-12 tasks without a group come first, then each group in the order it first appears', () => {
-  const tasks = [task('T08', 'active', { group: 'Review #1' }), task('T01', 'done'), task('T12', 'pending', { group: 'QA #1' }), task('T09', 'done', { group: 'Review #1' })]
+test('TC-08 FR-12 tasks keep the order they were added: a group stands where its first task does, loose tasks between groups form their own block', () => {
+  const tasks = [
+    task('T01', 'done'),
+    task('T02', 'done'),
+    task('T08', 'active', { group: 'Review #1' }),
+    task('T03', 'pending'),
+    task('T12', 'pending', { group: 'QA #1' }),
+    task('T09', 'done', { group: 'Review #1' }),
+    task('T04', 'pending'),
+  ]
 
   expect(groupTasks(tasks).map(group => [group.name, group.tasks.map(item => item.id)])).toEqual([
-    [undefined, ['T01']],
+    [undefined, ['T01', 'T02']],
     ['Review #1', ['T08', 'T09']],
+    [undefined, ['T03']],
     ['QA #1', ['T12']],
+    [undefined, ['T04']],
   ])
 })
 

@@ -3,7 +3,7 @@ import type { Feature, Kind, Task } from '../types'
 /** The fields that name a stage: the kind, the flow's own label, and the round. */
 export type Staged = { state: Kind; label?: string; round?: number }
 
-/** The tasks of one group in the pane; `name` is undefined for the tasks without a group. */
+/** The tasks of one block in the pane; `name` is undefined for a run of tasks without a group. */
 export type TaskGroup = { name: string | undefined; tasks: Task[] }
 
 /** The open features, latest first, and the done ones, latest first. */
@@ -70,14 +70,20 @@ export function isStale(feature: Feature, now: number, minutes: number): boolean
   return now - timeOf(feature.updatedAt) > minutes * MINUTE_MS
 }
 
-/** The tasks without a group first, then one block per group in the order each first appears (FR-12). */
+/**
+ * The tasks in the order the flow added them (FR-12): each group is one block where its first task stands, and the
+ * tasks without a group between two blocks form a block of their own.
+ */
 export function groupTasks(tasks: Task[]): TaskGroup[] {
-  const names: string[] = []
-  for (const task of tasks) if (task.group !== undefined && !names.includes(task.group)) names.push(task.group)
-  const loose = tasks.filter(task => task.group === undefined)
-  const groups = names.map(name => ({ name, tasks: tasks.filter(task => task.group === name) }))
+  const blocks: TaskGroup[] = []
+  for (const task of tasks) {
+    const last = blocks.at(-1)
+    const block = task.group === undefined ? (last?.name === undefined ? last : undefined) : blocks.find(item => item.name === task.group)
+    if (block === undefined) blocks.push({ name: task.group, tasks: [task] })
+    else block.tasks.push(task)
+  }
 
-  return loose.length === 0 ? groups : [{ name: undefined, tasks: loose }, ...groups]
+  return blocks
 }
 
 /** A span of whole minutes as `5 min`, `2 h 10 min` or `3 d`. */

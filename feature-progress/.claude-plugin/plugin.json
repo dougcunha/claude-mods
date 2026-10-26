@@ -1,6 +1,6 @@
 {
   "name": "feature-progress",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A tool any spec-driven flow calls to report the progress of a feature and its tasks; a band above the prompt shows the stage and the count, and a pane lists every task with its state, round, steps and note.",
   "author": {
     "name": "Douglas Cunha",

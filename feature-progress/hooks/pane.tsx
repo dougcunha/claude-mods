@@ -185,7 +185,7 @@ function featureCard(parts: Parts, { feature, props, isOpenByDefault }: Block) {
       {isOpen ? (
         <Box flexDirection="column" marginTop={1}>
           {groupTasks(feature.tasks).map(group => (
-            <Box key={`feature-progress-group:${feature.id}:${group.name ?? ''}`} flexDirection="column">
+            <Box key={`feature-progress-group:${feature.id}:${group.name ?? `loose:${group.tasks[0]?.id ?? ''}`}`} flexDirection="column">
               {group.name === undefined ? null : groupTitle(parts, group.name, group.tasks)}
               {group.tasks.map(task =>
                 taskRow(parts, { task, now: props.now, icons: props.icons, isInline: props.columns >= INLINE_MIN_COLUMNS, onOpenLink: props.onOpenLink }),
