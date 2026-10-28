@@ -951,12 +951,20 @@ async function guardPrompt($: EngineInterface, e: { text: string; origin: { kind
   return { drop: holdText(hold) }
 }
 
-type OpenPaneArgs = { title: string; isGitShown: boolean; isSessionShown: boolean }
+type OpenPaneArgs = { title: string; isGitShown: boolean; isSessionShown: boolean; paneBackground: string }
 
-async function openPane($: EngineInterface, { title, isGitShown, isSessionShown }: OpenPaneArgs): Promise<{ text: string }> {
+/**
+ * The `backgroundColor` that `$.ui.open` takes from Claude Code 2.1.312, which its declarations do not list yet.
+ * A set `paneBackground` opens the pane transparent, so the frame around the body shows the terminal's color, not the theme's.
+ */
+function frameColor(paneBackground: string): { backgroundColor?: 'transparent' } {
+  return paneBackground === '' ? {} : { backgroundColor: 'transparent' }
+}
+
+async function openPane($: EngineInterface, { title, isGitShown, isSessionShown, paneBackground }: OpenPaneArgs): Promise<{ text: string }> {
   if (isGitShown) void refreshRepo($)
   if (isSessionShown) void refreshContext($).catch(() => undefined)
-  await $.ui.open({ id: PANE, title, focus: true })
+  await $.ui.open({ id: PANE, title, focus: true, ...frameColor(paneBackground) } as never)
 
   return { text: 'Session info pane opened.' }
 }
@@ -990,7 +998,7 @@ export const register: Register = (on, options) => {
   const paneTitle = customTitle(options.paneTitle)
   const paneTitleColor = titleColor(options.paneTitleColor)
   const paneTitleAlign = titleAlign(options.paneTitleAlign)
-  const openArgs: OpenPaneArgs = { title: paneTitle || DEFAULT_TITLE, isGitShown: shows.git, isSessionShown: shows.session }
+  const openArgs: OpenPaneArgs = { title: paneTitle || DEFAULT_TITLE, isGitShown: shows.git, isSessionShown: shows.session, paneBackground }
   const patterns: Patterns = { build: toPattern(options.buildPattern), test: toPattern(options.testPattern) }
   const isAlerting = options.alerts !== false
   const isSuggestingFix = shows.checks && options.suggestFix !== false
@@ -1063,7 +1071,7 @@ export const register: Register = (on, options) => {
       $.clock.after(5_000, () => void checkRival($).catch(() => undefined))
     }
     // The engine draws a pane that the person did not ask for only on a wide terminal; a narrow one keeps it until /session-info.
-    if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: openArgs.title })
+    if (isOpenOnStart && e.isInteractive) await $.ui.open({ id: PANE, title: openArgs.title, ...frameColor(paneBackground) } as never)
 
     return next(e)
   })

@@ -574,6 +574,18 @@ for (const openOnStart of [true, false]) {
   })
 }
 
+for (const paneBackground of ['#2e3440', undefined]) {
+  test(`the session-info command opens the pane ${paneBackground === undefined ? 'with the theme frame without' : 'transparent with'} paneBackground`, { options: paneBackground === undefined ? {} : { paneBackground } }, async ($, on) => {
+    const opened: unknown[] = []
+    on('session.cwd', async () => ({ value: '/repo' }))
+    on('process.run', async () => ({ value: ran('', 128) }))
+    on('ui.open', async (_, e) => (opened.push((e as { backgroundColor?: string }).backgroundColor), { value: { isPlaced: true } }))
+
+    await $.command.run({ command: 'session-info' } as never)
+    expect(opened).toEqual([paneBackground === undefined ? undefined : 'transparent'])
+  })
+}
+
 for (const surface of ['terminal', 'desktop'] as const) {
   test(`paneBackground paints the pane body in the terminal only (${surface})`, { options: { paneBackground: '#2e3440' } }, async ($, on) => {
     on('session.cwd', async () => ({ value: '/repo' }))
