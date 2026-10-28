@@ -98,9 +98,17 @@ async function report($: EngineInterface, settings: Settings, input: unknown): P
   return { result: replyText(next) }
 }
 
+/**
+ * The `backgroundColor` that `$.ui.open` takes from Claude Code 2.1.312, which its declarations do not list yet.
+ * A set `paneBackground` opens the pane transparent, so the frame around the body shows the terminal's color, not the theme's.
+ */
+function frameColor(paneBackground: string): { backgroundColor?: 'transparent' } {
+  return paneBackground === '' ? {} : { backgroundColor: 'transparent' }
+}
+
 /** Opens the pane with focus, or focuses it when it is open; a pane the terminal is too narrow for is reported (FR-10). */
-async function openPane($: EngineInterface): Promise<{ text: string }> {
-  const opened = await $.ui.open({ id: PANE_ID, title: PANE_TITLE, focus: true })
+async function openPane($: EngineInterface, settings: Settings): Promise<{ text: string }> {
+  const opened = await $.ui.open({ id: PANE_ID, title: PANE_TITLE, focus: true, ...frameColor(settings.paneBackground) } as never)
   if (!opened.isPlaced) {
     $.ui.toast(`${PLUGIN}: widen the terminal to open the pane.`)
     return { text: 'Feature progress pane waits for a wider terminal.' }
@@ -110,9 +118,9 @@ async function openPane($: EngineInterface): Promise<{ text: string }> {
 }
 
 /** Opens the pane, or closes it when it is open; the slash command's toggle (FR-10). */
-async function togglePane($: EngineInterface): Promise<{ text: string }> {
+async function togglePane($: EngineInterface, settings: Settings): Promise<{ text: string }> {
   const isOpen = (await $.ui.panes()).some(pane => pane.id === PANE_ID)
-  if (!isOpen) return openPane($)
+  if (!isOpen) return openPane($, settings)
   await $.ui.close({ id: PANE_ID })
 
   return { text: 'Feature progress pane closed.' }
@@ -173,7 +181,7 @@ export const register: Register = (on, options) => {
         isStale: isStale(feature, await $.clock.now(), settings.staleMinutes),
         columns: e.props.bodyColumns,
         icons: settings.icons,
-        onOpen: () => void openPane($).catch(() => $.ui.toast(`${PLUGIN}: could not open the pane.`)),
+        onOpen: () => void openPane($, settings).catch(() => $.ui.toast(`${PLUGIN}: could not open the pane.`)),
       },
     )
 
@@ -219,7 +227,7 @@ export const register: Register = (on, options) => {
   /** Gating: answers the command itself; a failure prints the reason instead of the command's output. */
   on('command.run', { command: COMMAND.name }, async ($, e) => {
     const argument = e.args.trim()
-    if (argument === '') return togglePane($)
+    if (argument === '') return togglePane($, settings)
     if (argument === 'band') return flipBand($, settings)
     if (argument === 'clean') return clean($, settings)
 

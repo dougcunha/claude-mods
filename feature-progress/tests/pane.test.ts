@@ -25,9 +25,9 @@ const BAND = {
 
 const keyOf = (path: string): string => path.replace(/\\/g, '/').replace(/^[a-zA-Z]:/, '')
 
-/** A storage folder in memory, the engine's band beneath the plugins, and its pane nouns; `reads` counts listings. */
+/** A storage folder in memory, the engine's band beneath the plugins, and its pane nouns; `reads` counts listings, `colors` the `backgroundColor` of each open. */
 function world(on: On, files: Record<string, string> = {}) {
-  const state = { listings: 0, panes: [] as string[], toasts: [] as string[] }
+  const state = { listings: 0, panes: [] as string[], toasts: [] as string[], colors: [] as unknown[] }
   on('session.cwd', async () => ({ value: '/repo' }))
   on('fs.exists', async (_, e) => ({ value: keyOf(e.path) === FOLDER ? Object.keys(files).length > 0 : keyOf(e.path) in files }))
   on('fs.read', async (_, e) => {
@@ -48,7 +48,7 @@ function world(on: On, files: Record<string, string> = {}) {
     return h(Box, { key: 'engine' }) as never
   })
   on('ui.panes', async () => ({ value: state.panes.map(id => ({ id, title: 'Feature progress', isShown: true, isFocused: true, isPlaced: true })) }) as never)
-  on('ui.open', async (_, e) => (state.panes.push(e.id), { value: { isPlaced: true } }) as never)
+  on('ui.open', async (_, e) => (state.panes.push(e.id), state.colors.push((e as { backgroundColor?: string }).backgroundColor), { value: { isPlaced: true } }) as never)
   on('ui.close', async (_, e) => ((state.panes = state.panes.filter(id => id !== e.id)), { value: undefined }) as never)
   on('ui.toast', async (_, e) => (state.toasts.push(String(e.text)), { value: undefined }))
 
@@ -106,6 +106,16 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(props.backgroundColor).toBe(surface === 'terminal' ? '#2e3440' : undefined)
     expect(props.minHeight).toBe(surface === 'terminal' ? 200 : undefined)
     await ui.unmount()
+  })
+}
+
+for (const paneBackground of ['#2e3440', undefined]) {
+  test(`/feature-progress opens the pane ${paneBackground === undefined ? 'with the theme frame without' : 'transparent with'} paneBackground`, { options: paneBackground === undefined ? {} : { paneBackground } }, async ($, on) => {
+    const state = world(on)
+
+    await $.command.run({ command: 'feature-progress', args: '' } as never)
+
+    expect(state.colors).toEqual([paneBackground === undefined ? undefined : 'transparent'])
   })
 }
 

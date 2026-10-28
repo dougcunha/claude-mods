@@ -164,7 +164,7 @@ Set them in `/config`, under the mod's name.
 | `staleMinutes` | `30` | Minutes without a report before an open feature shows `⚠ stale`. A `waiting` or `done` feature is never stale. `0` turns the marker off. |
 | `editor` | `auto` | The program the **open** button starts: `auto` (VS Code when its `code` command is on the `PATH`, else the system's default program), `vscode`, or `system`. |
 | `showBand` | `true` | Shows the band above the prompt. `false` hides it; `/feature-progress band` flips it. |
-| `paneBackground` | empty | A color for the body of the pane in the terminal: hex such as `#2e3440`, or a color name. Empty keeps the color Claude Code draws. The frame and the close row keep Claude Code's color, and the desktop app ignores it. |
+| `paneBackground` | empty | A color for the body of the pane in the terminal: hex such as `#2e3440`, or a color name. Empty keeps the colors Claude Code draws. A set value also opens the pane transparent (`backgroundColor: 'transparent'`, read by Claude Code 2.1.312 and later but not yet in its declarations), so the frame and the close row show the terminal's own background instead of the theme's. To make the frame and the body match, use your terminal's background. The desktop app ignores it. |
 | `icons` | `unicode` | The glyphs of the states: `unicode` works in every terminal, `nerd` needs a Nerd Font, `emoji` needs a terminal that draws emoji 2 cells wide. |
 
 ## 🚧 Limitations
