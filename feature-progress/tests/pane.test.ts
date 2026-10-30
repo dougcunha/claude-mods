@@ -94,8 +94,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-for (const surface of ['terminal', 'desktop'] as const) {
-  test(`paneBackground paints the pane body in the terminal only (${surface})`, { options: { paneBackground: '#2e3440' } }, async ($, on) => {
+for (const [surface, paneBackground] of [['terminal', '#2e3440'], ['terminal', 'transparent'], ['desktop', '#2e3440']] as const) {
+  test(`paneBackground ${paneBackground} paints the pane body in the terminal only (${surface})`, { options: { paneBackground } }, async ($, on) => {
     mock.clock(on, { now: NOW })
     world(on)
 
@@ -103,7 +103,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const [root] = await ui.findAll({ type: 'Box' })
     const props = (root as unknown as { props: Record<string, unknown> }).props
 
-    expect(props.backgroundColor).toBe(surface === 'terminal' ? '#2e3440' : undefined)
+    expect(props.backgroundColor).toBe(surface === 'terminal' ? paneBackground : undefined)
     expect(props.minHeight).toBe(surface === 'terminal' ? 200 : undefined)
     await ui.unmount()
   })

@@ -1,6 +1,6 @@
 {
   "name": "feature-progress",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "A tool any spec-driven flow calls to report the progress of a feature and its tasks; a band above the prompt shows the stage and the count, and a pane lists every task with its state, round, steps and note.",
   "author": {
     "name": "Douglas Cunha",
@@ -42,7 +42,7 @@
     "paneBackground": {
       "type": "string",
       "title": "Pane background in the terminal",
-      "description": "A color for the body of the pane in the terminal, as hex (#2e3440) or a color name, for example your terminal's background. It also drops the theme color of the frame around the pane, so the frame shows the terminal's own background. Leave empty to keep the colors Claude Code draws. The desktop app ignores it.",
+      "description": "A color for the body of the pane in the terminal, as hex (#2e3440) or a color name, for example your terminal's background, or transparent to follow the terminal's background whatever its theme. It also drops the theme color of the frame around the pane, so the frame shows the terminal's own background. Leave empty to keep the colors Claude Code draws. The desktop app ignores it.",
       "default": ""
     },
     "icons": {
