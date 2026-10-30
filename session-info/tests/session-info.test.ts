@@ -586,8 +586,8 @@ for (const paneBackground of ['#2e3440', undefined]) {
   })
 }
 
-for (const surface of ['terminal', 'desktop'] as const) {
-  test(`paneBackground paints the pane body in the terminal only (${surface})`, { options: { paneBackground: '#2e3440' } }, async ($, on) => {
+for (const [surface, paneBackground] of [['terminal', '#2e3440'], ['terminal', 'transparent'], ['desktop', '#2e3440']] as const) {
+  test(`paneBackground ${paneBackground} paints the pane body in the terminal only (${surface})`, { options: { paneBackground } }, async ($, on) => {
     on('session.cwd', async () => ({ value: '/repo' }))
     on('agent.list', async () => ({ value: [] }))
     on('session.usage', async () => usage([]))
@@ -595,7 +595,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface, props: { ...PANE.props, scroll: { offset: 0, bodyRows: 40 } } } as never)
     const [root] = await ui.findAll({ type: 'Box' })
     const props = (root as unknown as { props: Record<string, unknown> }).props
-    expect(props.backgroundColor).toBe(surface === 'terminal' ? '#2e3440' : undefined)
+    expect(props.backgroundColor).toBe(surface === 'terminal' ? paneBackground : undefined)
     expect(props.minHeight).toBe(surface === 'terminal' ? 40 : undefined)
     await ui.unmount()
   })
