@@ -604,6 +604,7 @@ After every shell command, the mod also checks that each listed file still exist
 
 - **PowerShell commands:** a file that was already modified before the command and is modified again is not detected. Outside a git repository, only deletions of files already in the list are detected.
 - **Mouse clicks** work in the fullscreen terminal. Elsewhere, use the keyboard.
+- **Pane position:** the pane docks beside the chat only in Claude Code's fullscreen layout, from 110 columns; elsewhere it opens above the prompt. `/session-info` and `/changes` check the layout and, when the pane will not dock, a toast says why: start Claude Code in the fullscreen layout (`CLAUDE_CODE_NO_FLICKER=1`), or widen the terminal. A mod cannot switch the layout, because Claude Code picks it as it starts.
 - **Tree scrolling** places each list in the pane from the rows the sections above it are expected to take, and the wheel finds a list within 2 rows of where the mod placed it. When the pane is taller than its window, a wheel just outside that margin scrolls the pane instead of the list.
 - **The diff viewer** runs as a child of the mod, so it closes when the mod reloads. On Linux the terminal window of the Git client does too.
 - **Binary files** are not handled. The snapshot stores text only.
@@ -664,6 +665,7 @@ claude --plugin-dir .
 | `hooks/client.ts` | Opens the Git client in a new terminal window |
 | `hooks/viewer.ts` | Opens a change: the editor for new files, the diff viewer for the rest |
 | `hooks/tree.ts` | Builds and flattens the tree |
+| `hooks/layout.ts` | The toast that says why the pane will not dock beside the chat |
 | `hooks/icons.ts` | Icon sets and status colors |
 | `hooks/patch.ts` | Reverses hunks to recover a file's previous content |
 | `hooks/host.ts` | The engine calls the helper modules use |

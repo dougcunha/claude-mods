@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
+import type { CommandPresentation, EngineInterface, Register, RenderChildren, RenderSurface, ToolCallResult } from 'claude-code'
 
 import type { AgentModel, AutoContinue, AutopickPick, AutopickSettings, AutopickWait, BackgroundTask, CacheHold, CacheState, ChangeStatus, CheckKind, Checks, CiRun, ContinueRun, CiWatch, ContextReading, Detail, FileChange, Guard, GuardRun, GuardSkip, InlineDiff, JiraIssue, KeepWarm, Repo, RepoFile, SkillUse, Todo, TurnRecord, VersionInfo } from '../types'
 
@@ -25,6 +25,7 @@ import { GUARD_STORE, guardReply, isBypassed, NO_GUARD, passedResults, reusable,
 import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
 import type { IconSet } from './icons'
+import { dockHint } from './layout'
 import { allowRequest, browseUrl, errorText, isAllowed, isIssueKey, isRefusal, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
 import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
@@ -961,10 +962,16 @@ function frameColor(paneBackground: string): { backgroundColor?: 'transparent' }
   return paneBackground === '' ? {} : { backgroundColor: 'transparent' }
 }
 
-async function openPane($: EngineInterface, { title, isGitShown, isSessionShown, paneBackground }: OpenPaneArgs): Promise<{ text: string }> {
+async function openPane(
+  $: EngineInterface,
+  { title, isGitShown, isSessionShown, paneBackground }: OpenPaneArgs,
+  presentation: CommandPresentation | undefined,
+): Promise<{ text: string }> {
   if (isGitShown) void refreshRepo($)
   if (isSessionShown) void refreshContext($).catch(() => undefined)
   await $.ui.open({ id: PANE, title, focus: true, ...frameColor(paneBackground) } as never)
+  const hint = dockHint(PANE, presentation)
+  if (hint !== undefined) $.ui.toast(hint)
 
   return { text: 'Session info pane opened.' }
 }
@@ -1203,9 +1210,9 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  on('command.run', { command: 'session-info' }, async $ => openPane($, openArgs))
+  on('command.run', { command: 'session-info' }, async ($, e) => openPane($, openArgs, e.presentation))
 
-  on('command.run', { command: 'changes' }, async $ => openPane($, openArgs))
+  on('command.run', { command: 'changes' }, async ($, e) => openPane($, openArgs, e.presentation))
 
   if (shows.autopick) on('command.run', { command: 'autopick' }, async ($, e) => runAutopick($, live, String(e.args ?? '')))
 

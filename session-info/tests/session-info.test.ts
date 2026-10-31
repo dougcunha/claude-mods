@@ -586,6 +586,26 @@ for (const paneBackground of ['#2e3440', undefined]) {
   })
 }
 
+for (const command of ['session-info', 'changes']) {
+  for (const [presentation, hint] of [
+    [{ isFullscreen: false, columns: 200 }, 'start Claude Code in the fullscreen layout'],
+    [{ isFullscreen: true, columns: 100 }, 'Widen the terminal to 110 columns'],
+    [{ isFullscreen: true, columns: 110 }, undefined],
+  ] as const) {
+    test(`/${command} ${hint === undefined ? 'warns of nothing when the pane docks' : 'warns when the pane will not dock'} (fullscreen ${presentation.isFullscreen}, ${presentation.columns} columns)`, async ($, on) => {
+      const toasts: string[] = []
+      on('session.cwd', async () => ({ value: '/repo' }))
+      on('process.run', async () => ({ value: ran('', 128) }))
+      on('ui.open', async () => ({ value: { isPlaced: true } }))
+      on('ui.toast', async (_, e) => (toasts.push(String(e.text)), { value: undefined }))
+
+      await $.command.run({ command, presentation } as never)
+      if (hint === undefined) expect(toasts.filter(text => text.includes('dock'))).toEqual([])
+      else expect(toasts).toContainEqual(expect.stringContaining(hint))
+    })
+  }
+}
+
 for (const [surface, paneBackground] of [['terminal', '#2e3440'], ['terminal', 'transparent'], ['desktop', '#2e3440']] as const) {
   test(`paneBackground ${paneBackground} paints the pane body in the terminal only (${surface})`, { options: { paneBackground } }, async ($, on) => {
     on('session.cwd', async () => ({ value: '/repo' }))
