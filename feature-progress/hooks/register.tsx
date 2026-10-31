@@ -1,10 +1,11 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
+import type { CommandPresentation, EngineInterface, Register, ToolCallResult } from 'claude-code'
 
 import type { Feature } from '../types'
 
 import { bandLine } from './band'
 import type { Host } from './host'
+import { dockHint } from './layout'
 import { flip, paneBody } from './pane'
 import { isStale, latestOpen, orderFeatures, replyText } from './progress'
 import { applyReport, parseReport } from './report'
@@ -106,21 +107,26 @@ function frameColor(paneBackground: string): { backgroundColor?: 'transparent' }
   return paneBackground === '' ? {} : { backgroundColor: 'transparent' }
 }
 
-/** Opens the pane with focus, or focuses it when it is open; a pane the terminal is too narrow for is reported (FR-10). */
-async function openPane($: EngineInterface, settings: Settings): Promise<{ text: string }> {
+/**
+ * Opens the pane with focus, or focuses it when it is open; a pane the terminal is too narrow for is reported (FR-10).
+ * From the command, a layout that will not dock the pane beside the chat is reported too.
+ */
+async function openPane($: EngineInterface, settings: Settings, presentation?: CommandPresentation): Promise<{ text: string }> {
   const opened = await $.ui.open({ id: PANE_ID, title: PANE_TITLE, focus: true, ...frameColor(settings.paneBackground) } as never)
   if (!opened.isPlaced) {
     $.ui.toast(`${PLUGIN}: widen the terminal to open the pane.`)
     return { text: 'Feature progress pane waits for a wider terminal.' }
   }
+  const hint = dockHint(PLUGIN, presentation)
+  if (hint !== undefined) $.ui.toast(hint)
 
   return { text: 'Feature progress pane opened.' }
 }
 
 /** Opens the pane, or closes it when it is open; the slash command's toggle (FR-10). */
-async function togglePane($: EngineInterface, settings: Settings): Promise<{ text: string }> {
+async function togglePane($: EngineInterface, settings: Settings, presentation: CommandPresentation | undefined): Promise<{ text: string }> {
   const isOpen = (await $.ui.panes()).some(pane => pane.id === PANE_ID)
-  if (!isOpen) return openPane($, settings)
+  if (!isOpen) return openPane($, settings, presentation)
   await $.ui.close({ id: PANE_ID })
 
   return { text: 'Feature progress pane closed.' }
@@ -227,7 +233,7 @@ export const register: Register = (on, options) => {
   /** Gating: answers the command itself; a failure prints the reason instead of the command's output. */
   on('command.run', { command: COMMAND.name }, async ($, e) => {
     const argument = e.args.trim()
-    if (argument === '') return togglePane($, settings)
+    if (argument === '') return togglePane($, settings, e.presentation)
     if (argument === 'band') return flipBand($, settings)
     if (argument === 'clean') return clean($, settings)
 

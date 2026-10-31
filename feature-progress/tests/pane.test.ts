@@ -201,6 +201,22 @@ test('TC-15 FR-10 /feature-progress opens the pane and a second run closes it; a
   expect(state.panes).toEqual([])
 })
 
+for (const [presentation, hint] of [
+  [{ isFullscreen: false, columns: 200 }, 'start Claude Code in the fullscreen layout'],
+  [{ isFullscreen: true, columns: 100 }, 'Widen the terminal to 110 columns'],
+  [{ isFullscreen: true, columns: 110 }, undefined],
+] as const) {
+  test(`/feature-progress ${hint === undefined ? 'warns of nothing when the pane docks' : 'warns when the pane will not dock'} (fullscreen ${presentation.isFullscreen}, ${presentation.columns} columns)`, async ($, on) => {
+    const state = world(on)
+
+    await $.command.run({ command: 'feature-progress', args: '', presentation } as never)
+
+    expect(state.panes).toEqual(['feature-progress'])
+    if (hint === undefined) expect(state.toasts).toEqual([])
+    else expect(state.toasts).toEqual([expect.stringContaining(hint)])
+  })
+}
+
 test('TC-15 FR-10 pressing the band opens the pane', async ($, on) => {
   mock.clock(on, { now: NOW })
   const state = world(on)

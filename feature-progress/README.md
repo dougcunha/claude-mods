@@ -154,6 +154,8 @@ A review round, its correction tasks, and the next stage:
 
 The pane opens at any width when you ask for it. When the terminal is too narrow, a toast says `feature-progress: widen the terminal to open the pane.`
 
+The pane docks beside the chat only in Claude Code's fullscreen layout, from 110 columns; elsewhere it opens above the prompt. `/feature-progress` checks the layout and, when the pane will not dock, a toast says why: start Claude Code in the fullscreen layout (`CLAUDE_CODE_NO_FLICKER=1`), or widen the terminal. A mod cannot switch the layout, because Claude Code picks it as it starts.
+
 ## 🔧 Settings
 
 Set them in `/config`, under the mod's name.
@@ -201,6 +203,7 @@ claude --plugin-dir ./feature-progress
 | `hooks/icons.ts` | The glyph of each state per icon set, and its color |
 | `hooks/viewer.ts`, `hooks/platform.ts` | Opening a link, and the platform |
 | `hooks/settings.ts` | The settings and their defaults |
+| `hooks/layout.ts` | The toast that says why the pane will not dock beside the chat |
 | `hooks/paths.ts`, `hooks/host.ts` | Path helpers, and the engine calls the helper modules use |
 | `types/index.d.ts` | The stored feature types and the `$.state` contract |
 
