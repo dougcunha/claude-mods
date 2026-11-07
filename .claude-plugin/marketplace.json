@@ -24,6 +24,11 @@
       "description": "A tool any spec-driven flow calls to report the progress of a feature and its tasks; a band above the prompt shows the stage and the count, and a pane lists every task."
     },
     {
+      "name": "session-cleanup",
+      "source": "./session-cleanup",
+      "description": "The /cleanup command lists the temporary files the session created and the Git items it left (uncommitted changes, changed submodules, a detached HEAD, unpushed commits); choose what to send to the trash and what to ask Claude to fix."
+    },
+    {
       "name": "visual-review",
       "source": "./visual-review",
       "description": "The /visual-review command shows the design of the changes against a base branch as a diagram in the browser; comment on it and send the review back to the session in one step."

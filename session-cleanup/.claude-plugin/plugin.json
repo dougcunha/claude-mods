@@ -1,0 +1,28 @@
+{
+  "name": "session-cleanup",
+  "version": "0.1.0",
+  "description": "The /cleanup command lists the temporary files the session created and the Git items it left (uncommitted changes, changed submodules, a detached HEAD, unpushed commits); choose what to send to the trash and what to ask Claude to fix.",
+  "author": {
+    "name": "Douglas Cunha",
+    "url": "https://github.com/dougcunha"
+  },
+  "homepage": "https://github.com/dougcunha/claude-mods/tree/main/session-cleanup",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "dependencies": ["session-info"],
+  "userConfig": {
+    "removeMode": {
+      "type": "string",
+      "title": "How Remove removes a file",
+      "description": "trash: the system trash (the Recycle Bin on Windows); a file the trash refuses goes to the quarantine folder. quarantine: move to ~/.claude/cleanup-quarantine, where each run is kept for the days below. delete: delete for good.",
+      "default": "trash",
+      "options": ["trash", "quarantine", "delete"]
+    },
+    "quarantineDays": {
+      "type": "number",
+      "title": "Days a quarantine run is kept",
+      "description": "When a session starts, the mod deletes the quarantine runs older than this many days.",
+      "default": 7
+    }
+  }
+}

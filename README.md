@@ -19,6 +19,7 @@ Each mod lives in its own folder, and this repository is also a plugin marketpla
 | [**session-info**](session-info/) | One pane that shows the state of the session, the repository and the work Claude does. Pressing a new file opens it in your editor; a changed or deleted one opens its diff. | `/session-info`, `/autopick` |
 | [**feature-progress**](feature-progress/) | Shows the progress of a feature while a spec-driven flow runs: a band with the stage and the count, and a pane with each task's state, round, steps and note. Any flow reports through one tool. | `/feature-progress [band\|clean]` |
 | [**topic-guard**](topic-guard/) | Before a prompt enters the session, a small model judges whether it starts a separate topic. Enter keeps it here; New session clears the session for it. | — |
+| [**session-cleanup**](session-cleanup/) | Lists the temporary files the session created and the Git items it left: uncommitted changes, changed submodules, a detached HEAD and unpushed commits. Choose what to send to the trash and what to ask Claude to fix. Needs session-info. | `/cleanup` |
 | [**visual-review**](visual-review/) | Shows the design of the changes against a base branch as a diagram in the browser: classes, relations, size, quality notes and database tables. Comment on it and send the review back to the session in one step. | `/visual-review [base]` |
 
 <p align="center">
