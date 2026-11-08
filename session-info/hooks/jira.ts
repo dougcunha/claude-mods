@@ -33,6 +33,48 @@ export function serverNames(spelled: string): string[] {
   return [...names, spelled]
 }
 
+const RETIRED = /deprecated|phased out|\/v1\/sse|streamable http/i
+const SIGNED_OUT = /\b401\b|unauthori[sz]ed|not authenticated|authenticat|oauth|token (?:is |has )?(?:expired|invalid)|expired token|invalid[_ ]token/i
+
+/** Whether a tool's answer says its server cannot serve any read (retired endpoint, no sign-in), so another server may. */
+export function isServerFailure(result: Content): boolean {
+  if (!result.isError) return false
+  const text = unwrap((result.content ?? []).map(block => block.text ?? '').join('\n').trim())
+
+  return RETIRED.test(text) || SIGNED_OUT.test(text)
+}
+
+/** The message inside a JSON error body (`{"error":"x"}`, `{"message":"x"}`, `{"error":{"message":"x"}}`), or the text as it came. */
+function unwrap(text: string): string {
+  try {
+    const parsed = JSON.parse(text) as unknown
+    const pick = (value: unknown): string | undefined => {
+      if (typeof value === 'string' && value.trim() !== '') return value
+      if (value === null || typeof value !== 'object') return undefined
+      const item = value as Record<string, unknown>
+
+      return pick(item.message) ?? pick(item.error) ?? pick(item.errorMessage) ?? pick(item.error_description)
+    }
+
+    return pick(parsed) ?? text
+  } catch {
+    return text
+  }
+}
+
+/**
+ * A failed read as a short sentence that says what to do. Known causes (a retired endpoint, a missing or expired
+ * sign-in, no access) get their own words; any other message keeps its first line.
+ */
+export function describeFailure(raw: string): string {
+  const text = unwrap(raw.trim())
+  if (RETIRED.test(text)) return 'The Atlassian MCP server uses a retired endpoint. Reconnect it in /mcp to move to https://mcp.atlassian.com/v2/mcp.'
+  if (SIGNED_OUT.test(text)) return 'Atlassian is not signed in. Run /mcp, pick the Atlassian server and authenticate.'
+  if (/\b403\b|forbidden/i.test(text)) return 'Atlassian denied access to this issue.'
+
+  return text.trim().split('\n')[0]?.trim().slice(0, 300) || 'The issue could not be read.'
+}
+
 /**
  * An error as the row shows it: without the engine's `HooksError: <plugin>:` lead, on one line. Auto mode's classifier
  * judges only calls a model request asked for, so it refuses the mod's own read: the row then says how to allow it.
@@ -42,7 +84,7 @@ export function errorText(error: unknown): string {
   const tool = /classifier gave no verdict for (\S+?):/.exec(message)?.[1]
   if (tool !== undefined) return `Auto mode cannot approve the mod's read: allow ${tool} in permissions.`
 
-  return message.replace(/^(?:HooksError:\s*)?(?:session-info:\s*)?/, '').trim().split('\n')[0]?.slice(0, 300) || 'The issue could not be read.'
+  return describeFailure(message.replace(/^(?:HooksError:\s*)?(?:session-info:\s*)?/, '').replace(/^\$\.mcp\.call\([^)]*\)\s*(?:failed|refused):\s*/, ''))
 }
 
 /** Whether a failed read was the permission check's refusal, which an allow rule for the tool lifts. */
@@ -92,7 +134,7 @@ export function mention(list: readonly JiraIssue[], key: string, at: number): Ji
 export const needsRead = (issue: JiraIssue | undefined, now: number): boolean =>
   issue === undefined || issue.readAt === undefined || issue.error !== undefined || now - issue.readAt > JIRA_FRESH_MS
 
-type Content = { content?: readonly { type: string; text?: string }[]; isError?: boolean }
+export type Content = { content?: readonly { type: string; text?: string }[]; isError?: boolean }
 
 const name = (value: unknown, field: string): string | undefined => {
   const item = value as Record<string, unknown> | null | undefined
@@ -122,9 +164,7 @@ export function readIssue(issue: JiraIssue, result: Content, now: number): JiraI
       ...(Number.isNaN(updated) ? {} : { updated }),
     }
   } catch (error) {
-    const message = (error instanceof Error ? error.message : String(error)).trim().split('\n')[0] || 'The issue could not be read.'
-
-    return { ...base, readAt: now, error: message.slice(0, 200) }
+    return { ...base, readAt: now, error: describeFailure(error instanceof Error ? error.message : String(error)) }
   }
 }
 

@@ -26,7 +26,7 @@ import type { Host } from './host'
 import { fileIcon, folderIcon, STATUS } from './icons'
 import type { IconSet } from './icons'
 import { dockHint } from './layout'
-import { allowRequest, browseUrl, errorText, isAllowed, isIssueKey, isRefusal, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
+import { allowRequest, browseUrl, type Content, errorText, isAllowed, isIssueKey, isRefusal, isServerFailure, issueDetail, issueKeys, JIRA_FIELDS, JIRA_ROOM, mention, needsRead, readIssue, readSite, serverNames, serverOf, siteSetting, statusColor, toKeyPattern } from './jira'
 import { age, branchText, codeParts, countParts, fileStatus, isConflict, ISSUE_COLOR, issueText, operationText, readRepo, repoRowCount, SUBMODULE_ROWS } from './repo'
 import { endSkills, isSameSkill, SKILL_ROOM, SKILL_STATUS, skillSummary, startSkill } from './skills'
 import { moveCard, ORDER, orderText, parseSectionOrder, parseTabGroups, showOption, TITLES } from './tabs'
@@ -110,7 +110,7 @@ let polling: Promise<void> | undefined
 /** The Jira site the reads go to, found once per load; the keys whose read runs now. */
 let jiraSite: { cloudId: string; url?: string } | undefined
 /** The name `$.mcp.call` took for the Jira server, found by the first call that went through. */
-let jiraName: string | undefined
+const jiraNames = new Map<string, string>()
 /** /clear commands run since this load; $.state starts over with each /clear, so the count lives here. */
 let clearCount = 0
 /** How long layout mode waits for the draw that adds the Sections checklist before it scrolls the pane to its end. */
@@ -591,13 +591,22 @@ async function findJiraServer($: EngineInterface): Promise<string | null> {
   return server
 }
 
+/** Every Atlassian server the session has a `getJiraIssue` tool of: the one that read last first. */
+async function jiraServers($: EngineInterface): Promise<string[]> {
+  const known = await read($, jiraServer)
+  const listed = [...new Set((await $.tool.list()).map(tool => serverOf(tool.name)).filter((name): name is string => name !== undefined))]
+
+  return known === null ? listed : [known, ...listed.filter(name => name !== known)]
+}
+
 /** Calls a tool of the Jira server by each name it may go by until one goes through; all failing, the first error stands. */
 async function callJira($: EngineInterface, server: string, tool: string, args: Record<string, unknown>) {
   let first: unknown
-  for (const name of jiraName === undefined ? serverNames(server) : [jiraName]) {
+  const known = jiraNames.get(server)
+  for (const name of known === undefined ? serverNames(server) : [known]) {
     try {
       const result = await $.mcp.call(name, tool, args)
-      jiraName = name
+      jiraNames.set(server, name)
 
       return result
     } catch (error) {
@@ -621,13 +630,40 @@ async function readJira($: EngineInterface, key: string, setting: unknown): Prom
   const store = (fn: (issue: JiraIssue) => JiraIssue) =>
     update($, jiraIssues, list => (list ?? []).map(issue => (issue.key === key ? fn(issue) : issue)))
   try {
-    const server = await findJiraServer($)
-    if (server === null) return void (await store(issue => ({ ...issue, readAt: Date.now(), error: 'No Atlassian MCP server is connected.' })))
-    const site = await findJiraSite($, server, setting)
-    if (site === undefined) return void (await store(issue => ({ ...issue, readAt: Date.now(), error: 'No Jira site found: set jiraSite.' })))
-    const result = await callJira($, server, 'getJiraIssue', { cloudId: site.cloudId, issueIdOrKey: key, fields: JIRA_FIELDS })
-    const url = browseUrl(site.url, key)
-    await store(issue => ({ ...readIssue(issue, result, Date.now()), ...(url === undefined ? {} : { url }) }))
+    await findJiraServer($)
+    const servers = await jiraServers($)
+    if (servers.length === 0) return void (await store(issue => ({ ...issue, readAt: Date.now(), error: 'No Atlassian MCP server is connected.' })))
+    // A server with a retired endpoint or no sign-in fails alone: the next Atlassian server reads the issue.
+    let failure: unknown
+    let refused: Content | undefined
+    for (const server of servers) {
+      try {
+        const site = await findJiraSite($, server, setting)
+        if (site === undefined) {
+          failure ??= new Error('No Jira site found: set jiraSite.')
+          continue
+        }
+        const result = await callJira($, server, 'getJiraIssue', { cloudId: site.cloudId, issueIdOrKey: key, fields: JIRA_FIELDS })
+        if (isServerFailure(result)) {
+          refused ??= result
+          continue
+        }
+        await update($, jiraServer, () => server)
+        const url = browseUrl(site.url, key)
+        await store(issue => ({ ...readIssue(issue, result, Date.now()), ...(url === undefined ? {} : { url }) }))
+
+        return
+      } catch (error) {
+        failure ??= error
+      }
+    }
+    if (refused !== undefined) {
+      const answer = refused
+      await store(issue => readIssue(issue, answer, Date.now()))
+
+      return
+    }
+    throw failure
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     // The row has room for one line; the transcript keeps the whole message.

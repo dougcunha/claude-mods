@@ -32,7 +32,9 @@ const text = (body: string, isError = false) => ({ content: [{ type: 'text', tex
 /** What the issue buttons asked the system to open, per test. */
 let opened: string[][] = []
 
-const pane = (on: Parameters<TestBody>[1], tools: string[], calls: { server: string; tool: string; args: Record<string, unknown> }[] = [], refusal?: string) => {
+type Call = { server: string; tool: string; args: Record<string, unknown> }
+
+const pane = (on: Parameters<TestBody>[1], tools: string[], calls: Call[] = [], refusal?: string, answer?: (call: Call) => unknown) => {
   on('session.cwd', async () => ({ value: '/repo' }))
   on('env.get', async () => ({ value: undefined }))
   on('process.spawn', async function* (_, e) {
@@ -48,6 +50,7 @@ const pane = (on: Parameters<TestBody>[1], tools: string[], calls: { server: str
   on('mcp.call', async (_, e) => {
     calls.push({ server: e.server, tool: e.tool, args: e.args })
     if (refusal !== undefined) return { deny: refusal } as never
+    if (answer !== undefined) return answer(e) as never
     // The engine knows a plugin's server by its /mcp name alone.
     if (e.server !== 'plugin:atlassian:atlassian') throw new Error(`no MCP server named ${e.server}`)
     if (e.tool === 'getAccessibleAtlassianResources')
@@ -221,4 +224,37 @@ test('a server goes by its /mcp names before the spelling of its tools', async (
   const verdict =
     'session-info: $.mcp.call(plugin:atlassian:atlassian, getJiraIssue) refused: The server-side auto mode classifier gave no verdict for mcp__plugin_atlassian_atlassian__getJiraIssue: the request did not ask for one.'
   expect(errorText(new Error(verdict))).toBe("Auto mode cannot approve the mod's read: allow mcp__plugin_atlassian_atlassian__getJiraIssue in permissions.")
+})
+
+test('a server with a retired endpoint hands the read to the next Atlassian server', { options: { jiraKeyPattern: 'WIN-\\d+', jiraSite: SITE } }, async ($, on) => {
+  const calls: { server: string; tool: string; args: Record<string, unknown> }[] = []
+  pane(on, ['mcp__claude_ai_Atlassian__getJiraIssue', TOOL], calls, undefined, call => {
+    if (call.server === 'claude.ai Atlassian')
+      return { value: text('This request was rejected because the deprecated HTTP+SSE transport at https://mcp.atlassian.com/v1/sse is being phased out.', true) }
+    if (call.server !== 'plugin:atlassian:atlassian') throw new Error(`no MCP server named ${call.server}`)
+
+    return { value: text(issueJson(String(call.args.issueIdOrKey))) }
+  })
+
+  await $.prompt.submit({ text: 'WIN-3252' } as never)
+  const ui = await mountRead($, 'terminal', 'In test')
+  expect(await ui.find({ type: 'Text', text: ' · Fix the login timeout' })).toBeDefined()
+  await ui.unmount()
+  expect(calls.map(call => call.server)).toEqual(['claude.ai Atlassian', 'plugin:atlassian:atlassian'])
+})
+
+test('known read failures become short sentences that say what to do', async () => {
+  const retired =
+    'This request was rejected because the deprecated HTTP+SSE transport at https://mcp.atlassian.com/v1/sse is being phased out. Point your MCP client to https://mcp.atlassian.com/v2/mcp.'
+  expect(readIssue({ key: 'WIN-1', at: 1 }, text(retired, true), 10).error).toBe(
+    'The Atlassian MCP server uses a retired endpoint. Reconnect it in /mcp to move to https://mcp.atlassian.com/v2/mcp.',
+  )
+  const signedOut = 'Unauthorized: the OAuth token has expired.'
+  expect(readIssue({ key: 'WIN-1', at: 1 }, text(JSON.stringify({ error: { message: signedOut } }), true), 10).error).toBe(
+    'Atlassian is not signed in. Run /mcp, pick the Atlassian server and authenticate.',
+  )
+  expect(errorText(new Error(`session-info: $.mcp.call(plugin:atlassian:atlassian, getJiraIssue) failed: ${signedOut}`))).toBe(
+    'Atlassian is not signed in. Run /mcp, pick the Atlassian server and authenticate.',
+  )
+  expect(readIssue({ key: 'WIN-1', at: 1 }, text('{"message":"Issue does not exist"}', true), 10).error).toBe('Issue does not exist')
 })
