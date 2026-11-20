@@ -1,0 +1,13 @@
+catalog: dougcunha/agent-skills
+
+bundles:
+  - core
+  - sdd
+  - ts
+
+sources:
+  - repo: mattpocock/skills
+    skills:
+      - grill-me
+      - grill-with-docs
+      - grilling
